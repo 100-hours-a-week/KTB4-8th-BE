@@ -130,6 +130,9 @@ jobs:
       #
       # 테스트 실패 또는 Application Build 실패 시
       # 이후 Docker Image Build로 넘어가지 않는다.
+      #
+      # TODO(Test): CI에서 외부 MySQL 없이 실행 가능한 test Profile을 구성한다.
+      # H2 또는 Testcontainers 중 프로젝트 정책에 맞는 방식을 선택한다.
       - name: Test and application build
         run: ./gradlew --no-daemon build
 
@@ -186,6 +189,9 @@ jobs:
       #
       # ECR에 저장되는 Image와 동일한 main Commit 기준으로
       # Test / Application Build 성공 여부를 보장한다.
+      #
+      # TODO(Test): CI 전용 Datasource 구성이 완료되면 외부 환경에 의존하지
+      # 않는 Context Test와 Repository Test를 추가한다.
       - name: Test and application build
         run: ./gradlew --no-daemon build
 

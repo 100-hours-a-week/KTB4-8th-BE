@@ -1,0 +1,37 @@
+# Git 이력
+**/.git
+
+# 개발 도구의 로컬 설정
+**/.idea
+**/.vscode
+**/*.iml
+
+#로컬 Gradle 캐시와 빌드 결과
+# Docker 안에서 새로 빌드하므로 전달하지 않는다
+**/.gradle
+**/build
+**/out
+
+# 로컬 환경변수와 인증 정보
+# TODO(Security): 이 규칙은 Docker Build Context만 제외한다.
+# Git 추적 방지는 .gitignore에서도 별도로 관리한다.
+**/.env
+**/.env.*
+**/.aws
+**/.ssh
+
+# 인증서·개인 키·키 저장소
+# 운영에 필요한 파일은 실행 시 별도로 공급
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+
+# 로그와 JVM 진단 파일
+**/*.log
+**/*.hprof
+**/hs_err_pid*
+
+# macOS에서 생성하는 파일
+**/.DS_Store
