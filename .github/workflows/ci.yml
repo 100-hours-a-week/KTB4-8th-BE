@@ -3,16 +3,9 @@ name: Backend CI
 # ------------------------------------------------------------
 # CI 정책
 # ------------------------------------------------------------
-# 1) feature/* Push
-#    - 개발 중 빠른 피드백을 위해 Test만 수행한다.
-#
-# 2) main 대상 Pull Request
-#    - Gradle Build와 Docker Image Build를 모두 검증한다.
-#    - GitHub Branch Protection에서 ci-gate를 Required Check로 설정한다.
-#
-# 3) main Merge
-#    - 최종 main Commit을 다시 검증한다.
-#    - 검증된 Docker Image를 Commit SHA Tag로 ECR에 저장한다.
+# main Push
+# - Gradle Build와 Docker Image Build를 검증한다.
+# - 검증된 Docker Image를 Commit SHA Tag로 ECR에 저장한다.
 #
 # 이 Workflow는 Production EC2에는 배포하지 않는다.
 # 실제 Production 배포는 Cloud Repository의 CD Workflow에서 수행한다.
@@ -23,17 +16,13 @@ name: Backend CI
 on:
   push:
     branches:
-      - 'feature/**'
       - main
 
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
-
+# main에 새로운 Commit이 Push되면 이전 Commit의 CI를 취소하고
+# 최신 Commit만 검증 및 발행한다.
+concurrency:
+  group: backend-main
+  cancel-in-progress: true
 
 # ------------------------------------------------------------
 # 기본 GitHub Token 권한
@@ -46,110 +35,6 @@ permissions:
 
 
 jobs:
-
-  # ============================================================
-  # 1. Feature Branch CI
-  # ============================================================
-
-  feature-check:
-    name: Feature - Fast Check
-
-    if: >
-      github.event_name == 'push' &&
-      startsWith(github.ref, 'refs/heads/feature/')
-
-    runs-on: ubuntu-latest
-
-    # 같은 Feature Branch에 새로운 Commit이 Push되면
-    # 이전 Commit의 CI는 더 이상 의미가 없으므로 취소한다.
-    concurrency:
-      group: backend-feature-${{ github.ref }}
-      cancel-in-progress: true
-
-    steps:
-
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Set up Java 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      # Gradle Dependency 등을 캐시하여
-      # 반복 CI 실행 시 다운로드 시간을 줄인다.
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Grant execute permission to Gradle Wrapper
-        run: chmod +x ./gradlew
-
-      # Feature 개발 중에는 빠른 피드백이 목적이다.
-      # Docker Image까지 매번 생성하지 않고 Test만 수행한다.
-      - name: Run tests
-        run: ./gradlew --no-daemon test
-
-
-  # ============================================================
-  # 2. Pull Request CI
-  # ============================================================
-
-  pr-gate:
-    name: ci-gate
-
-    if: github.event_name == 'pull_request'
-
-    runs-on: ubuntu-latest
-
-    # 같은 PR에 새로운 Commit이 Push되면
-    # 이전 PR 검증은 취소하고 최신 Commit을 검증한다.
-    concurrency:
-      group: backend-pr-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
-
-    steps:
-
-      - name: Checkout PR source
-        uses: actions/checkout@v4
-
-      - name: Set up Java 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Grant execute permission to Gradle Wrapper
-        run: chmod +x ./gradlew
-
-      # Gradle build를 통해
-      # Test + Application Build + bootJar 생성을 함께 검증한다.
-      #
-      # 테스트 실패 또는 Application Build 실패 시
-      # 이후 Docker Image Build로 넘어가지 않는다.
-      #
-      # TODO(Test): CI에서 외부 MySQL 없이 실행 가능한 test Profile을 구성한다.
-      # H2 또는 Testcontainers 중 프로젝트 정책에 맞는 방식을 선택한다.
-      - name: Test and application build
-        run: ./gradlew --no-daemon build
-
-      # 실제 Backend Dockerfile을 이용해
-      # Docker Image가 정상적으로 생성되는지 확인한다.
-      #
-      # PR에서는 검증만 수행하며 ECR에는 Push하지 않는다.
-      - name: Build Docker image
-        run: |
-          docker build \
-            --tag keepgo-backend:pr-${{ github.event.pull_request.number }} \
-            .
-
-
-  # ============================================================
-  # 3. Main Branch CI + ECR 등록
-  # ============================================================
 
   main-image:
     name: Main - Build and Push Image
@@ -182,12 +67,7 @@ jobs:
       - name: Grant execute permission to Gradle Wrapper
         run: chmod +x ./gradlew
 
-      # PR에서 이미 검증했더라도 main Commit을 다시 검증한다.
-      #
-      # Merge Commit 또는 Squash Commit으로 인해
-      # PR에서 검증했던 SHA와 최종 main SHA가 달라질 수 있기 때문이다.
-      #
-      # ECR에 저장되는 Image와 동일한 main Commit 기준으로
+      # ECR에 저장되는 Image와 동일한 main Commit을 기준으로
       # Test / Application Build 성공 여부를 보장한다.
       #
       # TODO(Test): CI 전용 Datasource 구성이 완료되면 외부 환경에 의존하지
