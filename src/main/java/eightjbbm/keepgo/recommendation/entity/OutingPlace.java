@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.file.entity.File;
+import eightjbbm.keepgo.util.File;
 import jakarta.persistence.*;
 import lombok.NoArgsConstructor;
 

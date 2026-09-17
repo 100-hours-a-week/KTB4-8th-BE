@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.member.entity;
 
-import eightjbbm.keepgo.file.entity.File;
+import eightjbbm.keepgo.util.File;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,4 +21,16 @@ public class Member {
     private File profileImage;
 
     private Instant deletedAt;
+
+    public void updateNickname(String newNickname) {
+        if (!this.nickname.equals(newNickname)) {
+            this.nickname = newNickname;
+        }
+    }
+
+    public void updateProfileImage(File newProfileImage) {
+        if (!this.profileImage.getId().equals(newProfileImage.getId())) {
+            this.profileImage = newProfileImage;
+        }
+    }
 }

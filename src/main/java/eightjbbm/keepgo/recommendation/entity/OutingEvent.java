@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.file.entity.File;
+import eightjbbm.keepgo.util.File;
 import jakarta.persistence.*;
 import lombok.NoArgsConstructor;
 
@@ -9,6 +9,7 @@ import java.time.Instant;
 @Entity
 @NoArgsConstructor
 public class OutingEvent {
+
     @Id @GeneratedValue
     private Long id;
 
