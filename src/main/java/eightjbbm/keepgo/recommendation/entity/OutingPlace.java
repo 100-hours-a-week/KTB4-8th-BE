@@ -5,18 +5,12 @@ import jakarta.persistence.*;
 import lombok.NoArgsConstructor;
 
 @Entity
+@DiscriminatorValue("PLACE")
 @NoArgsConstructor
-public class OutingPlace {
-
-    @Id @GeneratedValue
-    private Long id;
-
-    @OneToOne
-    @JoinColumn(name = "image_id")
-    private File attachedImage;
-
-    //private PlaceCategory category;
-    private String name;
-    private String description;
+public class OutingPlace extends OutingGuide {
     private String googlePlaceId;
+
+    public OutingPlace(String category, String name, String description) {
+        super(category, name, description);
+    }
 }
