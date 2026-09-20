@@ -3,16 +3,22 @@ package eightjbbm.keepgo.member.service;
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.util.AiServerClient;
 import eightjbbm.keepgo.util.File;
 import eightjbbm.keepgo.util.FileRepository;
+import eightjbbm.keepgo.util.YoutubeApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
+    private final YoutubeApiClient youtubeApiClient;
+    private final AiServerClient aiServerClient;
 
     public UpdateMemberInfoResult updateMemberInfo(
             UpdateMemberInfoCommand command
@@ -34,7 +40,7 @@ public class MemberService {
             GetMemberInfoCommand command
     ) {
         /*
-        회원 정보 조회 API
+        회원 정보 조회 API (구현 완료)
         1. authentication에서 회원 정보 추출
         2. 회원의 닉네임, 프로필 사진 주소, 이메일 주소 반환
         */
@@ -52,6 +58,10 @@ public class MemberService {
         3. 조회된 목록을 바탕으로 AI 서버에게 분석 요청
         4. 모든 영상 분석 완료 시 완료 응답 반환
         */
+        List<String> urls = youtubeApiClient.retrieveLikedVideos(command.userId());
+        for (String url: urls) {
+            aiServerClient.analyzeVideo(url);
+        }
 
         return null;
     }
