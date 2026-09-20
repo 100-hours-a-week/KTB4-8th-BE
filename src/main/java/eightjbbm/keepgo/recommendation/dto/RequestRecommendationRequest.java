@@ -1,14 +1,17 @@
 package eightjbbm.keepgo.recommendation.dto;
 
-import jakarta.validation.constraints.NotBlank;
-
-import java.time.Instant;
-
+/// @param lat
+/// @param lng
+/// @param location
+/// @param scheduledTimeSlot
+/// @param availableTimeDuration
+/// @param category
 public record RequestRecommendationRequest(
-        @NotBlank String availableTime,
-        @NotBlank String category,
-        @NotBlank Double originLat,
-        @NotBlank Double originLng,
-        @NotBlank Instant requestedTime
+        Float lat,
+        Float lng,
+        String location,
+        String scheduledTimeSlot,
+        String availableTimeDuration,
+        String category
 ) {
 }
