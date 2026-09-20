@@ -13,4 +13,8 @@ public class File {
     @Id @GeneratedValue
     private Long id;
     private String storagePath;
+
+    public File(String storagePath) {
+        this.storagePath = storagePath;
+    }
 }

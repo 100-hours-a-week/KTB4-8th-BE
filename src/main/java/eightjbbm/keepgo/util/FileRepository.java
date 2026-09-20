@@ -7,5 +7,5 @@ import java.util.Optional;
 
 @Repository
 public interface FileRepository extends JpaRepository<File, Long> {
-    public Optional<File> findByStoragePath(String storagePath);
+    Optional<File> findByStoragePath(String storagePath);
 }

@@ -1,41 +1,52 @@
 package eightjbbm.keepgo.util;
 
+import eightjbbm.keepgo.util.dto.SearchAddressByKeywordResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.apache.tomcat.util.http.fileupload.FileUploadException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+@RequestMapping("/api/v1")
 @RestController
 @RequiredArgsConstructor
 public class UtilController {
 
-    @PostMapping()
-    public void uploadFile() {
-        /*
-        파일 업로드 API
-        요청 본문: 파일(아마 Multipart)
-        응답 본문: 파일 주소
-        이건 교재를 좀 더 봐야할 듯.
-         */
+    private final LocationSearchClient locationSearchClient;
+    private final FileService fileService;
+
+     /// 프로필 사진 업로드 API
+     ///
+     /// 구현 1차적으로 완료
+     /// @param jwt
+     /// @param file
+    @PostMapping("/user/profile-image")
+    public ResponseEntity<Void> uploadProfileImage(@AuthenticationPrincipal Jwt jwt, @RequestPart("profileImage") MultipartFile file) throws FileUploadException {
+
+        Long userId = Long.valueOf(jwt.getSubject());
+        String uploadPath = fileService.uploadProfileImage(file, userId);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .header("Location", uploadPath)
+                .build();
     }
 
-    @GetMapping
-    public void readFile() {
-        /*
-        파일 조회 API
-        요청 본문: 파일 주소?
-        응답 본문: 파일
-        이것도 교재를 좀 더 보기.
-         */
-    }
+    /// 지역 검색 API
+    ///
+    /// (현재 프론트에게 기능 위임 논의 중)
+    /// @param query 검색할 키워드
+    /// @return {@link SearchAddressByKeywordResponse}
+    @GetMapping("/address")
+    public ResponseEntity<Void> searchAddressByKeyword(@RequestParam String query) {
 
-    @GetMapping
-    public void searchAddressByKeyword() {
-        /*
-        지역 검색 API
-        요청 본문: 검색 키워드
-        1. 지역 검색 API를 호출하여 키워드 검색 진행
-        2. 결과 반환
-         */
+        locationSearchClient.searchByKeyword(query);
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .build();
     }
 }
