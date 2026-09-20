@@ -19,14 +19,6 @@ public class RecommendationService {
         return null;
     }
 
-    public GetRecommendationCourseInfoResult getRecommendationCourseInfo(GetRecommendationCourseInfoCommand command) {
-        /*
-        여정 코스 추천 결과 조회 API
-        그럼 그냥 목록이랑 단건조회용을 싹 다 몰아넣자.
-        */
-        return null;
-    }
-
     public StopRecommendationResult stopRecommendation(StopRecommendationCommand command) {
         /*
         여정 코스 추천 중단 API
