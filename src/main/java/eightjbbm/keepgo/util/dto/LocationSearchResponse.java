@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
