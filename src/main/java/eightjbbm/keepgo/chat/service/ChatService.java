@@ -5,6 +5,7 @@ import eightjbbm.keepgo.chat.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.util.AiServerClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ import java.util.List;
 public class ChatService {
     private final MemberRepository memberRepository;
     private final ChatRepository chatRepository;
+    private final AiServerClient aiServerClient;
 
     public SendChatResult sendChat(SendChatCommand command) {
         /*
@@ -25,7 +27,7 @@ public class ChatService {
         */
         Member member = memberRepository.findById(command.userId()).orElseThrow();
         chatRepository.save(new Chat(member, command.content(), false));
-        //2번 구현 필요
+        //aiServerClient.extractSlot(...);
         return null;
     }
 
