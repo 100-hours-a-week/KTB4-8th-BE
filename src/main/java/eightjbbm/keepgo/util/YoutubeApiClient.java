@@ -36,6 +36,8 @@ public class YoutubeApiClient {
                                     .path("/playlistItems")
                                     .queryParam("part", "snippet")
                                     .queryParam("id", likesPlaylistId);
+
+                            return builder.build();
                         }
                 )
                 .retrieve()

@@ -22,6 +22,8 @@ public class Member {
 
     private Instant deletedAt;
 
+    private String likedVideosPlaylistId;
+
     public void updateNickname(String newNickname) {
         if (!this.nickname.equals(newNickname)) {
             this.nickname = newNickname;

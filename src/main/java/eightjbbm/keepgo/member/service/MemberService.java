@@ -2,33 +2,42 @@ package eightjbbm.keepgo.member.service;
 
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.recommendation.OutingEventRepository;
+import eightjbbm.keepgo.recommendation.OutingPlaceRepository;
+import eightjbbm.keepgo.recommendation.entity.OutingEvent;
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.AiServerClient;
 import eightjbbm.keepgo.util.File;
 import eightjbbm.keepgo.util.FileRepository;
 import eightjbbm.keepgo.util.YoutubeApiClient;
+import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
+    private final OutingPlaceRepository outingPlaceRepository;
+    private final OutingEventRepository outingEventRepository;
+    private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
     private final YoutubeApiClient youtubeApiClient;
     private final AiServerClient aiServerClient;
 
+    /// 회원 정보 수정 API
+    /// @param command {@link UpdateMemberInfoCommand}
+    /// @return {@link UpdateMemberInfoResult}
     public UpdateMemberInfoResult updateMemberInfo(
             UpdateMemberInfoCommand command
     ) {
-        /*
-        회원 정보 수정 API
-        요청 본문: 변경할 회원 닉네임, 변경할 회원 프로필 사진 주소
-        1. 요청 본문을 바탕으로 회원의 닉네임과 프로필 사진 수정
-        2. 변경된 닉네임과 변경된 회원 프로필 사진 주소 반환
-        */
         Member member = memberRepository.findById(command.userId()).orElseThrow();
         member.updateNickname(command.nickname());
         File profileImage = fileRepository.findByStoragePath(command.profileImagePath()).orElseThrow();
@@ -36,33 +45,55 @@ public class MemberService {
         return UpdateMemberInfoResult.from(member);
     }
 
+    /// 회원 정보 조회 API
+    ///
+    /// 상태: 구현 완료
+    /// @param command {@link GetMemberInfoCommand}
+    /// @result {@link GetMemberInfoResult}
     public GetMemberInfoResult getMemberInfo(
             GetMemberInfoCommand command
     ) {
-        /*
-        회원 정보 조회 API (구현 완료)
-        1. authentication에서 회원 정보 추출
-        2. 회원의 닉네임, 프로필 사진 주소, 이메일 주소 반환
-        */
         Member member = memberRepository.findById(command.userId()).orElseThrow();
         return GetMemberInfoResult.from(member);
     }
 
-    public SynchronizeYoutubeLikeVideosResult synchronizeYoutubeLikeVideos(
+    /// 좋아요한 동영상 목록 동기화 API
+    ///
+    /// 회원의 좋아요한 동영상 재생목록 ID를 가져오는 것은 회원가입 때 진행해야 됨.
+    /// @param command {@link SynchronizeYoutubeLikeVideosCommand}
+    public void synchronizeYoutubeLikeVideos(
             SynchronizeYoutubeLikeVideosCommand command
     ) {
-        /*
-        좋아요한 동영상 목록 동기화 API
-        1. authentication에서 회원 정보 추출
-        2. 추출한 정보를 바탕으로 해당 회원이 좋아요를 누른 동영상의 목록을 유튜브 API로 조회
-        3. 조회된 목록을 바탕으로 AI 서버에게 분석 요청
-        4. 모든 영상 분석 완료 시 완료 응답 반환
-        */
-        List<String> urls = youtubeApiClient.retrieveLikedVideos(command.userId());
+        Member member = memberRepository.findById(command.userId()).orElseThrow();
+        List<String> urls = youtubeApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId());
         for (String url: urls) {
-            aiServerClient.analyzeVideo(url);
+            AnalyzeVideoResponse response = aiServerClient.analyzeVideo(url);
+            OutingGuide guide;
+            if (isPlaceOrEvent(response.getCategory())) {
+                guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
+                        () -> outingPlaceRepository.save(new OutingPlace(
+                                response.getCategory(),
+                                response.getName(),
+                                response.getSummary()
+                        ))
+                );
+            } else {
+                guide = outingEventRepository.findByName(response.getName()).orElseGet(
+                        () -> outingEventRepository.save(new OutingEvent(
+                                response.getCategory(),
+                                response.getName(),
+                                response.getSummary(),
+                                null,
+                                response.data().eventStartDate(), 
+                                response.data().eventStartDate()
+                        ))
+                );
+            }
+            outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
         }
+    }
 
-        return null;
+    private boolean isPlaceOrEvent(String category) {
+        return category.equals("팝업") || category.equals("전시");
     }
 }
