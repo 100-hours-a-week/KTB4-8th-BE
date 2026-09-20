@@ -7,6 +7,8 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.AiServerClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,37 +20,36 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final AiServerClient aiServerClient;
 
+    /// 채팅 전송 API
+    /// @param command {@link SendChatCommand}
+    /// @return {@link SendChatResult}
     public SendChatResult sendChat(SendChatCommand command) {
-        /*
-        채팅 전송 API
-        요청 본문: 채팅 본문
-        1. 채팅 저장
-        2. AI 서버에게 채팅 전달(아마 POST /extract로 기억)
-        */
         Member member = memberRepository.findById(command.userId()).orElseThrow();
-        chatRepository.save(new Chat(member, command.content(), false));
+        Chat userChat = chatRepository.save(new Chat(member, command.content(), false));
         //aiServerClient.extractSlot(...);
-        return null;
+        return SendChatResult.from(userChat);
     }
 
+    /// 채팅 내역 조회 API
+    /// @param command {@link GetChatsCommand}
+    /// @return {@link GetChatsResult}
     public GetChatsResult getChats(GetChatsCommand command) {
-        /*
-        채팅 내역 조회 API
-        1. authentication에서 회원 정보 추출
-        2. 채팅 테이블에서 조회 후 반환
-        */
-        List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.userId());
-        return null;
+        Slice<Chat> chatSlice = chatRepository.findByMemberIdAndIdLessThanOrderByCreatedAtDescIdDesc(command.userId(), command.cursor(), PageRequest.of(0, command.size() + 1));
+        List<Chat> fetched = chatSlice.getContent();
+        List<Chat> chats = fetched.subList(0, Math.min(fetched.size(), command.size()));
+        boolean hasNext = fetched.size() > command.size();
+        Long nextCursor = hasNext ? fetched.getLast().getId() : -1L;
+        return GetChatsResult.from(chats, hasNext, nextCursor);
     }
 
-    public ResetChatroomResult resetChatroom(ResetChatroomCommand command) {
-        /*
-        채팅 내역 초기화 API
-        1. authentication에서 회원 정보 추출
-        2. Chat.delete()?
-        */
+    /// 채팅 내역 초기화 API
+    ///
+    /// 1차 구현 완료
+    /// @param command {@link ResetChatroomCommand}
+    public void resetChatroom(ResetChatroomCommand command) {
         List<Chat> allbyMemberId = chatRepository.findAllByMemberId(command.userId());
-
-        return null;
+        for (Chat chat: allbyMemberId) {
+            chat.delete();
+        }
     }
 }

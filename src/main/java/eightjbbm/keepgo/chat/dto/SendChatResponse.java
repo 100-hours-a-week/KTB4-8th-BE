@@ -1,7 +1,13 @@
 package eightjbbm.keepgo.chat.dto;
 
-public record SendChatResponse() {
+public record SendChatResponse(
+        String content,
+        Boolean isByBot
+) {
     public static SendChatResponse from(SendChatResult result) {
-        return null;
+        return new SendChatResponse(
+                result.content(),
+                result.isByBot()
+        );
     }
 }

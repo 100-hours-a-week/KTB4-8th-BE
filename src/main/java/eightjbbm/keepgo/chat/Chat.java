@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Entity
 @Getter
 @NoArgsConstructor
@@ -23,9 +25,15 @@ public class Chat {
 
     private Boolean isByBot;
 
+    private Instant deletedAt;
+
     public Chat(Member member, String content, Boolean isByBot) {
         this.member = member;
         this.content = content;
         this.isByBot = isByBot;
+    }
+
+    public void delete() {
+        this.deletedAt = Instant.now();
     }
 }
