@@ -33,7 +33,12 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/error")
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/error",
+                                "/api/v1/users/me/profile-image",
+                                "/public"
+                        )
                         .permitAll()
                         .anyRequest().authenticated()
                 )
