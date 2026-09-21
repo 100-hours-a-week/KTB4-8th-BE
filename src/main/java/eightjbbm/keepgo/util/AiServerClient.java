@@ -12,12 +12,34 @@ public class AiServerClient {
     private final String baseUrl = "";
     private final RestClient aiServerRestClient;
 
-    public void recommendCourse() {
-
+    public RecommendCourseResponse recommendCourse(RecommendCourseRequest request) {
+        return aiServerRestClient.post()
+                .uri(
+                        uriBuilder -> {
+                            UriBuilder builder = uriBuilder
+                                    .host(baseUrl)
+                                    .path("/v1/recommend-courses");
+                            return builder.build();
+                        }
+                )
+                .body(request)
+                .retrieve()
+                .body(RecommendCourseResponse.class);
     }
 
-    public void extractSlot() {
-
+    public ExtractSlotResponse extractSlot(ExtractSlotRequest request) {
+        return aiServerRestClient.post()
+                .uri(
+                        uriBuilder -> {
+                            UriBuilder builder = uriBuilder
+                                    .host(baseUrl)
+                                    .path("/v1/extract");
+                            return builder.build();
+                        }
+                )
+                .body(request)
+                .retrieve()
+                .body(ExtractSlotResponse.class);
     }
 
     public AnalyzeVideoResponse analyzeVideo(String url) {
@@ -25,8 +47,8 @@ public class AiServerClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .path(baseUrl);
-
+                                    .host(baseUrl)
+                                    .path("/v1/analyze-video");
                             return builder.build();
                         }
                 )

@@ -26,7 +26,7 @@ public class ChatService {
     public SendChatResult sendChat(SendChatCommand command) {
         Member member = memberRepository.findById(command.userId()).orElseThrow();
         Chat userChat = chatRepository.save(new Chat(member, command.content(), false));
-        //aiServerClient.extractSlot(...);
+        aiServerClient.extractSlot();
         return SendChatResult.from(userChat);
     }
 
