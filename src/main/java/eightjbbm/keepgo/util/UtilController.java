@@ -1,6 +1,5 @@
 package eightjbbm.keepgo.util;
 
-import eightjbbm.keepgo.util.dto.SearchAddressByKeywordResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class UtilController {
 
-    private final LocationSearchClient locationSearchClient;
     private final FileService fileService;
 
      /// 프로필 사진 업로드 API
@@ -32,21 +30,6 @@ public class UtilController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .header("Location", uploadPath)
-                .build();
-    }
-
-    /// 지역 검색 API
-    ///
-    /// (현재 프론트에게 기능 위임 논의 중)
-    /// @param query 검색할 키워드
-    /// @return {@link SearchAddressByKeywordResponse}
-    @GetMapping("/address")
-    public ResponseEntity<Void> searchAddressByKeyword(@RequestParam String query) {
-
-        locationSearchClient.searchByKeyword(query);
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
                 .build();
     }
 }
