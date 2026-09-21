@@ -5,7 +5,12 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -14,17 +19,27 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
+    private final TokenProvider tokenProvider;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        //1. 요청의 Authorization 헤더에서 AT 추출
+        String token = resolveToken(request);
 
-        //2. AT 유효성 검사
-        //2-1. 성공 시: Authentication 생성 후 SecurityContext에 저장
-        //2-2. 실패 시: 401 - AT 유효성 검증 실패
-
+        Jwt jwt = tokenProvider.validateAndExtractAccessToken(token).orElseThrow(
+                //401 오류 반환
+        );
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
     }
 }

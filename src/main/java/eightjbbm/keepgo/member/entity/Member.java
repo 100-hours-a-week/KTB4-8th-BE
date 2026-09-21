@@ -35,4 +35,12 @@ public class Member {
             this.profileImage = newProfileImage;
         }
     }
+
+    public Member(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public static Member create(String nickname) {
+        return new Member(nickname);
+    }
 }

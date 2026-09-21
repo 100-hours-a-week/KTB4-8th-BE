@@ -1,4 +1,6 @@
 package eightjbbm.keepgo.auth.dto;
 
-public record LoginRequest() {
+public record LoginRequest(
+        String provider
+) {
 }

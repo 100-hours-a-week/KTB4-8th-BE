@@ -1,24 +1,85 @@
 package eightjbbm.keepgo.auth;
 
+import eightjbbm.keepgo.auth.dto.LoginResponse;
+import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.entity.OAuthAccount;
+import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.time.Duration;
 
 @Component
+@RequiredArgsConstructor
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
+
+    private final ObjectMapper objectMapper;
+    private final OAuthAccountRepository oAuthAccountRepository;
+    private final MemberRepository memberRepository;
+    private final TokenProvider tokenProvider;
+
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
-        //1. Authentication에서 OidcUser 추출
+        OidcUser oidcUser = (OidcUser) authentication;
 
-        //2. OidcUser 내부 정보를 이용해 클라이언트 - 회원 간 매핑 테이블 조회하여 회원 검색
-        //2-1. 결과가 존재할 시 기존 회원
-        //2-2. 결과가 미존재할 시 신규 회원, 회원가입 진행
+        Member member = oAuthAccountRepository.findByIssSub(
+                    oidcUser.getIssuer().toString(),
+                    oidcUser.getSubject()
+                )
+                .orElseGet(
+                        () -> {
+                            Member newMember = memberRepository.save(
+                                    Member.create(
+                                            oidcUser.getNickName()
+                                    )
+                            );
+                            return oAuthAccountRepository.save(
+                                    OAuthAccount.create(
+                                            newMember,
+                                            oidcUser.getIssuer().toString(),
+                                            oidcUser.getSubject()
+                                    )
+                            );
+                        }
+                )
+                .getMember();
 
-        //3. 회원 정보를 이용하여 AT/RT 생성하여 반환(AT는 헤더에, RT는 쿠키에)
+        String accessToken = tokenProvider.issueAccessToken(member);
+        String refreshToken = tokenProvider.issueAndRotateRefreshToken(member);
+
+        ResponseCookie cookie = ResponseCookie
+                .from("refresh_token", refreshToken)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Lax")
+                .path("/user/auth-session/refresh")
+                .maxAge(Duration.ofDays(14))
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        objectMapper.writeValue(
+                response.getOutputStream(),
+                ResponseEntity
+                        .status(HttpStatus.CREATED)
+                        .body(LoginResponse.from(
+                                accessToken,
+                                "Bearer",
+                                3600
+                        ))
+        );
     }
 }
