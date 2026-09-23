@@ -1,12 +1,23 @@
 package eightjbbm.keepgo.recommendation.service;
 
+import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
+import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.*;
+import eightjbbm.keepgo.util.AiServerClient;
+import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class RecommendationService {
+
+    private final AiServerClient aiServerClient;
+    private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
+
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         /*
         여정 코스 추천 API
@@ -16,7 +27,20 @@ public class RecommendationService {
         2.
         202의 Location에 해당하는 결과 조회 API 엔드포인트 삽입
         */
-        return null;
+        List<OutingCollectionPrivate> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
+
+        RecommendCourseResponse recommendCourseResponse = aiServerClient.recommendCourse(RecommendCourseRequest.from(
+                null,
+                collection,
+                command.availableTime(),
+                command.category(),
+                command.requestedTime(),
+                command.originLat(),
+                command.originLng()
+        ));
+        return RequestRecommendationResult.from(
+
+        );
     }
 
     public StopRecommendationResult stopRecommendation(StopRecommendationCommand command) {

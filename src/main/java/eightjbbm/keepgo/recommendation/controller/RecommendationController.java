@@ -20,12 +20,18 @@ public class RecommendationController {
      * 여정 코스 추천 요청 API
      * @param jwt
      * @param request {@link RequestRecommendationRequest}
-     * @return
+     * @return {@link RequestRecommendationResponse}
      */
     @PostMapping("/user/recommendation")
     public ResponseEntity<RequestRecommendationResponse> requestRecommendation(@AuthenticationPrincipal Jwt jwt, RequestRecommendationRequest request) {
         RequestRecommendationCommand command = new RequestRecommendationCommand(
-
+                Long.valueOf(jwt.getSubject()),
+                request.availableTime(),
+                request.category(),
+                request.lat(),
+                request.lng(),
+                request.scheduledTimeSlot(),
+                request.location()
         );
 
         return ResponseEntity

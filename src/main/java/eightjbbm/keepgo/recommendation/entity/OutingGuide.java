@@ -2,10 +2,12 @@ package eightjbbm.keepgo.recommendation.entity;
 
 import eightjbbm.keepgo.util.File;
 import jakarta.persistence.*;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 
 @Entity
+@Getter
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @NoArgsConstructor
 @DiscriminatorColumn(name = "type")
@@ -19,6 +21,7 @@ public abstract class OutingGuide {
     private String category;
     private String name;
     private String description;
+    private String businessHours;
 
     public OutingGuide(String category, String name, String description) {
         this.category = category;

@@ -1,12 +1,13 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.util.File;
 import jakarta.persistence.*;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
 @Entity
+@Getter
 @DiscriminatorValue("EVENT")
 @NoArgsConstructor
 public class OutingEvent extends OutingGuide{

@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Entity
 @Getter
 @NoArgsConstructor
@@ -19,6 +21,8 @@ public class OutingCollectionPrivate {
     @ManyToOne
     @JoinColumn(name = "guide_id")
     private OutingGuide outingGuide;
+
+    private Instant createdAt;
 
     public OutingCollectionPrivate(Member member, OutingGuide outingGuide) {
         this.member = member;
