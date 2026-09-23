@@ -5,20 +5,26 @@ import eightjbbm.keepgo.chat.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.util.AiServerClient;
+import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
+import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
+import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class ChatService {
     private final MemberRepository memberRepository;
     private final ChatRepository chatRepository;
-    private final AiServerClient aiServerClient;
+    private final GetReplyCacheService getReplyCacheService;
+    private final SlotCacheService slotCacheService;
 
     /// 채팅 전송 API
     /// @param command {@link SendChatCommand}
@@ -26,8 +32,22 @@ public class ChatService {
     public SendChatResult sendChat(SendChatCommand command) {
         Member member = memberRepository.findById(command.userId()).orElseThrow();
         Chat userChat = chatRepository.save(new Chat(member, command.content(), false));
-        aiServerClient.extractSlot();
+        getReplyCacheService.createRequest(
+                command.userId(),
+                ExtractSlotRequest.from(
+                        command.content(),
+                        Instant.now().atZone(ZoneId.systemDefault()).toLocalDate(),
+                        slotCacheService.getSlot(command.userId())
+                )
+        );
         return SendChatResult.from(userChat);
+    }
+
+    /// 채팅 대답 폴링 API
+    public GetReplyResult getReply(GetReplyCommand command) {
+        return getReplyCacheService.poll(command.memberId())
+                .map(content -> GetReplyResult.Completed.from("COMPLETED", content))
+                .orElseGet(() -> GetReplyResult.InProgress.from("IN_PROGRESS", 1));
     }
 
     /// 채팅 내역 조회 API
@@ -47,9 +67,11 @@ public class ChatService {
     /// 1차 구현 완료
     /// @param command {@link ResetChatroomCommand}
     public void resetChatroom(ResetChatroomCommand command) {
-        List<Chat> allbyMemberId = chatRepository.findAllByMemberId(command.userId());
-        for (Chat chat: allbyMemberId) {
-            chat.delete();
-        }
+        List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.userId());
+        allByMemberId.forEach(Chat::delete);
+    }
+
+    public void updateSlot() {
+
     }
 }

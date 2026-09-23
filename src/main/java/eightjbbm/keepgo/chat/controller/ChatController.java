@@ -12,6 +12,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+
 @RestController
 @RequestMapping("/api/v1/user/chat-messages")
 @RequiredArgsConstructor
@@ -42,20 +44,29 @@ public class ChatController {
                 );
     }
 
+    @PatchMapping("/slot")
+    public void updateSlot() {
+        chatService.updateSlot();
+    }
+
     /// 챗봇의 대답 조회 API
     /// @param jwt
     /// @param chatId
     /// @return {@link GetReplyResponse}
     @GetMapping("/{chatId}/response")
     public ResponseEntity<GetReplyResponse> getReply(@AuthenticationPrincipal Jwt jwt, @PathVariable Long chatId) {
-
-
-        //chatService에서 상태 조회해서, 진행 중이면 진행 중 응답, 완료됐으면 완료 응답 반환하기
-        //최대한 분리해야 한다. 뭐라도 완성해야 한다.
-
+        GetReplyCommand command = new GetReplyCommand(
+                Long.valueOf(jwt.getSubject()),
+                chatId
+        );
+        GetReplyResult reply = chatService.getReply(command);
+        GetReplyResponse response = switch (reply) {
+            case GetReplyResult.InProgress inProgress -> GetReplyResponse.InProgress.from(inProgress);
+            case GetReplyResult.Completed completed -> GetReplyResponse.Completed.from(completed);
+        };
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .body();
+                .body(response);
     }
 
     /// 채팅 내역 조회 API

@@ -26,11 +26,13 @@ public class Chat {
     private Boolean isByBot;
 
     private Instant deletedAt;
+    private Instant createdAt;
 
     public Chat(Member member, String content, Boolean isByBot) {
         this.member = member;
         this.content = content;
         this.isByBot = isByBot;
+        this.createdAt = Instant.now();
     }
 
     public void delete() {

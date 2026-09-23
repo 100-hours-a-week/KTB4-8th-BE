@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.util;
 
-import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
+import eightjbbm.keepgo.util.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -25,6 +25,10 @@ public class AiServerClient {
                 .body(request)
                 .retrieve()
                 .body(RecommendCourseResponse.class);
+    }
+
+    public void stopRecommendation() {
+
     }
 
     public ExtractSlotResponse extractSlot(ExtractSlotRequest request) {
