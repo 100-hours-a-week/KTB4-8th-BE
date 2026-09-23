@@ -25,6 +25,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
+	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-authorization-server'
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-authorization-server-test'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
