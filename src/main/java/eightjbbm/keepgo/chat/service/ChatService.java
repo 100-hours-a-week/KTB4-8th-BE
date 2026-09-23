@@ -6,8 +6,9 @@ import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
+import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
-import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
+import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -32,12 +33,19 @@ public class ChatService {
     public SendChatResult sendChat(SendChatCommand command) {
         Member member = memberRepository.findById(command.userId()).orElseThrow();
         Chat userChat = chatRepository.save(new Chat(member, command.content(), false));
+        SlotValue slot = slotCacheService.getSlot(command.userId());
         getReplyCacheService.createRequest(
-                command.userId(),
-                ExtractSlotRequest.from(
+                GetReplyRequest.from(
+                        command.userId(),
                         command.content(),
-                        Instant.now().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        slotCacheService.getSlot(command.userId())
+                        userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
+                        slot.getLat(),
+                        slot.getLng(),
+                        slot.getRequestedLocationName(),
+                        slot.getRequestedDate(),
+                        slot.getAvailableTime(),
+                        slot.getCategories(),
+                        slot.getQuery()
                 )
         );
         return SendChatResult.from(userChat);

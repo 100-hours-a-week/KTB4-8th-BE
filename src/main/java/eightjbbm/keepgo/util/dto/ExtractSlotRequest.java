@@ -3,6 +3,7 @@ package eightjbbm.keepgo.util.dto;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public record ExtractSlotRequest(
         String chat,
@@ -15,7 +16,7 @@ public record ExtractSlotRequest(
             String region,
             LocalDate datetime,
             Integer availableTime,
-            String category
+            List<String> categories
     ) {
         public record OriginalCoordinate(
                 Float lat,
@@ -23,23 +24,28 @@ public record ExtractSlotRequest(
         ) {}
     }
 
-
     public static ExtractSlotRequest from(
             String chat,
+            LocalDate createdDate,
+            Float lat,
+            Float lng,
+            String region,
             LocalDate datetime,
-            SlotValue slotValue
+            Integer availableTime,
+            List<String> category,
+            String query
     ) {
         return new ExtractSlotRequest(
                 chat,
-                datetime,
+                createdDate,
                 new PrevSlot(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
+                        new PrevSlot.OriginalCoordinate(lat, lng),
+                        region,
+                        datetime,
+                        availableTime,
+                        category
                 ),
-                slotValue.getQuery()
+                query
         );
     }
 }
