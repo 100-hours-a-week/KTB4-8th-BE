@@ -16,22 +16,13 @@ public class RecommendationController {
 
     private final RecommendationService recommendationService;
 
-    /**
-     * 여정 코스 추천 요청 API
-     * @param jwt
-     * @param request {@link RequestRecommendationRequest}
-     * @return {@link RequestRecommendationResponse}
-     */
+    /// 여정 코스 추천 요청 API
+    /// @param jwt
+    /// @return {@link RequestRecommendationResponse}
     @PostMapping("/user/recommendation")
-    public ResponseEntity<RequestRecommendationResponse> requestRecommendation(@AuthenticationPrincipal Jwt jwt, RequestRecommendationRequest request) {
-        RequestRecommendationCommand command = new RequestRecommendationCommand(
-                Long.valueOf(jwt.getSubject()),
-                request.availableTime(),
-                request.category(),
-                request.lat(),
-                request.lng(),
-                request.scheduledTimeSlot(),
-                request.location()
+    public ResponseEntity<RequestRecommendationResponse> requestRecommendation(@AuthenticationPrincipal Jwt jwt) {
+        var command = new RequestRecommendationCommand(
+                Long.valueOf(jwt.getSubject())
         );
 
         return ResponseEntity
@@ -43,16 +34,16 @@ public class RecommendationController {
                 );
     }
 
-    /**
-     * 여정 코스 추천 중단 API
-     * @param jwt
-     * @return
-     */
+
+    /// 여정 코스 추천 중단 API
+    /// @param jwt
     @PostMapping("/user/recommendation/cancellation")
     public ResponseEntity<Void> stopRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        StopRecommendationCommand command = new StopRecommendationCommand(
-
+        var command = new StopRecommendationCommand(
+                Long.valueOf(jwt.getSubject())
         );
+
+        recommendationService.stopRecommendation(command);
 
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
