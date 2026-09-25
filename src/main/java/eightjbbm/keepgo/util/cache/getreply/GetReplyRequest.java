@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record GetReplyRequest(
@@ -10,7 +11,7 @@ public record GetReplyRequest(
         Float lat,
         Float lng,
         String region,
-        LocalDate datetime,
+        LocalDateTime datetime,
         Integer availableTime,
         List<String> categories,
         String query
@@ -22,7 +23,7 @@ public record GetReplyRequest(
             Float lat,
             Float lng,
             String region,
-            LocalDate datetime,
+            LocalDateTime datetime,
             Integer availableTime,
             List<String> category,
             String query

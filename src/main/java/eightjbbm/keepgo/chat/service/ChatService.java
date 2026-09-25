@@ -47,7 +47,7 @@ public class ChatService {
                         slot.getCoordinate().lat(),
                         slot.getCoordinate().lng(),
                         slot.getRequestedLocationName(),
-                        slot.getRequestedDate(),
+                        slot.getRequestedDateTime(),
                         slot.getAvailableTime(),
                         slot.getCategories(),
                         query
