@@ -27,8 +27,16 @@ public class AiServerClient {
                 .body(RecommendCourseResponse.class);
     }
 
-    public void stopRecommendation() {
-
+    public void stopRecommendation(Long jobId) {
+        aiServerRestClient.post()
+                .uri(
+                        uriBuilder -> {
+                            UriBuilder builder = uriBuilder
+                                    .host(baseUrl)
+                                    .path("/v1/recommend-course/" + jobId + "/cancel");
+                            return builder.build();
+                        }
+                ).retrieve().body(Void.class);
     }
 
     public ExtractSlotResponse extractSlot(ExtractSlotRequest request) {
