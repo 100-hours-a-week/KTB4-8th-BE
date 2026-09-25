@@ -15,13 +15,13 @@ import java.util.concurrent.CompletableFuture;
 public class GetReplyWorker {
 
     private final AiServerClient aiServerClient;
-    private final GetReplyRepository getReplyRepository;
+    private final GetReplyCacheRepository getReplyCacheRepository;
 
     @Async("httpTaskExecutor")
     @Transactional
     public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
         ExtractSlotResponse response = aiServerClient.extractSlot(request);
-        getReplyRepository.update(memberId, response.data().botMessage());
+        getReplyCacheRepository.update(memberId, response.data().botMessage());
         return CompletableFuture.completedFuture(null);
     }
 }

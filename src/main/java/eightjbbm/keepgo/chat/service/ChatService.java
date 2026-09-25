@@ -5,19 +5,21 @@ import eightjbbm.keepgo.chat.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.GeoCodingClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
+import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
+import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -26,26 +28,29 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final GetReplyCacheService getReplyCacheService;
     private final SlotCacheService slotCacheService;
+    private final QueryCacheService queryCacheService;
+    private final GeoCodingClient geoCodingClient;
 
     /// 채팅 전송 API
     /// @param command {@link SendChatCommand}
     /// @return {@link SendChatResult}
     public SendChatResult sendChat(SendChatCommand command) {
         Member member = memberRepository.findById(command.userId()).orElseThrow();
-        Chat userChat = chatRepository.save(new Chat(member, command.content(), false));
-        SlotValue slot = slotCacheService.getSlot(command.userId());
+        Chat userChat = chatRepository.save(Chat.from(member, command.content()));
+        SlotValue slot = slotCacheService.read(command.userId());
+        String query = queryCacheService.getQuery(command.userId());
         getReplyCacheService.createRequest(
                 GetReplyRequest.from(
                         command.userId(),
                         command.content(),
                         userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        slot.getLat(),
-                        slot.getLng(),
+                        slot.getCoordinate().lat(),
+                        slot.getCoordinate().lng(),
                         slot.getRequestedLocationName(),
                         slot.getRequestedDate(),
                         slot.getAvailableTime(),
                         slot.getCategories(),
-                        slot.getQuery()
+                        query
                 )
         );
         return SendChatResult.from(userChat);
@@ -79,7 +84,25 @@ public class ChatService {
         allByMemberId.forEach(Chat::delete);
     }
 
-    public void updateSlot() {
-
+    /// 의도 카드 수정 API
+    public UpdateSlotResult updateSlot(UpdateSlotCommand command) {
+        slotCacheService.updateSlot(
+                UpdateSlotCacheRequest.from(
+                        command.memberId(),
+                        command.userCoordinate().lat(),
+                        command.userCoordinate().lng(),
+                        command.requestedLocationName(),
+                        command.requestedDate(),
+                        command.requestedTimeSlot(),
+                        command.availableTime(),
+                        command.categories()
+                )
+        );
+        String result = null;
+        Coordinate coordinate = slotCacheService.getCoordinate(command.memberId());
+        if (!command.userCoordinate().equals(coordinate)) {
+            result = geoCodingClient.mapCoordinatesToLocationName(coordinate.lat(), coordinate.lng()).getAddress();
+        }
+        return UpdateSlotResult.from(result);
     }
 }

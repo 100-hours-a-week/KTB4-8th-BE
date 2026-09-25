@@ -9,11 +9,11 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class GetReplyCacheService {
-    private final GetReplyRepository getReplyRepository;
+    private final GetReplyCacheRepository getReplyCacheRepository;
     private final GetReplyWorker worker;
 
     public void createRequest(GetReplyRequest request) {
-        getReplyRepository.create(request.memberId());
+        getReplyCacheRepository.create(request.memberId());
         worker.requestGetReply(
                 request.memberId(),
                 ExtractSlotRequest.from(
@@ -31,6 +31,6 @@ public class GetReplyCacheService {
     }
 
     public Optional<String> poll(Long memberId) {
-        return getReplyRepository.poll(memberId);
+        return getReplyCacheRepository.poll(memberId);
     }
 }
