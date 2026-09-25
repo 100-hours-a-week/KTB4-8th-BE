@@ -38,4 +38,8 @@ public class Chat {
     public void delete() {
         this.deletedAt = Instant.now();
     }
+
+    public static Chat from(Member member, String content) {
+        return new Chat(member, content, false);
+    }
 }

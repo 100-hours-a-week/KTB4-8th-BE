@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/user/chat-messages")
@@ -28,7 +29,7 @@ public class ChatController {
     /// @return {@link SendChatResponse}
     @PostMapping
     public ResponseEntity<SendChatResponse> sendChat(@AuthenticationPrincipal Jwt jwt, SendChatRequest request) {
-        SendChatCommand command = new SendChatCommand(
+        var command = new SendChatCommand(
                 Long.valueOf(jwt.getSubject()),
                 request.content()
         );
@@ -40,13 +41,33 @@ public class ChatController {
                 .status(HttpStatus.ACCEPTED)
                 .header("Location", location)
                 .body(
-                        SendChatResponse.from(result)
+                        SendChatResponse.from(
+                                result
+                        )
                 );
     }
 
+    /// 의도 카드 업데이트 API
     @PatchMapping("/slot")
-    public void updateSlot() {
-        chatService.updateSlot();
+    public ResponseEntity<?> updateSlot(@AuthenticationPrincipal Jwt jwt, UpdateSlotRequest request) {
+        var command = UpdateSlotCommand.from(
+                Long.valueOf(jwt.getSubject()),
+                request.location().lat(),
+                request.location().lng(),
+                request.requestedLocationName(),
+                request.requestedDate(),
+                request.requestedTimeSlot(),
+                request.availableTime(),
+                request.categories()
+        );
+
+        UpdateSlotResult result = chatService.updateSlot(command);
+        return Optional.ofNullable(result.userLocationName())
+                .map(value -> ResponseEntity
+                        .status(HttpStatus.OK)
+                        .body(value))
+                .orElseGet(() -> ResponseEntity
+                        .status(HttpStatus.NO_CONTENT).build());
     }
 
     /// 챗봇의 대답 조회 API
@@ -55,7 +76,7 @@ public class ChatController {
     /// @return {@link GetReplyResponse}
     @GetMapping("/{chatId}/response")
     public ResponseEntity<GetReplyResponse> getReply(@AuthenticationPrincipal Jwt jwt, @PathVariable Long chatId) {
-        GetReplyCommand command = new GetReplyCommand(
+        var command = new GetReplyCommand(
                 Long.valueOf(jwt.getSubject()),
                 chatId
         );
@@ -79,7 +100,7 @@ public class ChatController {
             @AuthenticationPrincipal Jwt jwt,
             Long cursor,
             Integer size) {
-        GetChatsCommand command = new GetChatsCommand(
+        var command = new GetChatsCommand(
                 Long.valueOf(jwt.getSubject()),
                 cursor,
                 size
@@ -98,7 +119,7 @@ public class ChatController {
     /// @param jwt
     @DeleteMapping
     public ResponseEntity<Void> resetChatroom(@AuthenticationPrincipal Jwt jwt) {
-        ResetChatroomCommand command = new ResetChatroomCommand(
+        var command = new ResetChatroomCommand(
                 Long.valueOf(jwt.getSubject())
         );
 

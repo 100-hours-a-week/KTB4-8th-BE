@@ -9,7 +9,7 @@ import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
-public class GetReplyRepository {
+public class GetReplyCacheRepository {
     private final CacheManager cacheManager;
 
     public void create(Long memberId) {
