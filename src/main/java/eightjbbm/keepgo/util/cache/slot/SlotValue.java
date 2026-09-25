@@ -5,7 +5,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -13,8 +13,7 @@ import java.util.List;
 public class SlotValue {
     private Coordinate coordinate;
     private String requestedLocationName;
-    private LocalDate requestedDate;
-    private Integer requestedTimeSlot;
+    private LocalDateTime requestedDateTime;
     private Integer availableTime;
     private List<String> categories;
 
@@ -22,16 +21,14 @@ public class SlotValue {
             Float lat,
             Float lng,
             String requestedLocationName,
-            LocalDate requestedDate,
-            Integer requestedTimeSlot,
+            LocalDateTime requestedDateTime,
             Integer availableTime,
             List<String> categories
     ) {
         return new SlotValue(
                 new Coordinate(lat, lng),
                 requestedLocationName,
-                requestedDate,
-                requestedTimeSlot,
+                requestedDateTime,
                 availableTime,
                 categories
         );
