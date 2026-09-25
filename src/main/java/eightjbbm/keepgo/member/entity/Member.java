@@ -4,6 +4,7 @@ import eightjbbm.keepgo.util.File;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 
@@ -22,6 +23,7 @@ public class Member {
 
     private Instant deletedAt;
 
+    @Setter
     private String likedVideosPlaylistId;
 
     public void updateNickname(String newNickname) {

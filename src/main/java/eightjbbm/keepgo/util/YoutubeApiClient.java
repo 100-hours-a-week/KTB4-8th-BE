@@ -5,42 +5,44 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
 
-import java.util.List;
-
 @Component
 @RequiredArgsConstructor
 public class YoutubeApiClient {
 
     private final RestClient youtubeRestClient;
+    private final String baseUrl = "https://www.googleapis.com";
 
-    public String retrieveLikesPlaylistId(Long userId) {
+    public RetrieveLikesPlaylistIdResponse retrieveLikesPlaylistId(Long userId) {
         return youtubeRestClient.get()
                 .uri(
                     uriBuilder -> {
                         UriBuilder builder = uriBuilder
-                            .path("/channels")
+                            .path("/youtube/v3/channels")
                             .queryParam("part", "contentDetails")
                             .queryParam("mine", "true");
 
                         return builder.build();
                     })
                 .retrieve()
-                .body();
+                .body(RetrieveLikesPlaylistIdResponse.class);
     }
 
-    public List<String> retrieveLikedVideos(String likesPlaylistId) {
+    /// 첫 50개만 조회할 수 있음. 리팩토링 필요
+    public RetrieveLikedVideosResponse retrieveLikedVideos(String likesPlaylistId) {
         return youtubeRestClient.get()
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .path("/playlistItems")
-                                    .queryParam("part", "snippet")
-                                    .queryParam("id", likesPlaylistId);
+                                    .host(baseUrl)
+                                    .path("/youtube/v3/playlistItems")
+                                    .queryParam("part", "contentDetails")
+                                    .queryParam("id", likesPlaylistId)
+                                    .queryParam("maxResults", 50);
 
                             return builder.build();
                         }
                 )
                 .retrieve()
-                .body();
+                .body(RetrieveLikedVideosResponse.class);
     }
 }

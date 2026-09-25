@@ -64,7 +64,7 @@ public class MemberService {
             SynchronizeYoutubeLikeVideosCommand command
     ) {
         Member member = memberRepository.findById(command.userId()).orElseThrow();
-        List<String> urls = youtubeApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId());
+        List<String> urls = youtubeApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId()).getVideoIds();
         for (String url: urls) {
             AnalyzeVideoResponse response = aiServerClient.analyzeVideo(url);
             OutingGuide guide;
@@ -84,7 +84,7 @@ public class MemberService {
                                 response.getSummary(),
                                 null,
                                 response.data().eventStartDate(), 
-                                response.data().eventStartDate()
+                                response.data().eventEndDate()
                         ))
                 );
             }
