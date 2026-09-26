@@ -16,17 +16,7 @@ public class GetReplyCacheService {
         getReplyCacheRepository.create(request.memberId());
         worker.requestGetReply(
                 request.memberId(),
-                ExtractSlotRequest.from(
-                        request.content(),
-                        request.createdDate(),
-                        request.lat(),
-                        request.lng(),
-                        request.region(),
-                        request.datetime(),
-                        request.availableTime(),
-                        request.categories(),
-                        request.query()
-                )
+                ExtractSlotRequest.from(request)
         );
     }
 

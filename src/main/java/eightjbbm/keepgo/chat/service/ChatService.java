@@ -1,18 +1,18 @@
 package eightjbbm.keepgo.chat.service;
 
 import eightjbbm.keepgo.chat.Chat;
+import eightjbbm.keepgo.chat.ChatMapper;
 import eightjbbm.keepgo.chat.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.GeoCodingClient;
+import eightjbbm.keepgo.util.client.GeoCodingClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
-import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -35,21 +35,16 @@ public class ChatService {
     /// @param command {@link SendChatCommand}
     /// @return {@link SendChatResult}
     public SendChatResult sendChat(SendChatCommand command) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
+        Long memberId = command.memberId();
+        Member member = memberRepository.findById(memberId).orElseThrow();
         Chat userChat = chatRepository.save(Chat.from(member, command.content()));
-        SlotValue slot = slotCacheService.read(command.userId());
-        String query = queryCacheService.getQuery(command.userId());
+        SlotValue slot = slotCacheService.read(memberId);
+        String query = queryCacheService.getQuery(memberId);
         getReplyCacheService.createRequest(
                 GetReplyRequest.from(
-                        command.userId(),
-                        command.content(),
+                        command,
                         userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        slot.getCoordinate().lat(),
-                        slot.getCoordinate().lng(),
-                        slot.getRequestedLocationName(),
-                        slot.getRequestedDateTime(),
-                        slot.getAvailableTime(),
-                        slot.getCategories(),
+                        slot,
                         query
                 )
         );
@@ -67,7 +62,11 @@ public class ChatService {
     /// @param command {@link GetChatsCommand}
     /// @return {@link GetChatsResult}
     public GetChatsResult getChats(GetChatsCommand command) {
-        Slice<Chat> chatSlice = chatRepository.findByMemberIdAndIdLessThanOrderByCreatedAtDescIdDesc(command.userId(), command.cursor(), PageRequest.of(0, command.size() + 1));
+        Slice<Chat> chatSlice = chatRepository.findByMemberIdAndIdLessThanOrderByCreatedAtDescIdDesc(
+                command.userId(),
+                command.cursor(),
+                PageRequest.of(0, command.size() + 1)
+        );
         List<Chat> fetched = chatSlice.getContent();
         List<Chat> chats = fetched.subList(0, Math.min(fetched.size(), command.size()));
         boolean hasNext = fetched.size() > command.size();
@@ -86,18 +85,8 @@ public class ChatService {
 
     /// 의도 카드 수정 API
     public UpdateSlotResult updateSlot(UpdateSlotCommand command) {
-        slotCacheService.updateSlot(
-                UpdateSlotCacheRequest.from(
-                        command.memberId(),
-                        command.userCoordinate().lat(),
-                        command.userCoordinate().lng(),
-                        command.requestedLocationName(),
-                        command.requestedDate(),
-                        command.requestedTimeSlot(),
-                        command.availableTime(),
-                        command.categories()
-                )
-        );
+        var request = ChatMapper.INSTANCE.toUpdateSlotCacheRequest(command);
+        slotCacheService.updateSlot(request);
         String result = null;
         Coordinate coordinate = slotCacheService.getCoordinate(command.memberId());
         if (!command.userCoordinate().equals(coordinate)) {

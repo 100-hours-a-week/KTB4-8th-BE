@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.member.controller;
 
+import eightjbbm.keepgo.member.MemberMapper;
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,7 @@ public class MemberController {
     /// @return {@link GetMemberInfoResponse}
     @GetMapping
     public ResponseEntity<GetMemberInfoResponse> getMemberInfo(@AuthenticationPrincipal Jwt jwt) {
-        GetMemberInfoCommand command = new GetMemberInfoCommand(
+        var command = MemberMapper.INSTANCE.toGetMemberInfoCommand(
                 Long.valueOf(jwt.getSubject())
         );
 
@@ -40,10 +41,9 @@ public class MemberController {
     /// @return {@link UpdateMemberInfoResponse}
     @PatchMapping
     public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(@AuthenticationPrincipal Jwt jwt, UpdateMemberInfoRequest request) {
-        UpdateMemberInfoCommand command = new UpdateMemberInfoCommand(
+        var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(
                 Long.valueOf(jwt.getSubject()),
-                request.nickname(),
-                request.profileImageUrl()
+                request
         );
 
         return ResponseEntity
@@ -59,7 +59,7 @@ public class MemberController {
     /// @param jwt
     @PostMapping("/youtube-analyze")
     public ResponseEntity<Void> synchronizeYoutubeLikeVideos(@AuthenticationPrincipal Jwt jwt) {
-        SynchronizeYoutubeLikeVideosCommand command = new SynchronizeYoutubeLikeVideosCommand(
+        var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(
                 Long.valueOf(jwt.getSubject())
         );
 
