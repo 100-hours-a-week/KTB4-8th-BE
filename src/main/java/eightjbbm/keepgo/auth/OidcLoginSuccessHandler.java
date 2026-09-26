@@ -22,6 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -30,7 +31,8 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final ObjectMapper objectMapper;
     private final OAuthAccountRepository oAuthAccountRepository;
     private final MemberRepository memberRepository;
-    private final TokenProvider tokenProvider;
+    private final AccessTokenManager accessTokenManager;
+    private final RefreshTokenManager refreshTokenManager;
     private final YoutubeApiClient youtubeApiClient;
 
     @Override
@@ -60,15 +62,15 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 )
                 .getMember();
 
-        String accessToken = tokenProvider.issueAccessToken(member);
-        String refreshToken = tokenProvider.issueAndRotateRefreshToken(member);
+        String accessToken = accessTokenManager.issue(member.getId(), List.of());
+        String refreshToken = refreshTokenManager.issue(member.getId());
 
         ResponseCookie cookie = ResponseCookie
                 .from("refresh_token", refreshToken)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
-                .path("/user/auth-session/refresh")
+                .path("/api/v1/user/auth-session")
                 .maxAge(Duration.ofDays(14))
                 .build();
 

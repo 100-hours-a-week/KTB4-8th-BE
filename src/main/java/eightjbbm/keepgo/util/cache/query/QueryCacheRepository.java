@@ -14,7 +14,9 @@ public class QueryCacheRepository {
         Cache cache = cacheManager.getCache("query");
 
         if (cache == null) {
-            throw new
+            throw new IllegalStateException("No Cache");
         }
+
+        return cache;
     }
 }
