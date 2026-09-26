@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.recommendation;
+package eightjbbm.keepgo.recommendation.repository;
 
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import org.springframework.data.jpa.repository.JpaRepository;

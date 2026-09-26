@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.chat.dto;
 
-import eightjbbm.keepgo.chat.Chat;
+import eightjbbm.keepgo.chat.entity.Chat;
 
 import java.util.List;
 

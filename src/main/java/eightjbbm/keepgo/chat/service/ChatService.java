@@ -1,8 +1,8 @@
 package eightjbbm.keepgo.chat.service;
 
-import eightjbbm.keepgo.chat.Chat;
+import eightjbbm.keepgo.chat.entity.Chat;
 import eightjbbm.keepgo.chat.ChatMapper;
-import eightjbbm.keepgo.chat.ChatRepository;
+import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;

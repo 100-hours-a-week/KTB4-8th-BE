@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.chat;
+package eightjbbm.keepgo.chat.entity;
 
 import eightjbbm.keepgo.member.entity.Member;
 import jakarta.persistence.*;
