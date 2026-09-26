@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.client;
 
 import eightjbbm.keepgo.util.dto.*;
 import lombok.RequiredArgsConstructor;

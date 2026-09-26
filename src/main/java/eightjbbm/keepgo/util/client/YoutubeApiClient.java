@@ -1,5 +1,7 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.client;
 
+import eightjbbm.keepgo.util.dto.RetrieveLikedVideosResponse;
+import eightjbbm.keepgo.util.dto.RetrieveLikesPlaylistIdResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;

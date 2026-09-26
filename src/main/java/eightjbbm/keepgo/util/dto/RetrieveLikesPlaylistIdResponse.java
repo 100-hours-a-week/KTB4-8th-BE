@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.dto;
 
 public record RetrieveLikesPlaylistIdResponse(
         ContentDetails contentDetails
