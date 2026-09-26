@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.recommendation.controller;
 
+import eightjbbm.keepgo.recommendation.RecommendationMapper;
 import eightjbbm.keepgo.recommendation.dto.*;
 import eightjbbm.keepgo.recommendation.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,7 @@ public class RecommendationController {
     /// @return {@link RequestRecommendationResponse}
     @PostMapping("/user/recommendation")
     public ResponseEntity<RequestRecommendationResponse> requestRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        var command = new RequestRecommendationCommand(
+        var command = RecommendationMapper.INSTANCE.toRequestRecommendationCommand(
                 Long.valueOf(jwt.getSubject())
         );
 
@@ -39,7 +40,7 @@ public class RecommendationController {
     /// @param jwt
     @PostMapping("/user/recommendation/cancellation")
     public ResponseEntity<Void> stopRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        var command = new StopRecommendationCommand(
+        var command = RecommendationMapper.INSTANCE.toStopRecommendationCommand(
                 Long.valueOf(jwt.getSubject())
         );
 

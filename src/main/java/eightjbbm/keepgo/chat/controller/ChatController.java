@@ -1,18 +1,15 @@
 package eightjbbm.keepgo.chat.controller;
 
+import eightjbbm.keepgo.chat.ChatMapper;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.chat.service.ChatService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.Optional;
 
 @RestController
@@ -28,10 +25,13 @@ public class ChatController {
     /// @param request {@link SendChatRequest}
     /// @return {@link SendChatResponse}
     @PostMapping
-    public ResponseEntity<SendChatResponse> sendChat(@AuthenticationPrincipal Jwt jwt, SendChatRequest request) {
-        var command = new SendChatCommand(
+    public ResponseEntity<SendChatResponse> sendChat(
+            @AuthenticationPrincipal Jwt jwt,
+            SendChatRequest request
+    ) {
+        var command = ChatMapper.INSTANCE.toSendChatCommand(
                 Long.valueOf(jwt.getSubject()),
-                request.content()
+                request
         );
 
         SendChatResult result = chatService.sendChat(command);
@@ -49,16 +49,13 @@ public class ChatController {
 
     /// 의도 카드 업데이트 API
     @PatchMapping("/slot")
-    public ResponseEntity<?> updateSlot(@AuthenticationPrincipal Jwt jwt, UpdateSlotRequest request) {
-        var command = UpdateSlotCommand.from(
+    public ResponseEntity<?> updateSlot(
+            @AuthenticationPrincipal Jwt jwt,
+            UpdateSlotRequest request
+    ) {
+        var command = ChatMapper.INSTANCE.toUpdateSlotCommand(
                 Long.valueOf(jwt.getSubject()),
-                request.location().lat(),
-                request.location().lng(),
-                request.requestedLocationName(),
-                request.requestedDate(),
-                request.requestedTimeSlot(),
-                request.availableTime(),
-                request.categories()
+                request
         );
 
         UpdateSlotResult result = chatService.updateSlot(command);
@@ -75,8 +72,11 @@ public class ChatController {
     /// @param chatId
     /// @return {@link GetReplyResponse}
     @GetMapping("/{chatId}/response")
-    public ResponseEntity<GetReplyResponse> getReply(@AuthenticationPrincipal Jwt jwt, @PathVariable Long chatId) {
-        var command = new GetReplyCommand(
+    public ResponseEntity<GetReplyResponse> getReply(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long chatId
+    ) {
+        var command = ChatMapper.INSTANCE.toGetReplyCommand(
                 Long.valueOf(jwt.getSubject()),
                 chatId
         );
@@ -99,8 +99,9 @@ public class ChatController {
     public ResponseEntity<GetChatsResponse> getChats(
             @AuthenticationPrincipal Jwt jwt,
             Long cursor,
-            Integer size) {
-        var command = new GetChatsCommand(
+            Integer size
+    ) {
+        var command = ChatMapper.INSTANCE.toGetChatsCommand(
                 Long.valueOf(jwt.getSubject()),
                 cursor,
                 size
@@ -118,8 +119,10 @@ public class ChatController {
     /// 채팅 내역 초기화 API
     /// @param jwt
     @DeleteMapping
-    public ResponseEntity<Void> resetChatroom(@AuthenticationPrincipal Jwt jwt) {
-        var command = new ResetChatroomCommand(
+    public ResponseEntity<Void> resetChatroom(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        var command = ChatMapper.INSTANCE.toResetChatroomCommand(
                 Long.valueOf(jwt.getSubject())
         );
 

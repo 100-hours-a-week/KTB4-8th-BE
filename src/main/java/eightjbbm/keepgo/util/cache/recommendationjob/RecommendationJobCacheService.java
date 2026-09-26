@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.cache.recommendationjob;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

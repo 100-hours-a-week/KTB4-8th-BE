@@ -1,30 +1,28 @@
 package eightjbbm.keepgo.util.cache.slot;
 
-import java.time.LocalDate;
+import eightjbbm.keepgo.util.Coordinate;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record UpdateSlotCacheRequest(
         Long memberId,
-        Float lat,
-        Float lng,
+        Coordinate coordinate,
         String requestedLocationName,
-        LocalDate requestedDate,
-        Integer requestedTimeSlot,
+        LocalDateTime requestedDateTime,
         Integer availableTime,
         List<String> categories
 ) {
     public static UpdateSlotCacheRequest from(
             Long memberId,
-            Float lat,
-            Float lng,
+            Coordinate coordinate,
             String requestedLocationName,
-            LocalDate requestedDate,
-            Integer requestedTimeSlot,
+            LocalDateTime requestedDateTime,
             Integer availableTime,
             List<String> categories
     ) {
         return new UpdateSlotCacheRequest(
-                memberId, lat, lng, requestedLocationName, requestedDate, requestedTimeSlot, availableTime, categories
+                memberId, coordinate, requestedLocationName, requestedDateTime, availableTime, categories
         );
     }
 }

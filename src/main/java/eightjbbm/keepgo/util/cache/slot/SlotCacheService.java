@@ -23,11 +23,9 @@ public class SlotCacheService {
         slotCacheRepository.update(
                 request.memberId(),
                 SlotValue.from(
-                        request.lat(),
-                        request.lng(),
+                        request.coordinate(),
                         request.requestedLocationName(),
-                        request.requestedDate(),
-                        request.requestedTimeSlot(),
+                        request.requestedDateTime(),
                         request.availableTime(),
                         request.categories()
                 )

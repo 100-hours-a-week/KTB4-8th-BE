@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.file;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

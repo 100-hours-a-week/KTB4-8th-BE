@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
-import eightjbbm.keepgo.util.AiServerClient;
+import eightjbbm.keepgo.util.client.AiServerClient;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import lombok.RequiredArgsConstructor;

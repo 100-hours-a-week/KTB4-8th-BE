@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.file;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.tomcat.util.http.fileupload.FileUploadException;

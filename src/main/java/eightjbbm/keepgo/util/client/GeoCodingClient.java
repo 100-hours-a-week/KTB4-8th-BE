@@ -1,5 +1,6 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.client;
 
+import eightjbbm.keepgo.util.dto.MapCoordinatesToLocationNameResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;

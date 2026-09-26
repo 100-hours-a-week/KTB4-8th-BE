@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util;
+package eightjbbm.keepgo.util.file;
 
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 

@@ -18,15 +18,14 @@ public class SlotValue {
     private List<String> categories;
 
     public static SlotValue from(
-            Float lat,
-            Float lng,
+            Coordinate coordinate,
             String requestedLocationName,
             LocalDateTime requestedDateTime,
             Integer availableTime,
             List<String> categories
     ) {
         return new SlotValue(
-                new Coordinate(lat, lng),
+                coordinate,
                 requestedLocationName,
                 requestedDateTime,
                 availableTime,
