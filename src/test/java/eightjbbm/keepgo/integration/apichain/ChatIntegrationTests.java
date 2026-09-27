@@ -25,8 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /// 채팅 도메인 통합 테스트
 ///
@@ -93,14 +93,13 @@ public class ChatIntegrationTests {
                 })
                 .bodyValue(request)
                 .exchange()
+                .expectStatus().isAccepted()
                 .expectBody()
                 .returnResult();
 
         IO.println("status = " + result.getStatus());
         IO.println("headers = " + result.getResponseHeaders());
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.ACCEPTED);
     }
 
     /// 외부 API 호출: AI 서버
@@ -127,14 +126,13 @@ public class ChatIntegrationTests {
                 })
                 .bodyValue(request)
                 .exchange()
+                .expectStatus().isOk()
                 .expectBody()
                 .returnResult();
 
         IO.println("status = " + result.getStatus());
         IO.println("headers = " + result.getResponseHeaders());
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -151,6 +149,7 @@ public class ChatIntegrationTests {
                     headers.setBearerAuth(issueAccessToken());
                 })
                 .exchange()
+                .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("IN_PROGRESS")
                 .returnResult();
@@ -158,8 +157,6 @@ public class ChatIntegrationTests {
         IO.println("status = " + result.getStatus());
         IO.println("headers = " + result.getResponseHeaders());
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -176,6 +173,7 @@ public class ChatIntegrationTests {
                     headers.setBearerAuth(issueAccessToken());
                 })
                 .exchange()
+                .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("COMPLETED")
                 .returnResult();
@@ -183,8 +181,6 @@ public class ChatIntegrationTests {
         IO.println("status = " + result.getStatus());
         IO.println("headers = " + result.getResponseHeaders());
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -202,14 +198,13 @@ public class ChatIntegrationTests {
                     headers.setBearerAuth(issueAccessToken());
                 })
                 .exchange()
+                .expectStatus().isOk()
                 .expectBody()
                 .returnResult();
 
         IO.println("status = " + result.getStatus());
         IO.println("headers = " + result.getResponseHeaders());
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
