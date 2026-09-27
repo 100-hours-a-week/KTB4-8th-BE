@@ -63,7 +63,7 @@ public class ChatService {
     /// @return {@link GetChatsResult}
     public GetChatsResult getChats(GetChatsCommand command) {
         Slice<Chat> chatSlice = chatRepository.findByMemberIdAndIdLessThanOrderByCreatedAtDescIdDesc(
-                command.userId(),
+                command.memberId(),
                 command.cursor(),
                 PageRequest.of(0, command.size() + 1)
         );
@@ -79,7 +79,7 @@ public class ChatService {
     /// 1차 구현 완료
     /// @param command {@link ResetChatroomCommand}
     public void resetChatroom(ResetChatroomCommand command) {
-        List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.userId());
+        List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.memberId());
         allByMemberId.forEach(Chat::delete);
     }
 

@@ -26,16 +26,17 @@ public class RecommendationService {
     private final RecommendationJobCacheService recommendationJobCacheService;
 
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
-        String query = queryCacheService.getQuery(command.userId());
+        Long memberId = command.memberId();
+        String query = queryCacheService.getQuery(memberId);
         List<OutingCollectionPrivate> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
-        SlotValue slot = slotCacheService.read(command.userId());
-        recommendationJobCacheService.createJob(command.userId(), 0L);
+        SlotValue slot = slotCacheService.read(memberId);
+        recommendationJobCacheService.createJob(memberId, 0L);
 
         var recommendCourseResponse = aiServerClient.recommendCourse(RecommendCourseRequest.from(
                 query, collection, slot
         ));
 
-        recommendationJobCacheService.completeJob(command.userId());
+        recommendationJobCacheService.completeJob(command.memberId());
 
         return RequestRecommendationResult.from(
                 slot, recommendCourseResponse,
@@ -47,7 +48,7 @@ public class RecommendationService {
     }
 
     public void stopRecommendation(StopRecommendationCommand command) {
-        Long jobId = recommendationJobCacheService.getJobId(command.userId());
+        Long jobId = recommendationJobCacheService.getJobId(command.memberId());
         aiServerClient.stopRecommendation(jobId);
     }
 }

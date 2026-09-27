@@ -1,7 +1,7 @@
 package eightjbbm.keepgo.member.dto;
 
-/// @param userId 회원 ID
+/// @param memberId 회원 ID
 public record SynchronizeYoutubeLikeVideosCommand(
-        Long userId
+        Long memberId
 ) {
 }
