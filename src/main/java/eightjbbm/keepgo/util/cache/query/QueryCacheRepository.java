@@ -8,13 +8,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 @RequiredArgsConstructor
 public class QueryCacheRepository {
+    public static final String cacheName = "query";
     private final CacheManager cacheManager;
 
     private Cache getQueryCache() {
-        Cache cache = cacheManager.getCache("query");
+        Cache cache = cacheManager.getCache(cacheName);
 
         if (cache == null) {
-            throw new IllegalStateException("No Cache");
+            throw new IllegalStateException("No Cache: " + cacheName);
         }
 
         return cache;

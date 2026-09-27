@@ -23,6 +23,7 @@ import java.util.Optional;
 @Repository
 @RequiredArgsConstructor
 public class SlotCacheRepository {
+    public static final String cacheName = "slot";
     private final CacheManager cacheManager;
 
     public Optional<SlotValue> read(Long memberId) {
@@ -34,10 +35,10 @@ public class SlotCacheRepository {
     }
 
     private Cache getSlotCache() {
-        Cache cache = cacheManager.getCache("slot");
+        Cache cache = cacheManager.getCache(cacheName);
 
         if (cache == null) {
-            throw new IllegalStateException("No Cache");
+            throw new IllegalStateException("No Cache: " + cacheName);
         }
 
         return cache;
