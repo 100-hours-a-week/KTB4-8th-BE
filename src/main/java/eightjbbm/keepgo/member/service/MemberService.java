@@ -2,8 +2,10 @@ package eightjbbm.keepgo.member.service;
 
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
@@ -25,6 +27,7 @@ import java.util.List;
 public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
+    private final OAuthAccountRepository oAuthAccountRepository;
     private final OutingPlaceRepository outingPlaceRepository;
     private final OutingEventRepository outingEventRepository;
     private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
