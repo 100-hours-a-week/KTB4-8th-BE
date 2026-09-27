@@ -19,22 +19,14 @@ public interface ChatMapper {
 
     SendChatResponse toResponse(SendChatResult result);
 
-    @Mapping(source = "location", target = "userCoordinate")
+    @Mapping(source = "request.location", target = "userCoordinate")
     UpdateSlotCommand toUpdateSlotCommand(Long memberId, UpdateSlotRequest request);
-
-    UpdateSlotResponse toResponse(UpdateSlotResult result);
 
     GetReplyCommand toGetReplyCommand(Long memberId, Long chatId);
 
-    GetReplyResponse toResponse(GetReplyResult result);
-
     GetChatsCommand toGetChatsCommand(Long memberId, Long cursor, Integer size);
 
-    GetChatsResponse toResponse(GetChatsResult result);
-
     ResetChatroomCommand toResetChatroomCommand(Long memberId);
-
-    ResetChatroomResponse toResponse(ResetChatroomResult result);
 
     @Mapping(source = "userCoordinate", target = "coordinate")
     UpdateSlotCacheRequest toUpdateSlotCacheRequest(UpdateSlotCommand command);

@@ -17,9 +17,9 @@ public class AtBlacklistValidator implements OAuth2TokenValidator<Jwt> {
     @Override
     public OAuth2TokenValidatorResult validate(Jwt token) {
         if (accessTokenManager.checkBlacklist(token.getId())) {
-            return OAuth2TokenValidatorResult.success();
-        } else {
             return OAuth2TokenValidatorResult.failure(new OAuth2Error(OAuth2ErrorCodes.INVALID_TOKEN));
+        } else {
+            return OAuth2TokenValidatorResult.success();
         }
     }
 }

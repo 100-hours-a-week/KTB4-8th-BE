@@ -15,6 +15,7 @@ public class OAuthAccount {
     @ManyToOne
     @JoinColumn(name = "member_id")
     private Member member;
+    private String email;
     private String issuer;
     private String subject;
     private Instant lastLoginAt;
@@ -23,14 +24,15 @@ public class OAuthAccount {
     private Instant deletedAt;
     private String refreshTokenEncrypted;
 
-    public OAuthAccount(Member member, String issuer, String subject) {
+    public OAuthAccount(Member member, String email, String issuer, String subject) {
+        this.email = email;
         this.member = member;
         this.issuer = issuer;
         this.subject = subject;
     }
 
-    public static OAuthAccount create(Member member, String issuer, String subject) {
-        return new OAuthAccount(member, issuer, subject);
+    public static OAuthAccount create(Member member, String email, String issuer, String subject) {
+        return new OAuthAccount(member, email, issuer, subject);
     }
 
     public void rotateRefreshToken(String refreshTokenHash) {

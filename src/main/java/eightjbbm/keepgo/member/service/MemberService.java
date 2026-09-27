@@ -2,8 +2,10 @@ package eightjbbm.keepgo.member.service;
 
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
@@ -25,6 +27,7 @@ import java.util.List;
 public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
+    private final OAuthAccountRepository oAuthAccountRepository;
     private final OutingPlaceRepository outingPlaceRepository;
     private final OutingEventRepository outingEventRepository;
     private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
@@ -37,7 +40,7 @@ public class MemberService {
     public UpdateMemberInfoResult updateMemberInfo(
             UpdateMemberInfoCommand command
     ) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
+        Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
         File profileImage = fileRepository.findByStoragePath(command.profileImagePath()).orElseThrow();
         member.updateProfileImage(profileImage);
@@ -52,8 +55,9 @@ public class MemberService {
     public GetMemberInfoResult getMemberInfo(
             GetMemberInfoCommand command
     ) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
-        return GetMemberInfoResult.from(member);
+        Member member = memberRepository.findById(command.memberId()).orElseThrow();
+        OAuthAccount oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
+        return GetMemberInfoResult.from(member, oAuthAccount);
     }
 
     /// 좋아요한 동영상 목록 동기화 API
@@ -63,7 +67,7 @@ public class MemberService {
     public void synchronizeYoutubeLikeVideos(
             SynchronizeYoutubeLikeVideosCommand command
     ) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
+        Member member = memberRepository.findById(command.memberId()).orElseThrow();
         List<String> urls = youtubeApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId()).getVideoIds();
         for (String url: urls) {
             AnalyzeVideoResponse response = aiServerClient.analyzeVideo(url);

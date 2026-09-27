@@ -2,11 +2,12 @@ package eightjbbm.keepgo.auth;
 
 import eightjbbm.keepgo.util.cache.atblacklist.AtBlacklistCacheRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -16,12 +17,11 @@ import java.util.UUID;
 ///
 @Service
 @RequiredArgsConstructor
+@EnableConfigurationProperties(JwtProperties.class)
 public class AccessTokenManager {
 
-    private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(15);
     private final JwtEncoder jwtEncoder;
-    private final String KEY_ID = "placeholder";
-    private final String ISSUER = "https://auth.example.com";
+    private final JwtProperties jwtProperties;
     private final AtBlacklistCacheRepository atBlacklistCacheRepository;
 
     public String issue(
@@ -31,17 +31,18 @@ public class AccessTokenManager {
         Instant now = Instant.now();
         var header = JwsHeader
                 .with(SignatureAlgorithm.RS256)
-                .keyId(KEY_ID)
+                .keyId(jwtProperties.keyId())
                 .type("at+jwt")
                 .build();
 
         var claims = JwtClaimsSet.builder()
-                .issuer(ISSUER)
+                .issuer(jwtProperties.issuer())
                 .subject(memberId.toString())
-                .audience(List.of())
+                .audience(List.of(jwtProperties.audience()))
                 .issuedAt(now)
-                .expiresAt(now.plus(ACCESS_TOKEN_TTL))
+                .expiresAt(now.plus(jwtProperties.accessTokenTtl()))
                 .id(UUID.randomUUID().toString())
+                .claim("client_id", jwtProperties.clientId())
                 .claim("roles", roles)
                 .build();
 

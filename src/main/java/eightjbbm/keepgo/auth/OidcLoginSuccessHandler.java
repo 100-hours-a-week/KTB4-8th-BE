@@ -10,6 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -24,6 +25,12 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 
+@Import({
+        ObjectMapper.class,
+        AccessTokenManager.class,
+        RefreshTokenManager.class,
+        YoutubeApiClient.class
+})
 @Component
 @RequiredArgsConstructor
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
@@ -39,7 +46,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         OidcUser oidcUser = (OidcUser) authentication;
 
-        Member member = oAuthAccountRepository.findByIssSub(
+        Member member = oAuthAccountRepository.findByIssuerAndSubject(
                     oidcUser.getIssuer().toString(),
                     oidcUser.getSubject()
                 )
@@ -54,6 +61,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                             return oAuthAccountRepository.save(
                                     OAuthAccount.create(
                                             newMember,
+                                            oidcUser.getEmail(),
                                             oidcUser.getIssuer().toString(),
                                             oidcUser.getSubject()
                                     )

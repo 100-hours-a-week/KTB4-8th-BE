@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 @RequiredArgsConstructor
 public class RtHashCacheRepository {
+    public static final String cacheName = "rtHash";
     private final CacheManager cacheManager;
 
     public void create(String rtHash, RtHashCacheValue rtHashCacheValue) {
@@ -29,10 +30,10 @@ public class RtHashCacheRepository {
     }
 
     private Cache getRtHashCache() {
-        Cache cache = cacheManager.getCache("rtHash");
+        Cache cache = cacheManager.getCache(cacheName);
 
         if (cache == null) {
-            throw new IllegalStateException("No Cache");
+            throw new IllegalStateException("No Cache: " + cacheName);
         }
 
         return cache;

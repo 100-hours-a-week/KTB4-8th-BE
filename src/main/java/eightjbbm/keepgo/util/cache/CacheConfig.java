@@ -26,7 +26,8 @@ public class CacheConfig {
                 "replyJob",
                 "slot",
                 "accessTokenBlacklist",
-                "refreshTokenBlacklist"
+                "refreshTokenBlacklist",
+                "atBlacklist"
         );
         cacheManager.setCaffeine(caffeine);
         return cacheManager;

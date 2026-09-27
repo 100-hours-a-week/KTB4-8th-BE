@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 @RequiredArgsConstructor
 public class GetReplyCacheRepository {
+    public static final String cacheName = "replyJob";
     private final CacheManager cacheManager;
 
     public void create(Long memberId) {
@@ -33,10 +34,10 @@ public class GetReplyCacheRepository {
     }
 
     private Cache getReplyCache() {
-        Cache cache = cacheManager.getCache("replyJob");
+        Cache cache = cacheManager.getCache(cacheName);
 
         if (cache == null) {
-            throw new IllegalStateException("No Cache");
+            throw new IllegalStateException("No Cache: " + cacheName);
         }
 
         return cache;

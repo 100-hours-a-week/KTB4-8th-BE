@@ -3,6 +3,7 @@ package eightjbbm.keepgo.util.cache.atblacklist;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -11,6 +12,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AtBlacklistCacheRepository {
     private final CacheManager cacheManager;
+    private static final String cacheName = "atBlacklist";
 
     public void create(String jti) {
         getAtBlacklist().putIfAbsent(jti, true);
@@ -21,10 +23,10 @@ public class AtBlacklistCacheRepository {
     }
 
     private Cache getAtBlacklist() {
-        Cache cache = cacheManager.getCache("atBlacklist");
+        Cache cache = cacheManager.getCache(cacheName);
 
         if (cache == null) {
-            throw new IllegalStateException("No Cache");
+            throw new IllegalStateException("No Cache: " + cacheName);
         }
 
         return cache;

@@ -21,6 +21,6 @@ public interface MemberMapper {
 
     SynchronizeYoutubeLikeVideosCommand toSynchronizeYoutubeLikeVideosCommand(Long memberId);
 
-    @Mapping(source = "profileImageUrl", target = "profileImagePath")
+    @Mapping(source = "request.profileImageUrl", target = "profileImagePath")
     UpdateMemberInfoCommand toUpdateMemberInfoCommand(Long memberId, UpdateMemberInfoRequest request);
 }

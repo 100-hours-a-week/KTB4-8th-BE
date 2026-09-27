@@ -1,21 +1,18 @@
 package eightjbbm.keepgo.auth;
 
-import eightjbbm.keepgo.auth.rt.RtHashCacheService;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HexFormat;
 
 @RequiredArgsConstructor
 public class RefreshAuthenticationProvider implements AuthenticationProvider {
-    private final RtHashCacheService rtHashCacheService;
+    private final RefreshTokenManager refreshTokenManager;
 
     @Override
     public @Nullable Authentication authenticate(Authentication authentication) throws AuthenticationException {
@@ -28,29 +25,15 @@ public class RefreshAuthenticationProvider implements AuthenticationProvider {
     }
 
     private void validateRefreshToken(String refreshToken) {
-        var rtValue = rtHashCacheService.getRtByHash(
-                    hash(refreshToken)
-                )
+        var rtValue = refreshTokenManager.get(refreshToken)
                 .orElseThrow(
-                    //RT 없음
+                        () -> new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT)
                 );
-        if (!rtValue.getState().equals("ACTIVE")) {
+        if (!rtValue.getState().equals(RefreshTokenState.ACTIVE)) {
             throw new RuntimeException(); //무효화된 토큰으로 한 번 시도함
         }
         if (rtValue.getExpiresAt().isBefore(Instant.now())) {
             throw new RuntimeException(); //유효 기간 지남, 재로그인
-        }
-    }
-
-    private String hash(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(
-                    value.getBytes(StandardCharsets.UTF_8)
-            );
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 Unsupported", e);
         }
     }
 
