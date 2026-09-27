@@ -131,6 +131,7 @@ public class MemberIntegrationTests {
             """)
     void test3() throws Exception {
         // 유튜브 API 응답은 Mocking해야 할 듯
+        member.setLikedVideosPlaylistId(String.valueOf(0));
         webTestClient
                 .post()
                 .uri("/api/v1/user/youtube-analyze")
