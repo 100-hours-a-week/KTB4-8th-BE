@@ -2,6 +2,7 @@ package eightjbbm.keepgo.util.client;
 
 import eightjbbm.keepgo.util.dto.MapCoordinatesToLocationNameResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
@@ -10,7 +11,8 @@ import org.springframework.web.util.UriBuilder;
 @RequiredArgsConstructor
 public class GeoCodingClient {
 
-    private final String baseUrl = "https://api.vworld.kr/req/address";
+    private final String path = "/req/address";
+    @Qualifier("geoCodingRestClient")
     private final RestClient geoCodingRestClient;
     private final String apiKey = "placeholder";
 
@@ -19,7 +21,7 @@ public class GeoCodingClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .host(baseUrl)
+                                    .path(path)
                                     .queryParam("service", "address")
                                     .queryParam("request", "getAddress")
                                     .queryParam("version", 2.0)

@@ -2,6 +2,7 @@ package eightjbbm.keepgo.util.client;
 
 import eightjbbm.keepgo.util.dto.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
@@ -9,7 +10,7 @@ import org.springframework.web.util.UriBuilder;
 @Component
 @RequiredArgsConstructor
 public class AiServerClient {
-    private final String baseUrl = "";
+    @Qualifier("aiServerRestClient")
     private final RestClient aiServerRestClient;
 
     public RecommendCourseResponse recommendCourse(RecommendCourseRequest request) {
@@ -17,7 +18,6 @@ public class AiServerClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .host(baseUrl)
                                     .path("/v1/recommend-courses");
                             return builder.build();
                         }
@@ -32,7 +32,6 @@ public class AiServerClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .host(baseUrl)
                                     .path("/v1/recommend-course/" + jobId + "/cancel");
                             return builder.build();
                         }
@@ -44,7 +43,6 @@ public class AiServerClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .host(baseUrl)
                                     .path("/v1/extract");
                             return builder.build();
                         }
@@ -59,7 +57,6 @@ public class AiServerClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .host(baseUrl)
                                     .path("/v1/analyze-video");
                             return builder.build();
                         }
