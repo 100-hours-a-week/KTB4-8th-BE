@@ -3,6 +3,7 @@ package eightjbbm.keepgo.auth;
 import eightjbbm.keepgo.auth.rt.RtHashCacheValue;
 import eightjbbm.keepgo.auth.rt.RtHashCacheRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -13,7 +14,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
 
+@Import(RtHashCacheRepository.class)
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenManager {
@@ -32,6 +35,11 @@ public class RefreshTokenManager {
                 )
         );
         return refreshToken;
+    }
+
+    public Optional<RtHashCacheValue> get(String refreshToken) {
+        String refreshTokenHash = sha256(refreshToken);
+        return rtHashCacheRepository.read(refreshTokenHash);
     }
 
     public String rotate(String refreshToken) {
