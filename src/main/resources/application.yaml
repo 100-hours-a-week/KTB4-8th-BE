@@ -1,6 +1,8 @@
 spring:
   application:
     name: keepgo
+  jackson:
+    property-naming-strategy: SNAKE_CASE
   datasource:
     url: jdbc:${DB_VENDOR:mysql}://${DB_HOST:172.25.96.1}:${DB_PORT:3306}/${DB_NAME:keepgo}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}
     username: ${DB_USERNAME:keepgo}
