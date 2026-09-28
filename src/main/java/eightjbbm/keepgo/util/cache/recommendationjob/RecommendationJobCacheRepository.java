@@ -30,7 +30,7 @@ public class RecommendationJobCacheRepository {
         Cache cache = cacheManager.getCache(cacheName);
 
         if (cache == null) {
-            throw new IllegalStateException("No Cache" + cacheName);
+            throw new IllegalStateException("No Cache: " + cacheName);
         }
 
         return cache;
