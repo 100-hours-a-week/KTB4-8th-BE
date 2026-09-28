@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util.client;
+package eightjbbm.keepgo.util.client.ai;
 
 import eightjbbm.keepgo.util.dto.*;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +9,7 @@ import org.springframework.web.util.UriBuilder;
 
 @Component
 @RequiredArgsConstructor
-public class AiServerClient {
+public class AiServerApiClient {
     @Qualifier("aiServerRestClient")
     private final RestClient aiServerRestClient;
 

@@ -12,10 +12,10 @@ import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
-import eightjbbm.keepgo.util.client.AiServerClient;
+import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.file.File;
 import eightjbbm.keepgo.util.file.FileRepository;
-import eightjbbm.keepgo.util.client.YoutubeApiClient;
+import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,8 +31,8 @@ public class MemberService {
     private final OutingPlaceRepository outingPlaceRepository;
     private final OutingEventRepository outingEventRepository;
     private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
-    private final YoutubeApiClient youtubeApiClient;
-    private final AiServerClient aiServerClient;
+    private final GoogleApiClient googleApiClient;
+    private final AiServerApiClient aiServerApiClient;
 
     /// 회원 정보 수정 API
     /// @param command {@link UpdateMemberInfoCommand}
@@ -68,9 +68,9 @@ public class MemberService {
             SynchronizeYoutubeLikeVideosCommand command
     ) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        List<String> urls = youtubeApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId()).getVideoIds();
+        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId()).getVideoIds();
         for (String url: urls) {
-            AnalyzeVideoResponse response = aiServerClient.analyzeVideo(url);
+            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
             OutingGuide guide;
             if (isPlaceOrEvent(response.getCategory())) {
                 guide = outingPlaceRepository.findByName(response.getName()).orElseGet(

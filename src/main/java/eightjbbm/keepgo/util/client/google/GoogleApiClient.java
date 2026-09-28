@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.util.client;
+package eightjbbm.keepgo.util.client.google;
 
 import eightjbbm.keepgo.util.dto.RetrieveLikedVideosResponse;
 import eightjbbm.keepgo.util.dto.RetrieveLikesPlaylistIdResponse;
@@ -10,7 +10,7 @@ import org.springframework.web.util.UriBuilder;
 
 @Component
 @RequiredArgsConstructor
-public class YoutubeApiClient {
+public class GoogleApiClient {
 
     @Qualifier("googleRestClient")
     private final RestClient googleRestClient;

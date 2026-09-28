@@ -5,7 +5,7 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.util.client.YoutubeApiClient;
+import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,7 +29,7 @@ import java.util.List;
         ObjectMapper.class,
         AccessTokenManager.class,
         RefreshTokenManager.class,
-        YoutubeApiClient.class
+        GoogleApiClient.class
 })
 @Component
 @RequiredArgsConstructor
@@ -40,7 +40,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final MemberRepository memberRepository;
     private final AccessTokenManager accessTokenManager;
     private final RefreshTokenManager refreshTokenManager;
-    private final YoutubeApiClient youtubeApiClient;
+    private final GoogleApiClient googleApiClient;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
@@ -57,7 +57,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                                             oidcUser.getNickName()
                                     )
                             );
-                            newMember.setLikedVideosPlaylistId(youtubeApiClient.retrieveLikesPlaylistId(newMember.getId()).getLikesPlaylistId());
+                            newMember.setLikedVideosPlaylistId(googleApiClient.retrieveLikesPlaylistId(newMember.getId()).getLikesPlaylistId());
                             return oAuthAccountRepository.save(
                                     OAuthAccount.create(
                                             newMember,

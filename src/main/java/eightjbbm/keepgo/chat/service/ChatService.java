@@ -7,7 +7,7 @@ import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.client.GeoCodingClient;
+import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
@@ -29,7 +29,7 @@ public class ChatService {
     private final GetReplyCacheService getReplyCacheService;
     private final SlotCacheService slotCacheService;
     private final QueryCacheService queryCacheService;
-    private final GeoCodingClient geoCodingClient;
+    private final GeoCodingApiClient geoCodingApiClient;
 
     /// 채팅 전송 API
     /// @param command {@link SendChatCommand}
@@ -90,7 +90,7 @@ public class ChatService {
         String result = null;
         Coordinate coordinate = slotCacheService.getCoordinate(command.memberId());
         if (!command.userCoordinate().equals(coordinate)) {
-            result = geoCodingClient.mapCoordinatesToLocationName(coordinate.lat(), coordinate.lng()).getAddress();
+            result = geoCodingApiClient.mapCoordinatesToLocationName(coordinate.lat(), coordinate.lng()).getAddress();
         }
         return UpdateSlotResult.from(result);
     }
