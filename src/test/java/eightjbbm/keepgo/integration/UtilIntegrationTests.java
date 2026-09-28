@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.BodyInserters;
 
+import java.io.IOException;
 import java.util.List;
 
 /// 기타 도메인 통합 테스트
@@ -74,11 +75,10 @@ public class UtilIntegrationTests {
             프로필 사진 업로드 API 통합 테스트
             """)
     void test1() {
-        // 테스트용 임시 이미지 필요
-        var image = new ClassPathResource("images/profile.png");
+        var image = new ClassPathResource("images/lenna.png");
         var body = new MultipartBodyBuilder();
-        body.part("image", image)
-                .filename("profile.png")
+        body.part("profileImage", image)
+                .filename("lenna.png")
                 .contentType(MediaType.IMAGE_PNG);
 
         webTestClient
@@ -96,5 +96,40 @@ public class UtilIntegrationTests {
                 .exchange()
                 .expectStatus().isCreated()
                 .expectHeader().exists(HttpHeaders.LOCATION);
+    }
+
+    @Test
+    @DisplayName("""
+            파일 업로드 API 결과로 생성된 Location 헤더 검증
+            """)
+    void test2() throws IOException {
+        var image = new ClassPathResource("images/lenna.png");
+        var originalImage = image.getContentAsByteArray();
+        var body = new MultipartBodyBuilder();
+        body.part("profileImage", image)
+                .filename("lenna.png")
+                .contentType(MediaType.IMAGE_PNG);
+
+        var location = webTestClient
+                .post()
+                .uri("/api/v1/user/profile-image")
+                .headers(headers -> {
+                    headers.setBearerAuth(issueAccessToken());
+                })
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(
+                        BodyInserters.fromMultipartData(
+                                body.build()
+                        )
+                )
+                .exchange()
+                .returnResult()
+                .getResponseHeaders().get("Location").getFirst();
+
+        webTestClient
+                .get()
+                .uri(location)
+                .exchange()
+                .expectBody().equals(originalImage);
     }
 }
