@@ -45,6 +45,6 @@ public class GoogleLoginIntegrationTest {
                                         )
                                 )
                         )
-        ).andExpect(status().isOk());
+        ).andExpect(status().isFound());
     }
 }
