@@ -39,5 +39,5 @@ public class GeoCodingApiClient {
                 )
                 .retrieve()
                 .body(MapCoordinatesToLocationNameResponse.class);
-    };
+    }
 }

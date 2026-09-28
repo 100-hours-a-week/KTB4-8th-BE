@@ -27,7 +27,8 @@ public class CacheConfig {
                 "slot",
                 "accessTokenBlacklist",
                 "refreshTokenBlacklist",
-                "atBlacklist"
+                "atBlacklist",
+                "rtHash"
         );
         cacheManager.setCaffeine(caffeine);
         return cacheManager;

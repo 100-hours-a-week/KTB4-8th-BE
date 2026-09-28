@@ -4,6 +4,7 @@ import eightjbbm.keepgo.auth.rt.RtHashCacheValue;
 import eightjbbm.keepgo.auth.rt.RtHashCacheRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -34,7 +35,14 @@ public class RefreshTokenManager {
                         RefreshTokenState.ACTIVE
                 )
         );
-        return refreshToken;
+        return ResponseCookie
+                .from("refresh_token", refreshToken)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Lax")
+                .path("/api/v1/user/auth-session")
+                .maxAge(Duration.ofDays(14))
+                .build().toString();
     }
 
     public Optional<RtHashCacheValue> get(String refreshToken) {

@@ -25,7 +25,7 @@ public class AuthController {
     private final AccessTokenManager accessTokenManager;
     private final RefreshTokenManager refreshTokenManager;
 
-    @PostMapping("/user/auth-session")
+    @PostMapping("/api/v1/user/auth-session")
     public ResponseEntity<Void> login(
             LoginRequest request
     ) {
@@ -39,10 +39,10 @@ public class AuthController {
                 .build();
     }
 
-    @DeleteMapping("/user/auth-session")
+    @DeleteMapping("/api/v1/user/auth-session")
     public ResponseEntity<Void> logout(
             @AuthenticationPrincipal Jwt jwt,
-            @CookieValue(name = "refresh-token") String refreshToken
+            @CookieValue(name = "refresh_token") String refreshToken
     ) {
         accessTokenManager.revoke(jwt.getId());
         refreshTokenManager.revoke(
@@ -55,9 +55,9 @@ public class AuthController {
                 .build();
     }
 
-    @PostMapping("/user/auth-session/refresh")
+    @PostMapping("/api/v1/user/auth-session/refresh")
     public ResponseEntity<RefreshResponse> refresh(
-            @CookieValue(name = "refresh-token") String refreshToken
+            @CookieValue(name = "refresh_token") String refreshToken
     ) {
         String newAccessToken = accessTokenManager.issue(0L, List.of());
         String newRefreshToken = refreshTokenManager.rotate(refreshToken);
