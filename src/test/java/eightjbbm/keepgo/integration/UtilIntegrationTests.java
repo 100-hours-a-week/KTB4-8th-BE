@@ -34,7 +34,6 @@ import java.util.List;
 @EnableConfigurationProperties({JwtProperties.class})
 public class UtilIntegrationTests {
 
-    @Autowired
     WebTestClient webTestClient;
 
     @Autowired
@@ -48,6 +47,16 @@ public class UtilIntegrationTests {
 
     private Member member;
     private OAuthAccount memberOAuthAccount;
+
+    @Autowired
+    void setWebTestClient(WebTestClient webTestClient) {
+        this.webTestClient = webTestClient.mutate()
+                .codecs(configurer ->
+                        configurer.defaultCodecs()
+                                .maxInMemorySize(10 * 1024 * 1024)
+                )
+                .build();
+    }
 
     @BeforeEach
     void setUp() {
