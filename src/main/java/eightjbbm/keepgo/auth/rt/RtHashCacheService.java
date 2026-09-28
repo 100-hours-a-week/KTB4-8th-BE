@@ -18,6 +18,7 @@ public class RtHashCacheService {
         return rtHashCacheRepository.read(hash);
     }
 
+    /*
     public void loadSession(Long memberId, String refreshToken) {
         rtHashCacheRepository.update(
                 refreshToken,
@@ -28,6 +29,8 @@ public class RtHashCacheService {
                 )
         );
     }
+
+     */
 
 
     public void revokeSession(String refreshTokenHash) {

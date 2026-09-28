@@ -46,7 +46,6 @@ public class AuthController {
     ) {
         accessTokenManager.revoke(jwt.getId());
         refreshTokenManager.revoke(
-                Long.valueOf(jwt.getSubject()),
                 refreshToken
         );
 
@@ -62,18 +61,9 @@ public class AuthController {
         String newAccessToken = accessTokenManager.issue(0L, List.of());
         String newRefreshToken = refreshTokenManager.rotate(refreshToken);
 
-        ResponseCookie cookie = ResponseCookie
-                .from("refresh_token", newRefreshToken)
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Lax")
-                .path("/api/v1/user/auth-session")
-                .maxAge(Duration.ofDays(14))
-                .build();
-
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .header(HttpHeaders.SET_COOKIE, newRefreshToken)
                 .body(RefreshResponse.from(
                         newAccessToken,
                         "Bearer",

@@ -1,36 +1,66 @@
 package eightjbbm.keepgo.util.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.cache.caffeine.CaffeineCacheManager;
+import org.springframework.cache.caffeine.CaffeineCache;
+import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import java.util.List;
 
 @EnableCaching
 @Configuration
+@RequiredArgsConstructor
+@EnableConfigurationProperties(RtHashCacheProperties.class)
 public class CacheConfig {
-    @Bean
-    public Caffeine<Object, Object> caffeineConfig() {
-        return Caffeine.newBuilder()
-                .expireAfterWrite(900, TimeUnit.SECONDS)
-                .initialCapacity(10)
-                .maximumSize(1000);
-    }
+
+    private final RtHashCacheProperties rtHashCacheProperties;
 
     @Bean
-    public CacheManager cacheManager(Caffeine<Object, Object> caffeine) {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+    public CacheManager cacheManager() {
+        var cacheManager = new SimpleCacheManager();
+        var replyJob = new CaffeineCache(
                 "replyJob",
-                "slot",
-                "accessTokenBlacklist",
-                "refreshTokenBlacklist",
-                "atBlacklist",
-                "rtHash"
+                Caffeine.newBuilder()
+                        .maximumSize(1000)
+                        .expireAfterWrite(Duration.ofSeconds(600))
+                        .recordStats()
+                        .build()
         );
-        cacheManager.setCaffeine(caffeine);
+
+        var slot = new CaffeineCache(
+                "slot",
+                Caffeine.newBuilder()
+                        .maximumSize(1000)
+                        .expireAfterWrite(Duration.ofSeconds(600))
+                        .recordStats()
+                        .build()
+        );
+
+        var atBlacklist = new CaffeineCache(
+                "atBlacklist",
+                Caffeine.newBuilder()
+                        .maximumSize(1000)
+                        .expireAfterWrite(Duration.ofSeconds(600))
+                        .recordStats()
+                        .build()
+        );
+
+        var rtHash = new CaffeineCache(
+                "rtHash",
+                Caffeine.newBuilder()
+                        .maximumSize(rtHashCacheProperties.maximumSize())
+                        .expireAfterWrite(rtHashCacheProperties.expireAfterWrite())
+                        .recordStats()
+                        .build()
+        );
+
+        cacheManager.setCaches(List.of(replyJob, slot, atBlacklist, rtHash));
         return cacheManager;
     }
 }
