@@ -4,6 +4,7 @@ import eightjbbm.keepgo.auth.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
 import eightjbbm.keepgo.chat.dto.SendChatRequest;
 import eightjbbm.keepgo.chat.dto.UpdateSlotRequest;
+import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -51,6 +52,9 @@ public class ChatIntegrationTests {
     @Autowired
     OAuthAccountRepository oAuthAccountRepository;
 
+    @Autowired
+    ChatRepository chatRepository;
+
     private Member member;
     private OAuthAccount memberOAuthAccount;
 
@@ -69,6 +73,7 @@ public class ChatIntegrationTests {
 
     @AfterEach
     void tearDown() {
+        chatRepository.deleteAll();
         oAuthAccountRepository.deleteById(memberOAuthAccount.getId());
         memberRepository.deleteById(member.getId());
     }
