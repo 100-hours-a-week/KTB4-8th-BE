@@ -18,6 +18,11 @@ import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -33,6 +38,7 @@ public class MemberService {
     private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
     private final GoogleApiClient googleApiClient;
     private final AiServerApiClient aiServerApiClient;
+    private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     /// 회원 정보 수정 API
     /// @param command {@link UpdateMemberInfoCommand}
@@ -65,10 +71,30 @@ public class MemberService {
     /// 회원의 좋아요한 동영상 재생목록 ID를 가져오는 것은 회원가입 때 진행해야 됨.
     /// @param command {@link SynchronizeYoutubeLikeVideosCommand}
     public void synchronizeYoutubeLikeVideos(
-            SynchronizeYoutubeLikeVideosCommand command
+            SynchronizeYoutubeLikeVideosCommand command,
+            Authentication authentication
     ) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId()).getVideoIds();
+        if (!(authentication instanceof OAuth2AuthenticationToken oAuthToken)) {
+            throw new IllegalStateException("OAuth2 인증 정보가 아님");
+        }
+
+        OAuth2AuthorizedClient authorizedClient = oAuth2AuthorizedClientService.loadAuthorizedClient(
+                "google",
+                authentication.getName()
+        );
+
+        if (authorizedClient == null) {
+            throw new IllegalStateException("OAuth2AuthorizedClient를 찾지 못했음");
+        }
+
+        OAuth2AccessToken oAuth2AccessToken = authorizedClient.getAccessToken();
+
+        if (oAuth2AccessToken == null) {
+            throw new IllegalStateException("Google Access Token이 없음");
+        }
+
+        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId(), oAuth2AccessToken.getTokenValue()).getVideoIds();
         for (String url: urls) {
             AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
             OutingGuide guide;

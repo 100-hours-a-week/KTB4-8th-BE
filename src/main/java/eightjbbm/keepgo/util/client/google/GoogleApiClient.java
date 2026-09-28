@@ -34,7 +34,7 @@ public class GoogleApiClient {
     }
 
     /// 첫 50개만 조회할 수 있음. 리팩토링 필요
-    public RetrieveLikedVideosResponse retrieveLikedVideos(String likesPlaylistId) {
+    public RetrieveLikedVideosResponse retrieveLikedVideos(String likesPlaylistId, String googleAccessToken) {
         return googleRestClient.get()
                 .uri(
                         uriBuilder -> {
@@ -47,6 +47,7 @@ public class GoogleApiClient {
                             return builder.build();
                         }
                 )
+                .headers(headers -> headers.setBearerAuth(googleAccessToken))
                 .retrieve()
                 .body(RetrieveLikedVideosResponse.class);
     }

@@ -6,6 +6,7 @@ import eightjbbm.keepgo.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -61,13 +62,14 @@ public class MemberController {
     /// @param jwt
     @PostMapping("/youtube-analyze")
     public ResponseEntity<Void> synchronizeYoutubeLikeVideos(
-            @AuthenticationPrincipal Jwt jwt
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication
     ) {
         var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(
                 Long.valueOf(jwt.getSubject())
         );
 
-        memberService.synchronizeYoutubeLikeVideos(command);
+        memberService.synchronizeYoutubeLikeVideos(command, authentication);
 
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
