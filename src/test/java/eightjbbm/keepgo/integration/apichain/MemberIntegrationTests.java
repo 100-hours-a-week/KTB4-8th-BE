@@ -8,6 +8,7 @@ import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.util.file.File;
+import eightjbbm.keepgo.util.file.FileRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +47,9 @@ public class MemberIntegrationTests {
 
     @Autowired
     OAuthAccountRepository oAuthAccountRepository;
+
+    @Autowired
+    FileRepository fileRepository;
 
     private Member member;
     private OAuthAccount memberOAuthAccount;
@@ -100,7 +104,7 @@ public class MemberIntegrationTests {
             회원 정보 수정 API 통합 테스트
             """)
     void test2() throws Exception {
-        File newProfileImage = mock(File.class);
+        File newProfileImage = fileRepository.saveAndFlush(new File("/public/profile/profile-20260928153150-b6d51dcf.png"));
         var request = new UpdateMemberInfoRequest(
                 "new_nickname",
                 newProfileImage.getStoragePath()

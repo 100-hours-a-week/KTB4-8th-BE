@@ -33,9 +33,7 @@ public class Member {
     }
 
     public void updateProfileImage(File newProfileImage) {
-        if (!this.profileImage.getId().equals(newProfileImage.getId())) {
-            this.profileImage = newProfileImage;
-        }
+        this.profileImage = newProfileImage;
     }
 
     public Member(String nickname) {
