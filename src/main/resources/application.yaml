@@ -38,3 +38,16 @@ keepgo:
       key: ${VWORLD_API_KEY}
     ai:
       address: ${AI_SERVER_API_ADDRESS:placeholder}
+  cache:
+    rt-hash:
+      maximum-size: 1000
+      expire-after-write: 15m
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

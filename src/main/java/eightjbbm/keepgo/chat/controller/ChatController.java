@@ -3,6 +3,7 @@ package eightjbbm.keepgo.chat.controller;
 import eightjbbm.keepgo.chat.ChatMapper;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.chat.service.ChatService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -51,12 +52,14 @@ public class ChatController {
     @PatchMapping("/slot")
     public ResponseEntity<?> updateSlot(
             @AuthenticationPrincipal Jwt jwt,
-            UpdateSlotRequest request
+            @Valid @RequestBody UpdateSlotRequest request
     ) {
         var command = ChatMapper.INSTANCE.toUpdateSlotCommand(
                 Long.valueOf(jwt.getSubject()),
                 request
         );
+        IO.println("request coordinate: " + request.location());
+        IO.println("command coordinate: " + command.userCoordinate());
 
         UpdateSlotResult result = chatService.updateSlot(command);
         return Optional.ofNullable(result.userLocationName())
