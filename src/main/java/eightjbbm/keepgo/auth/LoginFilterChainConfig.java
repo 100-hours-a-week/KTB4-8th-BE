@@ -26,9 +26,15 @@ public class LoginFilterChainConfig {
         return http
                 .securityMatchers(
                         matchers -> matchers.requestMatchers(
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/user-session"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session"),
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth/authorization/**")
                         )
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session")
+                        ).permitAll()
+                        .anyRequest().authenticated()
                 )
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
