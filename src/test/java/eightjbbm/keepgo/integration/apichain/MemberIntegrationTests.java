@@ -20,6 +20,7 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -53,6 +54,7 @@ public class MemberIntegrationTests {
 
     private Member member;
     private OAuthAccount memberOAuthAccount;
+    private File newProfileImage;
 
     @BeforeEach
     void setUp() {
@@ -65,12 +67,15 @@ public class MemberIntegrationTests {
                 "0"
         );
         oAuthAccountRepository.saveAndFlush(memberOAuthAccount);
+        newProfileImage = new File("/public/profile/profile-20260928153150-b6d51dc9.png");
+        fileRepository.saveAndFlush(newProfileImage);
     }
 
     @AfterEach
     void tearDown() {
         oAuthAccountRepository.deleteById(memberOAuthAccount.getId());
         memberRepository.deleteById(member.getId());
+        fileRepository.deleteById(newProfileImage.getId());
     }
 
     private String issueAccessToken() {
@@ -104,7 +109,8 @@ public class MemberIntegrationTests {
             회원 정보 수정 API 통합 테스트
             """)
     void test2() throws Exception {
-        File newProfileImage = fileRepository.saveAndFlush(new File("/public/profile/profile-20260928153150-b6d51dcf.png"));
+        IO.println("count: " + fileRepository.count());
+        List<File> files = fileRepository.findAll();
         var request = new UpdateMemberInfoRequest(
                 "new_nickname",
                 newProfileImage.getStoragePath()
