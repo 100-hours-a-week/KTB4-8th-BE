@@ -103,16 +103,12 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 .build().toString();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie);
+        response.setStatus(201);
+        LoginResponse responseBody = LoginResponse.from(accessToken, "Bearer", 3600);
 
         objectMapper.writeValue(
                 response.getOutputStream(),
-                ResponseEntity
-                        .status(HttpStatus.CREATED)
-                        .body(LoginResponse.from(
-                                accessToken,
-                                "Bearer",
-                                3600
-                        ))
+                responseBody
         );
     }
 }

@@ -33,6 +33,15 @@ public class CacheConfig {
                         .build()
         );
 
+        var recommendationJob = new CaffeineCache(
+                "recommendationJob",
+                Caffeine.newBuilder()
+                        .maximumSize(1000)
+                        .expireAfterWrite(Duration.ofSeconds(600))
+                        .recordStats()
+                        .build()
+        );
+
         var slot = new CaffeineCache(
                 "slot",
                 Caffeine.newBuilder()
@@ -60,7 +69,7 @@ public class CacheConfig {
                         .build()
         );
 
-        cacheManager.setCaches(List.of(replyJob, slot, atBlacklist, rtHash));
+        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist, rtHash));
         return cacheManager;
     }
 }
