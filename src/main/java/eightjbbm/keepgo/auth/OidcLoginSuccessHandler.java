@@ -16,6 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -41,10 +45,31 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final AccessTokenManager accessTokenManager;
     private final RefreshTokenManager refreshTokenManager;
     private final GoogleApiClient googleApiClient;
+    private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
-        OidcUser oidcUser = (OidcUser) authentication;
+        OidcUser oidcUser = (OidcUser) authentication.getPrincipal();
+        if (!(authentication instanceof OAuth2AuthenticationToken oAuthToken)) {
+            throw new IllegalStateException("OAuth2 인증 정보가 아님");
+        }
+
+        String registrationId = oAuthToken.getAuthorizedClientRegistrationId();
+        String principalName = oAuthToken.getName();
+        OAuth2AuthorizedClient authorizedClient = oAuth2AuthorizedClientService.loadAuthorizedClient(
+                registrationId,
+                principalName
+        );
+
+        if (authorizedClient == null) {
+            throw new IllegalStateException("OAuth2AuthorizedClient를 찾지 못했음");
+        }
+
+        OAuth2AccessToken oAuth2AccessToken = authorizedClient.getAccessToken();
+
+        if (oAuth2AccessToken == null) {
+            throw new IllegalStateException("Google Access Token이 없음");
+        }
 
         Member member = oAuthAccountRepository.findByIssuerAndSubject(
                     oidcUser.getIssuer().toString(),
@@ -57,7 +82,8 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                                             oidcUser.getNickName()
                                     )
                             );
-                            newMember.setLikedVideosPlaylistId(googleApiClient.retrieveLikesPlaylistId(newMember.getId()).getLikesPlaylistId());
+                            //newMember.setLikedVideosPlaylistId(
+                            //        googleApiClient.retrieveLikesPlaylistId(oAuth2AccessToken.getTokenValue()).getLikesPlaylistId());
                             return oAuthAccountRepository.save(
                                     OAuthAccount.create(
                                             newMember,
