@@ -1,26 +1,34 @@
 package eightjbbm.keepgo.util.cache.slot;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class SlotCacheService {
-    private final CacheManager cacheManager;
+    private final SlotCacheRepository slotCacheRepository;
 
-    public SlotValue getSlot(Long memberId) {
+    public SlotValue read(Long memberId) {
+
         return null;
     }
 
-    private Cache getSlotCache() {
-        Cache cache = cacheManager.getCache("slot");
+    public Optional<SlotValue> getSlot(Long memberId) {
+        return slotCacheRepository.read(memberId);
+    }
 
-        if (cache == null) {
-            throw new IllegalStateException("No Cache");
-        }
-
-        return cache;
+    public void updateSlot(UpdateSlotCacheRequest request) {
+        slotCacheRepository.update(
+                request.memberId(),
+                SlotValue.from(
+                        request.coordinate(),
+                        request.requestedLocationName(),
+                        request.requestedDateTime(),
+                        request.availableTime(),
+                        request.categories()
+                )
+        );
     }
 }

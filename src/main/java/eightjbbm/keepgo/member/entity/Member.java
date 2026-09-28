@@ -1,9 +1,10 @@
 package eightjbbm.keepgo.member.entity;
 
-import eightjbbm.keepgo.util.File;
+import eightjbbm.keepgo.util.file.File;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 
@@ -22,6 +23,7 @@ public class Member {
 
     private Instant deletedAt;
 
+    @Setter
     private String likedVideosPlaylistId;
 
     public void updateNickname(String newNickname) {
@@ -31,9 +33,7 @@ public class Member {
     }
 
     public void updateProfileImage(File newProfileImage) {
-        if (!this.profileImage.getId().equals(newProfileImage.getId())) {
-            this.profileImage = newProfileImage;
-        }
+        this.profileImage = newProfileImage;
     }
 
     public Member(String nickname) {

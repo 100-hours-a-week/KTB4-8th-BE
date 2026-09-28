@@ -1,50 +1,131 @@
 package eightjbbm.keepgo.auth;
 
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
+import eightjbbm.keepgo.util.cache.atblacklist.AtBlacklistValidator;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
+import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.io.Resource;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.converter.RsaKeyConverters;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
-    private final JwtFilter jwtFilter;
-    private final OidcLoginSuccessHandler oidcLoginSuccessHandler;
+    private final JwtProperties jwtProperties;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    RSAPublicKey accessTokenPublicKey(
+            @Value(
+                    "${keepgo.security.jwt.public-key}"
+            )
+            Resource publicKeyResource
+    ) throws IOException {
+        try (InputStream inputStream = publicKeyResource.getInputStream()) {
+            return RsaKeyConverters
+                    .x509()
+                    .convert(inputStream);
+        }
+    }
+
+    @Bean
+    RSAPrivateKey accessTokenPrivateKey(
+            @Value(
+                    "${keepgo.security.jwt.private-key}"
+            )
+            Resource privateKeyResource
+    ) throws IOException {
+        try (InputStream inputStream = privateKeyResource.getInputStream()) {
+            return RsaKeyConverters
+                    .pkcs8()
+                    .convert(inputStream);
+        }
+    }
+
+    @Bean
+    JwtDecoder jwtDecoder(
+            RSAPublicKey publicKey,
+            AtBlacklistValidator blacklistValidator
+    ) {
+        var decoder = NimbusJwtDecoder
+                .withPublicKey(publicKey)
+                .signatureAlgorithm(
+                        SignatureAlgorithm.RS256
+                )
+                .validateType(false)
+                .build();
+
+        var standardValidator = JwtValidators.createAtJwtValidator()
+                .issuer(jwtProperties.issuer())
+                .audience(jwtProperties.audience())
+                .clientId(jwtProperties.clientId())
+                .build();
+        var validators = new DelegatingOAuth2TokenValidator<>(
+                standardValidator,
+                blacklistValidator
+        );
+
+        decoder.setJwtValidator(validators);
+
+        return decoder;
+    }
+
+    @Bean
+    JwtEncoder jwtEncoder(
+            RSAPublicKey publicKey,
+            RSAPrivateKey privateKey
+    ) {
+        var rsaKey = new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
+                .keyID(jwtProperties.keyId())
+                .build();
+
+        JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(
+                new JWKSet(rsaKey)
+        );
+
+        return new NimbusJwtEncoder(jwkSource);
+    }
+
+
+    @Order(1000)
+    @Bean
+    public SecurityFilterChain fallBackFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable)
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .oauth2Login(auth -> auth
-                        .successHandler(oidcLoginSuccessHandler)
-                )
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/v1/auth/**",
-                                "/error",
-                                "/api/v1/users/me/profile-image",
-                                "/public"
-                        )
+                                EndpointRequest.to(HealthEndpoint.class)
+                        ).permitAll()
+                        .requestMatchers("/public/**")
                         .permitAll()
-                        .anyRequest().authenticated()
-                )
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(new CustomAuthenticationEntryPoint())
+                        .dispatcherTypeMatchers(DispatcherType.ERROR)
+                        .permitAll()
+                        .anyRequest()
+                        .denyAll()
                 )
                 .build();
     }

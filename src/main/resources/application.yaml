@@ -1,6 +1,8 @@
 spring:
   application:
     name: keepgo
+  jackson:
+    property-naming-strategy: SNAKE_CASE
   datasource:
     url: jdbc:${DB_VENDOR:mysql}://${DB_HOST:172.25.96.1}:${DB_PORT:3306}/${DB_NAME:keepgo}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}
     username: ${DB_USERNAME:keepgo}
@@ -19,3 +21,35 @@ spring:
               - openid
               - profile
               - email
+
+keepgo:
+  security:
+    jwt:
+      access-token-ttl: 30m
+      key-id: placeholder
+      issuer: https://auth.example.com
+      audience: placeholder
+      client-id: placeholder
+      public-key: classpath:keys/public_key.pem
+      private-key: classpath:keys/private_key.pem
+  clients:
+    google:
+      address: ${GOOGLE_API_ADDRESS:https://www.googleapis.com}
+    geocoding:
+      address: ${VWORLD_API_ADDRESS:https://api.vworld.kr}
+      key: ${VWORLD_API_KEY}
+    ai:
+      address: ${AI_SERVER_API_ADDRESS:placeholder}
+  cache:
+    rt-hash:
+      maximum-size: 1000
+      expire-after-write: 15m
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

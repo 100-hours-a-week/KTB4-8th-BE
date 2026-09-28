@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.chat.dto;
 
-import eightjbbm.keepgo.chat.Chat;
+import eightjbbm.keepgo.chat.entity.Chat;
 
 /// @param chatId 채팅 ID
 /// @param content 채팅의 내용

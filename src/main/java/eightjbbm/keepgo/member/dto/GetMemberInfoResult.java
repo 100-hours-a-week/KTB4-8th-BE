@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.member.dto;
 
 import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.entity.OAuthAccount;
 
 /**
  *
@@ -13,11 +14,15 @@ public record GetMemberInfoResult(
         String profileImageUrl,
         String email
 ) {
-    public static GetMemberInfoResult from(Member member) {
+    public static GetMemberInfoResult from(Member member, OAuthAccount oAuthAccount) {
+        String profileImageUrl = null;
+        if (member.getProfileImage() != null) {
+            profileImageUrl = member.getProfileImage().getStoragePath();
+        }
         return new GetMemberInfoResult(
                 member.getNickname(),
-                member.getProfileImage().getStoragePath(),
-                member.getNickname()
+                profileImageUrl,
+                oAuthAccount.getEmail()
         );
     }
 }

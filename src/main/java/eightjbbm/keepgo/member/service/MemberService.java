@@ -2,20 +2,27 @@ package eightjbbm.keepgo.member.service;
 
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
-import eightjbbm.keepgo.recommendation.OutingEventRepository;
-import eightjbbm.keepgo.recommendation.OutingPlaceRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
-import eightjbbm.keepgo.util.AiServerClient;
-import eightjbbm.keepgo.util.File;
-import eightjbbm.keepgo.util.FileRepository;
-import eightjbbm.keepgo.util.YoutubeApiClient;
+import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
+import eightjbbm.keepgo.util.file.File;
+import eightjbbm.keepgo.util.file.FileRepository;
+import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,11 +32,13 @@ import java.util.List;
 public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
+    private final OAuthAccountRepository oAuthAccountRepository;
     private final OutingPlaceRepository outingPlaceRepository;
     private final OutingEventRepository outingEventRepository;
     private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
-    private final YoutubeApiClient youtubeApiClient;
-    private final AiServerClient aiServerClient;
+    private final GoogleApiClient googleApiClient;
+    private final AiServerApiClient aiServerApiClient;
+    private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     /// 회원 정보 수정 API
     /// @param command {@link UpdateMemberInfoCommand}
@@ -37,7 +46,7 @@ public class MemberService {
     public UpdateMemberInfoResult updateMemberInfo(
             UpdateMemberInfoCommand command
     ) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
+        Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
         File profileImage = fileRepository.findByStoragePath(command.profileImagePath()).orElseThrow();
         member.updateProfileImage(profileImage);
@@ -52,8 +61,9 @@ public class MemberService {
     public GetMemberInfoResult getMemberInfo(
             GetMemberInfoCommand command
     ) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
-        return GetMemberInfoResult.from(member);
+        Member member = memberRepository.findById(command.memberId()).orElseThrow();
+        OAuthAccount oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
+        return GetMemberInfoResult.from(member, oAuthAccount);
     }
 
     /// 좋아요한 동영상 목록 동기화 API
@@ -61,12 +71,22 @@ public class MemberService {
     /// 회원의 좋아요한 동영상 재생목록 ID를 가져오는 것은 회원가입 때 진행해야 됨.
     /// @param command {@link SynchronizeYoutubeLikeVideosCommand}
     public void synchronizeYoutubeLikeVideos(
-            SynchronizeYoutubeLikeVideosCommand command
+            SynchronizeYoutubeLikeVideosCommand command,
+            Authentication authentication
     ) {
-        Member member = memberRepository.findById(command.userId()).orElseThrow();
-        List<String> urls = youtubeApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId());
+        Member member = memberRepository.findById(command.memberId()).orElseThrow();
+        var oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
+        var client = oAuth2AuthorizedClientService.loadAuthorizedClient("google", oAuthAccount.getName());
+        if (client == null) {
+            throw new IllegalStateException(
+                    "Google OAuth 인증 정보가 없습니다."
+            );
+        }
+        String oAuth2AccessToken = client.getAccessToken().getTokenValue();
+
+        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId(), oAuth2AccessToken).getVideoIds();
         for (String url: urls) {
-            AnalyzeVideoResponse response = aiServerClient.analyzeVideo(url);
+            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
             OutingGuide guide;
             if (isPlaceOrEvent(response.getCategory())) {
                 guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
@@ -84,7 +104,7 @@ public class MemberService {
                                 response.getSummary(),
                                 null,
                                 response.data().eventStartDate(), 
-                                response.data().eventStartDate()
+                                response.data().eventEndDate()
                         ))
                 );
             }

@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.util.File;
+import eightjbbm.keepgo.util.Coordinate;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @DiscriminatorValue("PLACE")
 @NoArgsConstructor
 public class OutingPlace extends OutingGuide {
-    private String googlePlaceId;
+    private Coordinate coordinate;
 
     public OutingPlace(String category, String name, String description) {
         super(category, name, description);

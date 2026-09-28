@@ -9,7 +9,7 @@ import java.util.Optional;
 
 @Repository
 public interface OAuthAccountRepository extends JpaRepository<OAuthAccount, Long> {
-    Optional<OAuthAccount> findByIssSub(String iss, String sub);
+    Optional<OAuthAccount> findByIssuerAndSubject(String issuer, String subject);
 
     Optional<OAuthAccount> findByMember(Member member);
 }

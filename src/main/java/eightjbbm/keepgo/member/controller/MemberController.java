@@ -1,10 +1,12 @@
 package eightjbbm.keepgo.member.controller;
 
+import eightjbbm.keepgo.member.MemberMapper;
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +23,7 @@ public class MemberController {
     /// @return {@link GetMemberInfoResponse}
     @GetMapping
     public ResponseEntity<GetMemberInfoResponse> getMemberInfo(@AuthenticationPrincipal Jwt jwt) {
-        GetMemberInfoCommand command = new GetMemberInfoCommand(
+        var command = MemberMapper.INSTANCE.toGetMemberInfoCommand(
                 Long.valueOf(jwt.getSubject())
         );
 
@@ -39,11 +41,12 @@ public class MemberController {
     /// @param request {@link UpdateMemberInfoRequest}
     /// @return {@link UpdateMemberInfoResponse}
     @PatchMapping
-    public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(@AuthenticationPrincipal Jwt jwt, UpdateMemberInfoRequest request) {
-        UpdateMemberInfoCommand command = new UpdateMemberInfoCommand(
+    public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody UpdateMemberInfoRequest request) {
+        var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(
                 Long.valueOf(jwt.getSubject()),
-                request.nickname(),
-                request.profileImageUrl()
+                request
         );
 
         return ResponseEntity
@@ -58,12 +61,15 @@ public class MemberController {
     /// 유튜브 동기화 API
     /// @param jwt
     @PostMapping("/youtube-analyze")
-    public ResponseEntity<Void> synchronizeYoutubeLikeVideos(@AuthenticationPrincipal Jwt jwt) {
-        SynchronizeYoutubeLikeVideosCommand command = new SynchronizeYoutubeLikeVideosCommand(
+    public ResponseEntity<Void> synchronizeYoutubeLikeVideos(
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication
+    ) {
+        var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(
                 Long.valueOf(jwt.getSubject())
         );
 
-        memberService.synchronizeYoutubeLikeVideos(command);
+        memberService.synchronizeYoutubeLikeVideos(command, authentication);
 
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)

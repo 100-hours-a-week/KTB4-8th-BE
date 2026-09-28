@@ -1,8 +1,12 @@
 package eightjbbm.keepgo.recommendation.dto;
 
+import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.IntStream;
 
 public record RequestRecommendationResult(
         RecommendationMetadata metadata,
@@ -41,12 +45,20 @@ public record RequestRecommendationResult(
             Integer totalTravelTime,
             List<RecommendationDetailItem> items
     ) {
-        public static RecommendationDetail from(RecommendCourseResponse.RecommendData.RecommendCourse course) {
+        public static RecommendationDetail from(
+                RecommendCourseResponse.RecommendData.RecommendCourse course,
+                Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingPlace> extractor
+        ) {
             return new RecommendationDetail(
                     course.title(),
                     String.valueOf(100),
                     course.places().stream().mapToInt(RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace::travelMinutes).sum(),
-                    course.places().stream().map(RecommendationDetailItem::from).toList()
+                    IntStream.range(0, course.places().size())
+                            .mapToObj(k -> RecommendationDetailItem.from(
+                                    k,
+                                    course.places().get(k),
+                                    extractor.apply(course.places().get(k))
+                            )).toList()
             );
         }
     }
@@ -59,29 +71,30 @@ public record RequestRecommendationResult(
             Float lat,
             Float lng
     ) {
-        public static RecommendationDetailItem from(RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace place) {
+        public static RecommendationDetailItem from(int sequence, RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace place, OutingPlace outingPlace) {
             return new RecommendationDetailItem(
-                    null,
+                    sequence,
                     place.placeName(),
-                    null,
+                    outingPlace.getCategory(),
                     place.travelMinutes().toString(),
-                    null,
-                    null
+                    outingPlace.getCoordinate().lat(),
+                    outingPlace.getCoordinate().lng()
             );
         }
     }
 
     public static RequestRecommendationResult from(
-            RequestRecommendationCommand command,
-            RecommendCourseResponse response) {
+            SlotValue slot,
+            RecommendCourseResponse response,
+            Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingPlace> extractor) {
         return new RequestRecommendationResult(
                 new RecommendationMetadata(
                         response.data().courses().size(),
-                        command.location(),
-                        command.requestedTime().toString()
+                        slot.getRequestedLocationName(),
+                        slot.getRequestedDateTime().toString()
                 ),
                 response.data().courses().stream().map(RecommendationSnippet::from).toList(),
-                response.data().courses().stream().map().toList()
+                response.data().courses().stream().map(k -> RecommendationDetail.from(k, extractor)).toList()
         );
     }
 }

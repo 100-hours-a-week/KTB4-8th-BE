@@ -1,7 +1,8 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
-import eightjbbm.keepgo.util.AiServerClient;
+import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
+import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -13,14 +14,14 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class GetReplyWorker {
 
-    private final AiServerClient aiServerClient;
+    private final AiServerApiClient aiServerApiClient;
+    private final GetReplyCacheRepository getReplyCacheRepository;
 
     @Async("httpTaskExecutor")
     @Transactional
-    public CompletableFuture<Void> getReply(ExtractSlotRequest request) {
-        // 작업 상태를 진행 중으로 하여 캐시에 적재
-        aiServerClient.extractSlot(request);
-        // 완료 시 적재된 캐시에 반환된 응답 기록
+    public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
+        ExtractSlotResponse response = aiServerApiClient.extractSlot(request);
+        getReplyCacheRepository.update(memberId, response.data().botMessage());
         return CompletableFuture.completedFuture(null);
     }
 }

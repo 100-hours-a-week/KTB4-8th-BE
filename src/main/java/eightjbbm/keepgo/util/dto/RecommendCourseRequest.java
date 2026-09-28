@@ -2,6 +2,8 @@ package eightjbbm.keepgo.util.dto;
 
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.cache.slot.SlotValue;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,9 +23,9 @@ public record RecommendCourseRequest(
         List<RecommendCandidate> candidates,
         List<RecommendHistoryPlaceId> historyPlaceIds,
         Integer availableTime,
-        String category,
+        List<String> category,
         LocalDateTime dateTime,
-        RecommendOrigin origin
+        Coordinate origin
 ) {
     public record RecommendCandidate(
             String placeId,
@@ -57,23 +59,10 @@ public record RecommendCourseRequest(
         }
     }
 
-    public record RecommendOrigin(
-            Float lat,
-            Float lng
-    ) {
-        public static RecommendOrigin from(Float lat, Float lng) {
-            return new RecommendOrigin(lat, lng);
-        }
-    }
-
     public static RecommendCourseRequest from(
             String query,
             List<OutingCollectionPrivate> places,
-            Integer availableTime,
-            String category,
-            Instant dateTime,
-            Float lat,
-            Float lng
+            SlotValue slot
     ) {
 
         return new RecommendCourseRequest(
@@ -82,10 +71,10 @@ public record RecommendCourseRequest(
                         k -> RecommendCandidate.from(k.getOutingGuide())
                 ).toList(),
                 places.stream().map(RecommendHistoryPlaceId::from).toList(),
-                availableTime,
-                category,
-                dateTime.atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                RecommendOrigin.from(lat, lng)
+                slot.getAvailableTime(),
+                slot.getCategories(),
+                slot.getRequestedDateTime(),
+                slot.getCoordinate()
         );
     }
 }
