@@ -119,6 +119,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 EndpointRequest.to(HealthEndpoint.class)
                         ).permitAll()
+                        .requestMatchers("/public/**")
+                        .permitAll()
                         .anyRequest()
                         .denyAll()
                 )
