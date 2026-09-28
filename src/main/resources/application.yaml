@@ -19,3 +19,18 @@ spring:
               - openid
               - profile
               - email
+
+keepgo:
+  security:
+    jwt:
+      access-token-ttl: 30m
+      key-id: placeholder
+      issuer: https://auth.example.com
+      audience: placeholder
+      client-id: placeholder
+      public-key: classpath:keys/public_key.pem
+      private-key: classpath:keys/private_key.pem
+  clients:
+    google: https://www.googleapis.com
+    geocoding: https://api.vworld.kr
+    ai: placeholder
