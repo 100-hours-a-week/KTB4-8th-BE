@@ -10,7 +10,12 @@ import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheRepository;
+import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
+import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
+import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
+import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,11 +30,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.anyOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /// 채팅 도메인 통합 테스트
 ///
@@ -54,6 +63,12 @@ public class ChatIntegrationTests {
 
     @Autowired
     ChatRepository chatRepository;
+
+    @MockitoBean
+    AiServerApiClient aiServerApiClient;
+
+    @Autowired
+    GetReplyCacheRepository getReplyCacheRepository;
 
     private Member member;
     private OAuthAccount memberOAuthAccount;
@@ -171,23 +186,45 @@ public class ChatIntegrationTests {
             챗봇 응답 조회 API 통합 테스트 (응답 생성 완료)
             """)
     void test3_1() {
-        long chatId = 0L;
+        when(aiServerApiClient.extractSlot(any(ExtractSlotRequest.class)))
+                .thenAnswer(invocation -> {
+                    Thread.sleep(Duration.ofSeconds(5));
+                    IO.println("Job Done!");
+                    getReplyCacheRepository.update(member.getId(), "hi");
+                    return null;
+                });
 
-        var result = webTestClient
-                .get()
-                .uri("/api/v1/user/chat-messages/" + chatId + "/response")
+        var request = new SendChatRequest("hello");
+
+        String accessToken = issueAccessToken();
+
+        var location = webTestClient
+                .post()
+                .uri("/api/v1/user/chat-messages")
                 .headers(headers -> {
-                    headers.setBearerAuth(issueAccessToken());
+                    headers.setBearerAuth(accessToken);
                 })
+                .bodyValue(request)
                 .exchange()
-                .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.status").isEqualTo("COMPLETED")
-                .returnResult();
+                .returnResult().getResponseHeaders().getLocation();
 
-        IO.println("status = " + result.getStatus());
-        IO.println("headers = " + result.getResponseHeaders());
-        IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
+        IO.println(location.toString());
+
+        await()
+                .atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> {
+                    webTestClient.get()
+                            .uri(location.toString())
+                            .headers(headers -> headers
+                                    .setBearerAuth(accessToken)
+                            )
+                            .exchange()
+                            .expectStatus().isOk()
+                            .expectBody()
+                            .jsonPath("$.status").isEqualTo("COMPLETED");
+                });
     }
 
     @Test
