@@ -1,8 +1,9 @@
 package eightjbbm.keepgo.util.cache.slot;
 
-import eightjbbm.keepgo.util.Coordinate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -14,9 +15,8 @@ public class SlotCacheService {
         return null;
     }
 
-    public Coordinate getCoordinate(Long memberId) {
-        SlotValue slotValue = slotCacheRepository.read(memberId).orElseThrow();
-        return slotValue.getCoordinate();
+    public Optional<SlotValue> getSlot(Long memberId) {
+        return slotCacheRepository.read(memberId);
     }
 
     public void updateSlot(UpdateSlotCacheRequest request) {

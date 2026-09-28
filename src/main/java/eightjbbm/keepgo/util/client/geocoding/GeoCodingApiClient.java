@@ -19,7 +19,7 @@ public class GeoCodingApiClient {
     private final GeoCodingApiClientProperties properties;
 
     public MapCoordinatesToLocationNameResponse mapCoordinatesToLocationName(Float lat, Float lng) {
-        return geoCodingRestClient.get()
+        var response =  geoCodingRestClient.get()
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
@@ -27,10 +27,10 @@ public class GeoCodingApiClient {
                                     .queryParam("service", "address")
                                     .queryParam("request", "getAddress")
                                     .queryParam("version", 2.0)
-                                    .queryParam("crs", 4326)
+                                    .queryParam("crs", "epsg:4326")
                                     .queryParam("point", lat + "," + lng)
                                     .queryParam("format", "json")
-                                    .queryParam("type", "ROAD")
+                                    .queryParam("type", "road")
                                     .queryParam("zipcode", false)
                                     .queryParam("simple", true)
                                     .queryParam("key", properties.key());
@@ -39,5 +39,7 @@ public class GeoCodingApiClient {
                 )
                 .retrieve()
                 .body(MapCoordinatesToLocationNameResponse.class);
+        IO.println("response: " + response);
+        return response;
     }
 }

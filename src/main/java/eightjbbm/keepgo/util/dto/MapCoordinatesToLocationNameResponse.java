@@ -1,22 +1,29 @@
 package eightjbbm.keepgo.util.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import java.util.List;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record MapCoordinatesToLocationNameResponse(
-        MctlnResult result
+        Response response
 ) {
-    record MctlnResult(
-            MctlnItem item
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Response(
+            List<Result> result
     ) {
-        record MctlnItem (
-                MctlnStructure structure
-        ) {
-            record MctlnStructure (
-                    String level2,
-                    String level4A
-            ) {}
-        }
     }
 
-    public String getAddress() {
-        return result().item().structure().level2() + " " + result().item().structure().level4A();
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Result(
+            Structure structure
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Structure(
+            String level2,
+            String level4A
+    ) {
     }
 }

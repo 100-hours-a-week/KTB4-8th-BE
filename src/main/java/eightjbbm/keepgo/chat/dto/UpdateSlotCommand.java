@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.chat.dto;
 
 import eightjbbm.keepgo.util.Coordinate;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
