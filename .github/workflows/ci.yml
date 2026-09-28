@@ -15,7 +15,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [main, debug/integration-test]
+    branches: [main, dev]
 
 # main에 새로운 Commit이 Push되면 이전 Commit의 CI를 취소하고
 # 최신 Commit만 검증 및 발행한다.
@@ -38,7 +38,7 @@ jobs:
   main-image:
     name: Main - Build and Push Image
 
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/debug/integration-test'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
 
     runs-on: ubuntu-latest
 
