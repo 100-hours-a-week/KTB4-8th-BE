@@ -2,6 +2,7 @@ package eightjbbm.keepgo.integration.refreshchain;
 
 import eightjbbm.keepgo.auth.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
+import eightjbbm.keepgo.auth.RefreshTokenManager;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
@@ -37,6 +39,9 @@ public class RefreshChainIntegrationTests {
 
     @Autowired
     AccessTokenManager accessTokenManager;
+
+    @Autowired
+    RefreshTokenManager refreshTokenManager;
 
     @Autowired
     MemberRepository memberRepository;
@@ -70,6 +75,8 @@ public class RefreshChainIntegrationTests {
         return accessTokenManager.issue(member.getId(), List.of());
     }
 
+    private String issueRefreshToken() { return refreshTokenManager.issue(member.getId()); }
+
     @Test
     @DisplayName("""
             로그아웃 API 통합 테스트
@@ -79,6 +86,7 @@ public class RefreshChainIntegrationTests {
         webTestClient
                 .delete()
                 .uri("/api/v1/user/auth-session")
+                .cookie("refresh_token", issueRefreshToken())
                 .headers(headers -> {
                     headers.setBearerAuth(issueAccessToken());
                 })
@@ -95,6 +103,7 @@ public class RefreshChainIntegrationTests {
         var result = webTestClient
                 .post()
                 .uri("/api/v1/user/auth-session/refresh")
+                .cookie("refresh_token", issueRefreshToken())
                 .headers(headers -> {
                     headers.setBearerAuth(issueAccessToken());
                 })

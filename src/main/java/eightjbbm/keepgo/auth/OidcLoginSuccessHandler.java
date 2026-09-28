@@ -73,16 +73,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
         String accessToken = accessTokenManager.issue(member.getId(), List.of());
         String refreshToken = refreshTokenManager.issue(member.getId());
 
-        ResponseCookie cookie = ResponseCookie
-                .from("refresh_token", refreshToken)
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Lax")
-                .path("/api/v1/user/auth-session")
-                .maxAge(Duration.ofDays(14))
-                .build();
-
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshToken);
 
         objectMapper.writeValue(
                 response.getOutputStream(),
