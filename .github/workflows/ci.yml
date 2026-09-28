@@ -69,8 +69,8 @@ jobs:
       #
       # TODO(Test): CI 전용 Datasource 구성이 완료되면 외부 환경에 의존하지
       # 않는 Context Test와 Repository Test를 추가한다.
-      - name: Test and application build
-        run: ./gradlew --no-daemon build
+      - name: Application build (tests skipped)
+        run: ./gradlew --no-daemon bootjar
 
       # GitHub OIDC Token을 이용해
       # ECR Push 권한만 가진 AWS IAM Role을 Assume한다.
