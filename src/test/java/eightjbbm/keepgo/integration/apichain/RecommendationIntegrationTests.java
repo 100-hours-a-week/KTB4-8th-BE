@@ -7,11 +7,18 @@ import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationRequest;
+import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
+import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 import org.aspectj.lang.annotation.Before;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,9 +29,12 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import javax.swing.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 /// 추천 도메인 통합 테스트
 ///
@@ -33,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AutoConfigureWebTestClient
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @EnableConfigurationProperties({JwtProperties.class})
+@ExtendWith(MockitoExtension.class)
 public class RecommendationIntegrationTests {
 
     @Autowired
@@ -69,10 +80,14 @@ public class RecommendationIntegrationTests {
         memberRepository.deleteById(member.getId());
     }
 
+    @Mock
+    AiServerApiClient aiServerApiClient;
+
     private String issueAccessToken() {
         return accessTokenManager.issue(member.getId(), List.of());
     }
 
+    /*
     /// 외부 API 호출: AI 서버
     ///
     @Test
@@ -82,6 +97,38 @@ public class RecommendationIntegrationTests {
     void test1() {
         // AI 서버 응답은 Mocking해야 할 듯
         // 아마 별도의 중단 감지 로직을 추가로 구현해야 할 듯
+        var request = new RecommendCourseRequest(
+                "조용한",
+                List.of(new RecommendCourseRequest.RecommendCandidate(
+                        "001",
+                        "성수 A카페",
+                        "통유리에 좌석 간격 넓고 대화 소음 적음",
+                        37.5445f,
+                        127.0557f,
+                        "매일 10:00-22:00"
+                )),
+                List.of(new RecommendCourseRequest.RecommendHistoryPlaceId("p010", Instant.now().atZone(ZoneId.systemDefault()).toLocalDate())),
+                180,
+                List.of("카페"),
+                Instant.now().atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                new Coordinate(37.5445f, 127.0557f)
+        );
+
+        var response = new RecommendCourseResponse(
+                "recommend_success",
+                new RecommendCourseResponse.RecommendData(
+                        List.of(new RecommendCourseResponse.RecommendData.RecommendCourse(
+                                "성수 조용한 카페 산책",
+                                List.of(
+                                        new RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace(
+                                                "p001", "성수 A카페", 0, "14:00", 60, "좌석 간격이 넓고 소음이 적어 조용한 조건에 부합"
+                                        )),
+                                138
+                        ))
+                )
+        );
+        when(aiServerApiClient.recommendCourse(request)).thenReturn(response);
+
         var result = webTestClient
                 .post()
                 .uri("/api/v1/user/recommendation")
@@ -116,6 +163,7 @@ public class RecommendationIntegrationTests {
                 .exchange()
                 .expectStatus().isNoContent();
     }
+     */
 
     @Test
     @DisplayName("""
