@@ -19,7 +19,6 @@ public class RtHashCacheService {
     }
 
     public void loadSession(Long memberId, String refreshToken) {
-        rtHashCacheRepository.create(refreshToken);
         rtHashCacheRepository.update(
                 refreshToken,
                 new RtHashCacheValue(
@@ -32,7 +31,10 @@ public class RtHashCacheService {
 
 
     public void revokeSession(String refreshTokenHash) {
+        /*
         var refreshTokenValue = rtHashCacheRepository.read(refreshTokenHash).orElseThrow();
         refreshTokenValue.setState();
+
+         */
     }
 }
