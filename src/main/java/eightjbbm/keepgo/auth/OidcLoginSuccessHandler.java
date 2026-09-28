@@ -83,7 +83,8 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                                             newMember,
                                             oidcUser.getEmail(),
                                             oidcUser.getIssuer().toString(),
-                                            oidcUser.getSubject()
+                                            oidcUser.getSubject(),
+                                            oidcUser.getName()
                                     )
                             );
                         }
