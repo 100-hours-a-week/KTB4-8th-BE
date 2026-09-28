@@ -27,6 +27,7 @@ dependencies {
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-authorization-server'
 	implementation 'org.mapstruct:mapstruct:1.6.3'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	testImplementation 'org.springframework.boot:spring-boot-webtestclient'
 	implementation 'org.springframework.boot:spring-boot-restclient'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-authorization-server-test'
