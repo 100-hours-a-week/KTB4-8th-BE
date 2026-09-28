@@ -29,12 +29,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 
-@Import({
-        ObjectMapper.class,
-        AccessTokenManager.class,
-        RefreshTokenManager.class,
-        GoogleApiClient.class
-})
 @Component
 @RequiredArgsConstructor
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
