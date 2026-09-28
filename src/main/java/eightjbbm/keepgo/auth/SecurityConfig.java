@@ -110,6 +110,7 @@ public class SecurityConfig {
 
 
     @Order(1000)
+    @Bean
     public SecurityFilterChain fallBackFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
