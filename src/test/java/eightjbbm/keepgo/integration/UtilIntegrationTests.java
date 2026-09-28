@@ -132,4 +132,17 @@ public class UtilIntegrationTests {
                 .exchange()
                 .expectBody().equals(originalImage);
     }
+
+    @Test
+    @DisplayName("""
+            헬스 체크 API 통합 테스트
+            """)
+    void test3() {
+        webTestClient
+                .get()
+                .uri("/actuator/health")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody();
+    }
 }

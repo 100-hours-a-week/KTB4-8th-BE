@@ -9,6 +9,8 @@ import eightjbbm.keepgo.util.cache.atblacklist.AtBlacklistValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -114,6 +116,9 @@ public class SecurityConfig {
     public SecurityFilterChain fallBackFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                EndpointRequest.to(HealthEndpoint.class)
+                        ).permitAll()
                         .anyRequest()
                         .denyAll()
                 )
