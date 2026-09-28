@@ -1,20 +1,22 @@
-package eightjbbm.keepgo.util.client;
+package eightjbbm.keepgo.util.client.geocoding;
 
 import eightjbbm.keepgo.util.dto.MapCoordinatesToLocationNameResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
 
 @Component
 @RequiredArgsConstructor
-public class GeoCodingClient {
+@EnableConfigurationProperties(GeoCodingApiClientProperties.class)
+public class GeoCodingApiClient {
 
     private final String path = "/req/address";
     @Qualifier("geoCodingRestClient")
     private final RestClient geoCodingRestClient;
-    private final String apiKey = "placeholder";
+    private final GeoCodingApiClientProperties properties;
 
     public MapCoordinatesToLocationNameResponse mapCoordinatesToLocationName(Float lat, Float lng) {
         return geoCodingRestClient.get()
@@ -31,7 +33,7 @@ public class GeoCodingClient {
                                     .queryParam("type", "ROAD")
                                     .queryParam("zipcode", false)
                                     .queryParam("simple", true)
-                                    .queryParam("key", apiKey);
+                                    .queryParam("key", properties.key());
                             return builder.build();
                         }
                 )
