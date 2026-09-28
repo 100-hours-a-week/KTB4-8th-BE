@@ -75,26 +75,16 @@ public class MemberService {
             Authentication authentication
     ) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        if (!(authentication instanceof OAuth2AuthenticationToken oAuthToken)) {
-            throw new IllegalStateException("OAuth2 인증 정보가 아님");
+        var oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
+        var client = oAuth2AuthorizedClientService.loadAuthorizedClient("google", oAuthAccount.getName());
+        if (client == null) {
+            throw new IllegalStateException(
+                    "Google OAuth 인증 정보가 없습니다."
+            );
         }
+        String oAuth2AccessToken = client.getAccessToken().getTokenValue();
 
-        OAuth2AuthorizedClient authorizedClient = oAuth2AuthorizedClientService.loadAuthorizedClient(
-                "google",
-                authentication.getName()
-        );
-
-        if (authorizedClient == null) {
-            throw new IllegalStateException("OAuth2AuthorizedClient를 찾지 못했음");
-        }
-
-        OAuth2AccessToken oAuth2AccessToken = authorizedClient.getAccessToken();
-
-        if (oAuth2AccessToken == null) {
-            throw new IllegalStateException("Google Access Token이 없음");
-        }
-
-        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId(), oAuth2AccessToken.getTokenValue()).getVideoIds();
+        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId(), oAuth2AccessToken).getVideoIds();
         for (String url: urls) {
             AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
             OutingGuide guide;
