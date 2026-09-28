@@ -11,6 +11,9 @@ public record Coordinate(
         Float lng
 ) {
     public boolean equals(Coordinate other) {
+        if (other == null) {
+            return false;
+        }
         return (lat.equals(other.lat()) && lng.equals(other.lng()));
     }
 }

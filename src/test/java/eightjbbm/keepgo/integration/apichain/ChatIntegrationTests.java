@@ -9,6 +9,7 @@ import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.nio.charset.StandardCharsets;
@@ -102,7 +104,7 @@ public class ChatIntegrationTests {
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
     }
 
-    /// 외부 API 호출: AI 서버
+    /// 외부 API 호출: 지오코딩
     ///
     @Test
     @DisplayName("""
@@ -111,7 +113,7 @@ public class ChatIntegrationTests {
     void test2() {
         // AI 서버 응답은 Mocking해야 할 듯.
         var request = new UpdateSlotRequest(
-                new Coordinate(0f, 0f),
+                new Coordinate(126.978275264f, 37.566642192f),
                 "test",
                 LocalDateTime.now(),
                 180,

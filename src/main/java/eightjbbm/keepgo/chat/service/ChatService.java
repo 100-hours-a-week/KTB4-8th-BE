@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -85,12 +86,18 @@ public class ChatService {
 
     /// 의도 카드 수정 API
     public UpdateSlotResult updateSlot(UpdateSlotCommand command) {
+        Optional<SlotValue> slot = slotCacheService.getSlot(command.memberId());
         var request = ChatMapper.INSTANCE.toUpdateSlotCacheRequest(command);
         slotCacheService.updateSlot(request);
         String result = null;
-        Coordinate coordinate = slotCacheService.getCoordinate(command.memberId());
-        if (!command.userCoordinate().equals(coordinate)) {
-            result = geoCodingApiClient.mapCoordinatesToLocationName(coordinate.lat(), coordinate.lng()).getAddress();
+        if (slot.isEmpty() || slot.map(SlotValue::getCoordinate).equals(command.userCoordinate())) {
+            var response = geoCodingApiClient.mapCoordinatesToLocationName(
+                            command.userCoordinate().lat(),
+                            command.userCoordinate().lng());
+
+            String level2 = response.response().result().getFirst().structure().level2();
+            String level4A = response.response().result().getFirst().structure().level4A();
+            result = level2 + " " + level4A;
         }
         return UpdateSlotResult.from(result);
     }
