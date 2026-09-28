@@ -27,12 +27,15 @@ public class LoginFilterChainConfig {
                 .securityMatchers(
                         matchers -> matchers.requestMatchers(
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session"),
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth/authorization/**")
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth2/**"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/login/oauth2/code/**")
                         )
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session")
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth2/**"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/login/oauth2/code/**")
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

@@ -9,10 +9,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.Duration;
@@ -27,7 +24,7 @@ public class AuthController {
 
     @PostMapping("/api/v1/user/auth-session")
     public ResponseEntity<Void> login(
-            LoginRequest request
+            @RequestBody LoginRequest request
     ) {
         URI location = URI.create(
             "/oauth2/authorization/" + request.provider()

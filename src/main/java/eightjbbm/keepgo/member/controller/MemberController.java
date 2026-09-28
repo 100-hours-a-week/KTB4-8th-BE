@@ -40,7 +40,9 @@ public class MemberController {
     /// @param request {@link UpdateMemberInfoRequest}
     /// @return {@link UpdateMemberInfoResponse}
     @PatchMapping
-    public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(@AuthenticationPrincipal Jwt jwt, UpdateMemberInfoRequest request) {
+    public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody UpdateMemberInfoRequest request) {
         var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(
                 Long.valueOf(jwt.getSubject()),
                 request
@@ -58,7 +60,9 @@ public class MemberController {
     /// 유튜브 동기화 API
     /// @param jwt
     @PostMapping("/youtube-analyze")
-    public ResponseEntity<Void> synchronizeYoutubeLikeVideos(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<Void> synchronizeYoutubeLikeVideos(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
         var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(
                 Long.valueOf(jwt.getSubject())
         );

@@ -22,7 +22,10 @@ public class FileController {
      /// @param jwt
      /// @param file
     @PostMapping("/user/profile-image")
-    public ResponseEntity<Void> uploadProfileImage(@AuthenticationPrincipal Jwt jwt, @RequestPart("profileImage") MultipartFile file) throws FileUploadException {
+    public ResponseEntity<Void> uploadProfileImage(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestPart("profileImage") MultipartFile file
+    ) throws FileUploadException {
 
         Long userId = Long.valueOf(jwt.getSubject());
         String uploadPath = fileService.uploadProfileImage(file, userId);

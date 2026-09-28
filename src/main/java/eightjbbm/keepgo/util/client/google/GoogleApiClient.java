@@ -15,7 +15,7 @@ public class GoogleApiClient {
     @Qualifier("googleRestClient")
     private final RestClient googleRestClient;
 
-    public RetrieveLikesPlaylistIdResponse retrieveLikesPlaylistId(Long userId) {
+    public RetrieveLikesPlaylistIdResponse retrieveLikesPlaylistId(String googleAccessToken) {
         return googleRestClient.get()
                 .uri(
                     uriBuilder -> {
@@ -26,6 +26,9 @@ public class GoogleApiClient {
 
                         return builder.build();
                     })
+                .headers(headers -> {
+                    headers.setBearerAuth(googleAccessToken);
+                })
                 .retrieve()
                 .body(RetrieveLikesPlaylistIdResponse.class);
     }

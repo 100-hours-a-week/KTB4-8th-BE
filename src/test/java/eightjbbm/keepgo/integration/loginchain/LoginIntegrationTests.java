@@ -40,13 +40,12 @@ public class LoginIntegrationTests {
                 .uri("/api/v1/user/auth-session")
                 .bodyValue(request)
                 .exchange()
+                .expectStatus().isSeeOther()
                 .expectBody()
                 .returnResult();
 
         IO.println("status = " + result.getStatus());
         IO.println("headers = " + result.getResponseHeaders());
         IO.println("body = " + new String(result.getResponseBodyContent(), StandardCharsets.UTF_8));
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.CREATED);
     }
 }
