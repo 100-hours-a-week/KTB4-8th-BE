@@ -1,48 +1,39 @@
 package eightjbbm.keepgo.auth;
 
-import eightjbbm.keepgo.auth.rt.RtHashCacheValue;
 import eightjbbm.keepgo.auth.rt.RtHashCacheRepository;
+import eightjbbm.keepgo.auth.rt.RtHashCacheValue;
+import eightjbbm.keepgo.util.cache.RtHashCacheProperties;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.ResponseCookie;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
 
-@Import(RtHashCacheRepository.class)
 @Service
 @RequiredArgsConstructor
+@EnableConfigurationProperties(RtHashCacheProperties.class)
 public class RefreshTokenManager {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-    private final Duration refreshTokenTtl = Duration.ofDays(7);
+    private final RtHashCacheProperties properties;
     private final RtHashCacheRepository rtHashCacheRepository;
 
     public String issue(Long memberId) {
-        String refreshToken = issueInternal(memberId);
+        String refreshToken = issueInternal();
         rtHashCacheRepository.create(
                 sha256(refreshToken),
-                new RtHashCacheValue(
+                RtHashCacheValue.create(
                         memberId,
-                        Instant.now().plus(refreshTokenTtl),
-                        RefreshTokenState.ACTIVE
+                        Instant.now().plus(properties.expireAfterWrite())
                 )
         );
-        return ResponseCookie
-                .from("refresh_token", refreshToken)
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Lax")
-                .path("/api/v1/user/auth-session")
-                .maxAge(Duration.ofDays(14))
-                .build().toString();
+        return refreshToken;
     }
 
     public Optional<RtHashCacheValue> get(String refreshToken) {
@@ -52,25 +43,25 @@ public class RefreshTokenManager {
 
     public String rotate(String refreshToken) {
         String refreshTokenHash = sha256(refreshToken);
-        return rtHashCacheRepository.read(refreshTokenHash).map(
-                k -> {
-                    k.setState(RefreshTokenState.USED);
-                    return issue(k.getMemberId());
-                }).orElseThrow();
+        var rtHash = rtHashCacheRepository.read(refreshTokenHash).orElseThrow();
+        rtHash.use();
+        rtHashCacheRepository.update(refreshTokenHash, rtHash);
+        return issue(rtHash.getMemberId());
     }
 
-    public void revoke(Long memberId, String refreshToken) {
+    public void revoke(String refreshToken) {
         String refreshTokenHash = sha256(refreshToken);
-        rtHashCacheRepository.read(refreshTokenHash).ifPresent(k -> k.setState(RefreshTokenState.REVOKED));
+        var rtHash = rtHashCacheRepository.read(refreshTokenHash).orElseThrow();
+        rtHash.revoke();
+        rtHashCacheRepository.update(refreshTokenHash, rtHash);
     }
 
-    private String issueInternal(Long memberId) {
+    private String issueInternal() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
-        String refreshToken = Base64.getUrlEncoder()
+        return Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(bytes);
-        return refreshToken;
     }
 
     private String sha256(String value) {
