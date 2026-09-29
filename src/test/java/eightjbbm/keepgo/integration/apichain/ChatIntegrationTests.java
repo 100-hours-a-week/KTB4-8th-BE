@@ -59,9 +59,6 @@ public class ChatIntegrationTests {
     MemberRepository memberRepository;
 
     @Autowired
-    OAuthAccountRepository oAuthAccountRepository;
-
-    @Autowired
     ChatRepository chatRepository;
 
     @MockitoBean
@@ -71,25 +68,16 @@ public class ChatIntegrationTests {
     GetReplyCacheRepository getReplyCacheRepository;
 
     private Member member;
-    private OAuthAccount memberOAuthAccount;
 
     @BeforeEach
     void setUp() {
         member = Member.create("test");
         memberRepository.saveAndFlush(member);
-        memberOAuthAccount = OAuthAccount.create(
-                member,
-                "test@test.com",
-                "google",
-                "0"
-        );
-        oAuthAccountRepository.saveAndFlush(memberOAuthAccount);
     }
 
     @AfterEach
     void tearDown() {
         chatRepository.deleteAll();
-        oAuthAccountRepository.deleteById(memberOAuthAccount.getId());
         memberRepository.deleteById(member.getId());
     }
 

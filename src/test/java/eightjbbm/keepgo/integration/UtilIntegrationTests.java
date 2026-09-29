@@ -66,7 +66,8 @@ public class UtilIntegrationTests {
                 member,
                 "test@test.com",
                 "google",
-                "0"
+                "0",
+                "name"
         );
         oAuthAccountRepository.saveAndFlush(memberOAuthAccount);
     }
