@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class GoogleApiClient {
@@ -50,5 +52,22 @@ public class GoogleApiClient {
                 .headers(headers -> headers.setBearerAuth(googleAccessToken))
                 .retrieve()
                 .body(RetrieveLikedVideosResponse.class);
+    }
+
+    public GetLikedVideosResponse getLikedVideos(String oAuth2AccessToken) {
+        return googleRestClient.get()
+                .uri(
+                        uriBuilder -> {
+                            UriBuilder builder = uriBuilder
+                                    .path("/youtube/v3/videos")
+                                    .queryParam("part", "id")
+                                    .queryParam("myRating", "like");
+
+                            return builder.build();
+                        }
+                )
+                .headers(headers -> headers.setBearerAuth(oAuth2AccessToken))
+                .retrieve()
+                .body(GetLikedVideosResponse.class);
     }
 }
