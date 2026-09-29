@@ -76,8 +76,6 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                                             oidcUser.getNickName()
                                     )
                             );
-                            //newMember.setLikedVideosPlaylistId(
-                            //        googleApiClient.retrieveLikesPlaylistId(oAuth2AccessToken.getTokenValue()).getLikesPlaylistId());
                             return oAuthAccountRepository.save(
                                     OAuthAccount.create(
                                             newMember,
