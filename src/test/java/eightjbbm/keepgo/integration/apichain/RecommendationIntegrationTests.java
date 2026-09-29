@@ -55,28 +55,16 @@ public class RecommendationIntegrationTests {
     @Autowired
     MemberRepository memberRepository;
 
-    @Autowired
-    OAuthAccountRepository oAuthAccountRepository;
-
     private Member member;
-    private OAuthAccount memberOAuthAccount;
 
     @BeforeEach
     void setUp() {
         member = Member.create("test");
         memberRepository.saveAndFlush(member);
-        memberOAuthAccount = OAuthAccount.create(
-                member,
-                "test@test.com",
-                "google",
-                "0"
-        );
-        oAuthAccountRepository.saveAndFlush(memberOAuthAccount);
     }
 
     @AfterEach
     void tearDown() {
-        oAuthAccountRepository.deleteById(memberOAuthAccount.getId());
         memberRepository.deleteById(member.getId());
     }
 
