@@ -13,6 +13,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
+import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
 import eightjbbm.keepgo.util.file.File;
 import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
@@ -83,33 +84,37 @@ public class MemberService {
             );
         }
         String oAuth2AccessToken = client.getAccessToken().getTokenValue();
-
-        List<String> urls = googleApiClient.retrieveLikedVideos(member.getLikedVideosPlaylistId(), oAuth2AccessToken).getVideoIds();
-        for (String url: urls) {
-            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
-            OutingGuide guide;
-            if (isPlaceOrEvent(response.getCategory())) {
-                guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
-                        () -> outingPlaceRepository.save(new OutingPlace(
-                                response.getCategory(),
-                                response.getName(),
-                                response.getSummary()
-                        ))
+        googleApiClient.getLikedVideos(oAuth2AccessToken)
+                .items()
+                .stream()
+                .map(GetLikedVideosResponse.Item::id)
+                .forEach(
+                        url -> {
+                            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
+                            OutingGuide guide;
+                            if (isPlaceOrEvent(response.getCategory())) {
+                                guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
+                                        () -> outingPlaceRepository.save(new OutingPlace(
+                                                response.getCategory(),
+                                                response.getName(),
+                                                response.getSummary()
+                                        ))
+                                );
+                            } else {
+                                guide = outingEventRepository.findByName(response.getName()).orElseGet(
+                                        () -> outingEventRepository.save(new OutingEvent(
+                                                response.getCategory(),
+                                                response.getName(),
+                                                response.getSummary(),
+                                                null,
+                                                response.data().eventStartDate(),
+                                                response.data().eventEndDate()
+                                        ))
+                                );
+                            }
+                            outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
+                        }
                 );
-            } else {
-                guide = outingEventRepository.findByName(response.getName()).orElseGet(
-                        () -> outingEventRepository.save(new OutingEvent(
-                                response.getCategory(),
-                                response.getName(),
-                                response.getSummary(),
-                                null,
-                                response.data().eventStartDate(), 
-                                response.data().eventEndDate()
-                        ))
-                );
-            }
-            outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
-        }
     }
 
     private boolean isPlaceOrEvent(String category) {
