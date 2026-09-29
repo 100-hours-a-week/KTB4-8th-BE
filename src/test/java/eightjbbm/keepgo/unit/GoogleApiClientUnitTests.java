@@ -32,7 +32,6 @@ public class GoogleApiClientUnitTests {
             유튜브 좋아요 누른 동영상 목록 조회 API 단위 테스트
             """)
     void test1() {
-        String googleAccessToken = "";
         var response = googleApiClient.getLikedVideos(googleAccessToken);
         IO.println(response);
     }
