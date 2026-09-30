@@ -220,7 +220,6 @@ public class ChatIntegrationTests {
             채팅 내역 조회 API 통합 테스트
             """)
     void test4() {
-        // 커서랑 사이즈 조정 필요...
         long cursor = 0L;
         long size = 20L;
         var result = webTestClient
