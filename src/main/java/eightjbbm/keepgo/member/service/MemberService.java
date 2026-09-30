@@ -72,8 +72,7 @@ public class MemberService {
     /// 회원의 좋아요한 동영상 재생목록 ID를 가져오는 것은 회원가입 때 진행해야 됨.
     /// @param command {@link SynchronizeYoutubeLikeVideosCommand}
     public void synchronizeYoutubeLikeVideos(
-            SynchronizeYoutubeLikeVideosCommand command,
-            Authentication authentication
+            SynchronizeYoutubeLikeVideosCommand command
     ) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         var oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
