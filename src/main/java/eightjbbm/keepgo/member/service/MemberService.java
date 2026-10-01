@@ -51,7 +51,9 @@ public class MemberService {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
         File profileImage = fileRepository.findByStoragePath(command.profileImagePath()).orElseThrow();
-        member.updateProfileImage(profileImage);
+        if (profileImage != null) {
+            member.updateProfileImage(profileImage);
+        }
         return UpdateMemberInfoResult.from(member);
     }
 
