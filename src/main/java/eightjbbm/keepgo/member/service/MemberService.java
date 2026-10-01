@@ -26,6 +26,7 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -46,11 +47,13 @@ public class MemberService {
     /// 회원 정보 수정 API
     /// @param command {@link UpdateMemberInfoCommand}
     /// @return {@link UpdateMemberInfoResult}
+    @Transactional
     public UpdateMemberInfoResult updateMemberInfo(
             UpdateMemberInfoCommand command
     ) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
+
         fileRepository.findByStoragePath(command.profileImagePath()).ifPresent(member::updateProfileImage);
         return UpdateMemberInfoResult.from(member);
     }
