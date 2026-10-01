@@ -1,6 +1,5 @@
 package eightjbbm.keepgo.auth;
 
-import eightjbbm.keepgo.auth.dto.LoginResponse;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -10,11 +9,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -31,14 +28,14 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@EnableConfigurationProperties(LoginProperties.class)
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
 
-    private final ObjectMapper objectMapper;
     private final OAuthAccountRepository oAuthAccountRepository;
     private final MemberRepository memberRepository;
     private final AccessTokenManager accessTokenManager;
     private final RefreshTokenManager refreshTokenManager;
-    private final GoogleApiClient googleApiClient;
+    private final LoginProperties loginProperties;
     private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     @Override
@@ -76,8 +73,6 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                                             oidcUser.getNickName()
                                     )
                             );
-                            //newMember.setLikedVideosPlaylistId(
-                            //        googleApiClient.retrieveLikesPlaylistId(oAuth2AccessToken.getTokenValue()).getLikesPlaylistId());
                             return oAuthAccountRepository.save(
                                     OAuthAccount.create(
                                             newMember,
@@ -102,14 +97,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 .path("/api/v1/user/auth-session")
                 .maxAge(Duration.ofDays(14))
                 .build().toString();
-
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie);
-        response.setStatus(201);
-        LoginResponse responseBody = LoginResponse.from(accessToken, "Bearer", 3600);
-
-        objectMapper.writeValue(
-                response.getOutputStream(),
-                responseBody
-        );
+        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken + "&expiresIn=3600");
     }
 }
