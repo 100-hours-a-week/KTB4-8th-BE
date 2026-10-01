@@ -24,6 +24,7 @@ spring:
 
 keepgo:
   security:
+    redirection: ${FRONTEND_SERVER_ADDRESS:http://localhost:3000}
     jwt:
       access-token-ttl: 30m
       key-id: placeholder
