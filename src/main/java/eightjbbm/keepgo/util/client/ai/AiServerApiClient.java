@@ -52,7 +52,7 @@ public class AiServerApiClient {
                 .body(ExtractSlotResponse.class);
     }
 
-    public AnalyzeVideoResponse analyzeVideo(String url) {
+    public AnalyzeVideoResponse analyzeVideo(AnalyzeVideoRequest request) {
         return aiServerRestClient.post()
                 .uri(
                         uriBuilder -> {
@@ -61,7 +61,7 @@ public class AiServerApiClient {
                             return builder.build();
                         }
                 )
-                .body(url)
+                .body(request)
                 .retrieve()
                 .body(AnalyzeVideoResponse.class);
     }

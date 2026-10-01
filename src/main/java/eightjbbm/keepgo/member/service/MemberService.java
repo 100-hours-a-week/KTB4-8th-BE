@@ -13,6 +13,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
+import eightjbbm.keepgo.util.client.ai.AnalyzeVideoRequest;
 import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
 import eightjbbm.keepgo.util.file.File;
 import eightjbbm.keepgo.util.file.FileRepository;
@@ -89,7 +90,7 @@ public class MemberService {
                 .map(GetLikedVideosResponse.Item::id)
                 .forEach(
                         url -> {
-                            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(url);
+                            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest(url));
                             OutingGuide guide;
                             if (isPlaceOrEvent(response.getCategory())) {
                                 guide = outingPlaceRepository.findByName(response.getName()).orElseGet(

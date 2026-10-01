@@ -6,7 +6,6 @@ import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
@@ -39,7 +38,9 @@ public class ChatService {
         Long memberId = command.memberId();
         Member member = memberRepository.findById(memberId).orElseThrow();
         Chat userChat = chatRepository.save(Chat.from(member, command.content()));
-        SlotValue slot = slotCacheService.read(memberId);
+        SlotValue slot = slotCacheService.getSlot(memberId).orElse(
+                SlotValue.from(null, null, null, null, null)
+        );
         String query = queryCacheService.getQuery(memberId);
         getReplyCacheService.createRequest(
                 GetReplyRequest.from(
@@ -90,7 +91,7 @@ public class ChatService {
         var request = ChatMapper.INSTANCE.toUpdateSlotCacheRequest(command);
         slotCacheService.updateSlot(request);
         String result = null;
-        if (slot.isEmpty() || slot.map(SlotValue::getCoordinate).equals(command.userCoordinate())) {
+        if (slot.isEmpty() || slot.map(SlotValue::getOrigin).equals(command.userCoordinate())) {
             var response = geoCodingApiClient.mapCoordinatesToLocationName(
                             command.userCoordinate().lat(),
                             command.userCoordinate().lng());

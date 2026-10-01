@@ -90,8 +90,8 @@ public record RequestRecommendationResult(
         return new RequestRecommendationResult(
                 new RecommendationMetadata(
                         response.data().courses().size(),
-                        slot.getRequestedLocationName(),
-                        slot.getRequestedDateTime().toString()
+                        slot.getRegion(),
+                        slot.getDateTime().toString()
                 ),
                 response.data().courses().stream().map(RecommendationSnippet::from).toList(),
                 response.data().courses().stream().map(k -> RecommendationDetail.from(k, extractor)).toList()

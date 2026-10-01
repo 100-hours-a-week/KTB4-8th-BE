@@ -11,11 +11,11 @@ import java.util.List;
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class SlotValue {
-    private Coordinate coordinate;
-    private String requestedLocationName;
-    private LocalDateTime requestedDateTime;
+    private Coordinate origin;
+    private String region;
+    private LocalDateTime dateTime;
     private Integer availableTime;
-    private List<String> categories;
+    private List<String> category;
 
     public static SlotValue from(
             Coordinate coordinate,

@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -25,7 +26,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.logging.Logger;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 @EnableConfigurationProperties(LoginProperties.class)
@@ -68,9 +71,10 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 )
                 .orElseGet(
                         () -> {
+                            log.info("name: " + (String) oidcUser.getClaims().get("name"));
                             Member newMember = memberRepository.save(
                                     Member.create(
-                                            oidcUser.getName()
+                                            (String) oidcUser.getClaims().get("name")
                                     )
                             );
                             return oAuthAccountRepository.save(
