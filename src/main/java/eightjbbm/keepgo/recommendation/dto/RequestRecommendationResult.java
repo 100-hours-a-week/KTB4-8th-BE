@@ -91,7 +91,7 @@ public record RequestRecommendationResult(
                 new RecommendationMetadata(
                         response.data().courses().size(),
                         slot.getRegion(),
-                        slot.getDateTime().toString()
+                        slot.getDatetime().toString()
                 ),
                 response.data().courses().stream().map(RecommendationSnippet::from).toList(),
                 response.data().courses().stream().map(k -> RecommendationDetail.from(k, extractor)).toList()
