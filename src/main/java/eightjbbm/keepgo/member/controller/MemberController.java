@@ -69,7 +69,7 @@ public class MemberController {
                 Long.valueOf(jwt.getSubject())
         );
 
-        memberService.synchronizeYoutubeLikeVideos(command);
+        memberService.synchronizeYoutubeLikeVideos(command, authentication);
 
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
