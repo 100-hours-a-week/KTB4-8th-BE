@@ -13,7 +13,7 @@ import java.util.List;
 public class SlotValue {
     private Coordinate origin;
     private String region;
-    private LocalDateTime dateTime;
+    private LocalDateTime datetime;
     private Integer availableTime;
     private List<String> category;
 
