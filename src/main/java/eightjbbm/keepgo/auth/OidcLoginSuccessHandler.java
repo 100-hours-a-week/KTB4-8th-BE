@@ -10,7 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -31,6 +31,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@EnableConfigurationProperties(LoginProperties.class)
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final ObjectMapper objectMapper;
@@ -38,7 +39,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final MemberRepository memberRepository;
     private final AccessTokenManager accessTokenManager;
     private final RefreshTokenManager refreshTokenManager;
-    private final GoogleApiClient googleApiClient;
+    private final LoginProperties loginProperties;
     private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     @Override
