@@ -17,14 +17,19 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.converter.RsaKeyConverters;
+import org.springframework.security.oauth2.client.JdbcOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.interfaces.RSAPrivateKey;
@@ -37,6 +42,17 @@ import java.security.interfaces.RSAPublicKey;
 public class SecurityConfig {
 
     private final JwtProperties jwtProperties;
+
+    @Bean
+    OAuth2AuthorizedClientService oAuth2AuthorizedClientService(
+            DataSource dataSource,
+            ClientRegistrationRepository clientRegistrationRepository
+    ) {
+        return new JdbcOAuth2AuthorizedClientService(
+                new JdbcTemplate(dataSource),
+                clientRegistrationRepository
+        );
+    }
 
     @Bean
     RSAPublicKey accessTokenPublicKey(

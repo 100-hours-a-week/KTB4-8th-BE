@@ -1,4 +1,8 @@
 spring:
+  sql:
+    init:
+      schema-locations:
+        - classpath:org/springframework/security/oauth2/client/oauth2-client-schema.sql
   application:
     name: keepgo
   jackson:
