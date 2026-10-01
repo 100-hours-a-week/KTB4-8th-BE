@@ -70,7 +70,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                         () -> {
                             Member newMember = memberRepository.save(
                                     Member.create(
-                                            oidcUser.getNickName()
+                                            oidcUser.getName()
                                     )
                             );
                             return oAuthAccountRepository.save(
