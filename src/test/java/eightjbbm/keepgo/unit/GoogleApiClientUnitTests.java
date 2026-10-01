@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.unit;
 
+import eightjbbm.keepgo.config.TestGoogleClientConfig;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.client.google.GoogleApiClientConfig;
 import org.junit.jupiter.api.DisplayName;
@@ -19,7 +20,7 @@ import org.springframework.web.client.RestClient;
 @ActiveProfiles("test")
 @SpringJUnitConfig({
         GoogleApiClientConfig.class,
-        GoogleApiClientUnitTests.TestConfig.class
+        TestGoogleClientConfig.class
 })
 public class GoogleApiClientUnitTests {
 
@@ -38,25 +39,4 @@ public class GoogleApiClientUnitTests {
     }
 
      */
-
-    @TestConfiguration
-    static class TestConfig {
-        @Bean
-        RestClient.Builder restClientBuilder() {
-            return RestClient.builder();
-        }
-
-        @Bean
-        RestClient googleRestClient(
-                RestClient.Builder builder
-        ) {
-            return builder
-                    .baseUrl("https://www.googleapis.com")
-                    .defaultHeader(
-                            HttpHeaders.ACCEPT,
-                            MediaType.APPLICATION_JSON_VALUE
-                    )
-                    .build();
-        }
-    }
 }
