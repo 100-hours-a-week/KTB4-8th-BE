@@ -98,6 +98,6 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 .maxAge(Duration.ofDays(14))
                 .build().toString();
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie);
-        response.sendRedirect("http://" + loginProperties.redirectionAddress() + "?accessToken=" + accessToken + "&expiresIn=3600");
+        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken + "&expiresIn=3600");
     }
 }
