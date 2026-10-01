@@ -6,9 +6,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 @Configuration
 @RequiredArgsConstructor
@@ -21,7 +24,15 @@ public class AiServerApiClientConfig {
     RestClient aiServerRestClient(
             RestClient.Builder builder
     ) {
+        var httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+
+        var requestFactory = new JdkClientHttpRequestFactory(httpClient);
+
         return builder
+                .requestFactory(requestFactory)
                 .baseUrl(properties.address())
                 .requestInterceptor((request, body, execution) -> {
                     String safeUri = request.getURI()
