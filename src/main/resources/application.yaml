@@ -54,3 +54,7 @@ management:
   endpoint:
     health:
       show-details: never
+
+logging:
+  level:
+    root: ${LOGGING_LEVEL:TRACE}

@@ -27,9 +27,7 @@ public class Member {
     private String likedVideosPlaylistId;
 
     public void updateNickname(String newNickname) {
-        if (!this.nickname.equals(newNickname)) {
-            this.nickname = newNickname;
-        }
+        this.nickname = newNickname;
     }
 
     public void updateProfileImage(File newProfileImage) {
@@ -37,7 +35,11 @@ public class Member {
     }
 
     public Member(String nickname) {
-        this.nickname = nickname;
+        String finalNickname = "새 사용자";
+        if (nickname != null) {
+            finalNickname = nickname;
+        }
+        this.nickname = finalNickname;
     }
 
     public static Member create(String nickname) {
