@@ -5,7 +5,6 @@ import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -72,9 +71,9 @@ public record RecommendCourseRequest(
                 ).toList(),
                 places.stream().map(RecommendHistoryPlaceId::from).toList(),
                 slot.getAvailableTime(),
-                slot.getCategories(),
-                slot.getRequestedDateTime(),
-                slot.getCoordinate()
+                slot.getCategory(),
+                slot.getDateTime(),
+                slot.getOrigin()
         );
     }
 }

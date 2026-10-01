@@ -44,7 +44,7 @@ keepgo:
   cache:
     rt-hash:
       maximum-size: 1000
-      expire-after-write: 15m
+      expire-after-write: 1d
 
 management:
   endpoints:
