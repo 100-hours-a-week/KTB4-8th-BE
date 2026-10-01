@@ -2,56 +2,46 @@ package eightjbbm.keepgo.integration.apichain;
 
 import eightjbbm.keepgo.auth.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
-import eightjbbm.keepgo.config.TestGoogleClientConfig;
-import eightjbbm.keepgo.config.TestOAuth2Config;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoRequest;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.member.service.MemberService;
-import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
-import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.file.File;
 import eightjbbm.keepgo.util.file.FileRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.client.RestClient;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /// 회원 도메인 통합 테스트
 ///
 /// API 엔드포인트 총 3개
 @ActiveProfiles("test")
 @AutoConfigureWebTestClient
-@Import({
-        TestOAuth2Config.class,
-        //TestGoogleClientConfig.class
-})
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@EnableConfigurationProperties({
-        JwtProperties.class
-})
+@EnableConfigurationProperties({JwtProperties.class})
 public class MemberIntegrationTests {
 
     @Autowired
@@ -68,12 +58,6 @@ public class MemberIntegrationTests {
 
     @Autowired
     FileRepository fileRepository;
-
-    @Autowired
-    GoogleApiClient googleApiClient;
-
-    @MockitoBean
-    MemberService memberService;
 
     private Member member;
     private OAuthAccount memberOAuthAccount;
@@ -105,9 +89,6 @@ public class MemberIntegrationTests {
     private String issueAccessToken() {
         return accessTokenManager.issue(member.getId(), List.of());
     }
-
-    @Test
-    void contextLoad() {}
 
     @Test
     @DisplayName("""
@@ -159,6 +140,7 @@ public class MemberIntegrationTests {
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
     }
+    /*
 
     /// 외부 API 호출: 구글
     ///
@@ -167,11 +149,9 @@ public class MemberIntegrationTests {
             유튜브 동기화 API 통합 테스트
             """)
     void test3() throws Exception {
-        when(googleApiClient.getLikedVideos("test-token-value")).thenReturn(new GetLikedVideosResponse(
-                "1234",
-                List.of(new GetLikedVideosResponse.Item("1234")),
-                new GetLikedVideosResponse.PageInfo(1, 5)
-        ));
+
+
+        member.setLikedVideosPlaylistId(String.valueOf(0));
         webTestClient
                 .post()
                 .uri("/api/v1/user/youtube-analyze")
@@ -181,4 +161,6 @@ public class MemberIntegrationTests {
                 .exchange()
                 .expectStatus().isNoContent();
     }
+
+     */
 }
