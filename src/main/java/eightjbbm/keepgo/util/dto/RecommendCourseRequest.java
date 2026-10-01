@@ -72,7 +72,7 @@ public record RecommendCourseRequest(
                 places.stream().map(RecommendHistoryPlaceId::from).toList(),
                 slot.getAvailableTime(),
                 slot.getCategory(),
-                slot.getDateTime(),
+                slot.getDatetime(),
                 slot.getOrigin()
         );
     }
