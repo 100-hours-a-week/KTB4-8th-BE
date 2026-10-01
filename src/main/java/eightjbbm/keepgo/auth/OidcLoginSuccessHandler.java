@@ -26,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 @Slf4j
@@ -65,11 +66,14 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
             throw new IllegalStateException("Google Access Token이 없음");
         }
 
-        Member member = oAuthAccountRepository.findByIssuerAndSubject(
+        Optional<OAuthAccount> oauthAccount = oAuthAccountRepository.findByIssuerAndSubject(
                     oidcUser.getIssuer().toString(),
                     oidcUser.getSubject()
-                )
-                .orElseGet(
+        );
+
+        boolean initialLogin = oauthAccount.isEmpty();
+
+        Member member = oauthAccount.orElseGet(
                         () -> {
                             log.info("name: " + (String) oidcUser.getClaims().get("name"));
                             Member newMember = memberRepository.save(
@@ -102,6 +106,6 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 .maxAge(Duration.ofDays(14))
                 .build().toString();
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie);
-        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken + "&expiresIn=3600");
+        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken + "&expiresIn=1800&initialLogin=" + initialLogin);
     }
 }
