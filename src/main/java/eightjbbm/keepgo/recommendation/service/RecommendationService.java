@@ -3,7 +3,7 @@ package eightjbbm.keepgo.recommendation.service;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.*;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.cache.recommendationjob.RecommendationJobCacheService;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
@@ -17,7 +17,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,12 +47,14 @@ public class RecommendationService {
 
         recommendationJobCacheService.completeJob(command.memberId());
 
+        // AI의 place_id는 후보로 보낸 OutingGuide id다. 보낸 후보 안에서 찾는다.
+        Map<String, OutingGuide> candidates = collection.stream()
+                .map(OutingCollectionPrivate::getOutingGuide)
+                .collect(Collectors.toMap(guide -> guide.getId().toString(), Function.identity()));
+
         return RequestRecommendationResult.from(
                 slot, recommendCourseResponse,
-                (k -> (OutingPlace) outingCollectionPrivateRepository
-                        .findById(Long.valueOf(k.placeId()))
-                        .orElseThrow()
-                        .getOutingGuide())
+                place -> candidates.get(place.placeId())
         );
     }
 

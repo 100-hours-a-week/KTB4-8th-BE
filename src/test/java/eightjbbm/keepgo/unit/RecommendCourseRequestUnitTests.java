@@ -3,6 +3,8 @@ package eightjbbm.keepgo.unit;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationCommand;
+import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult;
+import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.service.RecommendationService;
 import eightjbbm.keepgo.util.Coordinate;
@@ -12,6 +14,10 @@ import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse.RecommendData;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse.RecommendData.RecommendCourse;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -101,6 +107,33 @@ public class RecommendCourseRequestUnitTests {
         assertThat(captor.getValue().candidates())
                 .extracting(RecommendCourseRequest.RecommendCandidate::placeId)
                 .containsExactly("3", "5");
+    }
+
+    @Test
+    @DisplayName("""
+            AI가 고른 장소를 후보로 보낸 장소(guide id)에서 찾는다
+            """)
+    void mapResponsePlacesByGuideId() {
+        var fixture = new Fixture();
+        var event = new OutingEvent("팝업", "성수 팝업", null, null, null);
+        ReflectionTestUtils.setField(event, "id", 9L);
+        when(fixture.slotCacheService.getSlot(MEMBER_ID))
+                .thenReturn(Optional.of(SlotValue.from(null, "서울 성동구", null, null, null)));
+        when(fixture.repository.findAllByMemberIdOrderByIdDesc(MEMBER_ID))
+                .thenReturn(List.of(saved(5L), new OutingCollectionPrivate(null, event)));
+        when(fixture.aiServerApiClient.recommendCourse(any())).thenReturn(new RecommendCourseResponse("ok", new RecommendData(List.of(
+                new RecommendCourse("성수 코스", List.of(
+                        new RecommendPlace("5", "장소5", 0, "10:00", 60, "조용함"),
+                        new RecommendPlace("9", "성수 팝업", 0, "11:00", 40, "인기")
+                ), 100)
+        ))));
+
+        RequestRecommendationResult result = fixture.service.requestRecommendation(new RequestRecommendationCommand(MEMBER_ID));
+
+        assertThat(result.details().getFirst().items())
+                .extracting(RequestRecommendationResult.RecommendationDetailItem::category)
+                .containsExactly("카페", "팝업");
+        assertThat(result.metadata().scheduledTime()).isNull();
     }
 
     private static OutingCollectionPrivate saved(Long guideId) {

@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.recommendation.dto;
 
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 
@@ -47,7 +47,7 @@ public record RequestRecommendationResult(
     ) {
         public static RecommendationDetail from(
                 RecommendCourseResponse.RecommendData.RecommendCourse course,
-                Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingPlace> extractor
+                Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingGuide> extractor
         ) {
             return new RecommendationDetail(
                     course.title(),
@@ -71,11 +71,11 @@ public record RequestRecommendationResult(
             Float lat,
             Float lng
     ) {
-        public static RecommendationDetailItem from(int sequence, RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace place, OutingPlace outingPlace) {
+        public static RecommendationDetailItem from(int sequence, RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace place, OutingGuide outingGuide) {
             return new RecommendationDetailItem(
                     sequence,
                     place.placeName(),
-                    outingPlace.getCategory(),
+                    outingGuide == null ? null : outingGuide.getCategory(),
                     place.travelMinutes().toString(),
                     /*
                     outingPlace.getLat(),
@@ -91,7 +91,7 @@ public record RequestRecommendationResult(
     public static RequestRecommendationResult from(
             SlotValue slot,
             RecommendCourseResponse response,
-            Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingPlace> extractor) {
+            Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingGuide> extractor) {
         return new RequestRecommendationResult(
                 new RecommendationMetadata(
                         response.data().courses().size(),
