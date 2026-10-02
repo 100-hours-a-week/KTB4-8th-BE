@@ -4,6 +4,7 @@ import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.*;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.cache.recommendationjob.RecommendationJobCacheService;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
@@ -28,6 +29,7 @@ public class RecommendationService {
 
     private final AiServerApiClient aiServerApiClient;
     private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
+    private final OutingGuideRepository outingGuideRepository;
     private final QueryCacheService queryCacheService;
     private final SlotCacheService slotCacheService;
     private final RecommendationJobCacheService recommendationJobCacheService;
@@ -35,31 +37,37 @@ public class RecommendationService {
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         Long memberId = command.memberId();
         String query = queryCacheService.getQuery(memberId);
-        List<OutingCollectionPrivate> collection = recentDistinctPlaces(memberId);
         SlotValue slot = slotCacheService.getSlot(memberId).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.BAD_REQUEST, "추천 조건이 없습니다. 의도 카드를 먼저 저장해 주세요."
         ));
+        List<OutingGuide> candidates = candidatePlaces();
+        List<OutingCollectionPrivate> history = recentSavedPlaces(memberId);
         recommendationJobCacheService.createJob(memberId, 0L);
 
         var recommendCourseResponse = aiServerApiClient.recommendCourse(RecommendCourseRequest.from(
-                query, collection, slot
+                query, candidates, history, slot
         ));
 
         recommendationJobCacheService.completeJob(command.memberId());
 
         // AI의 place_id는 후보로 보낸 OutingGuide id다. 보낸 후보 안에서 찾는다.
-        Map<String, OutingGuide> candidates = collection.stream()
-                .map(OutingCollectionPrivate::getOutingGuide)
+        Map<String, OutingGuide> candidateById = candidates.stream()
                 .collect(Collectors.toMap(guide -> guide.getId().toString(), Function.identity()));
 
         return RequestRecommendationResult.from(
                 slot, recommendCourseResponse,
-                place -> candidates.get(place.placeId())
+                place -> candidateById.get(place.placeId())
         );
     }
 
-    /// 회원이 저장한 장소를 최근 순으로, 같은 장소는 한 번만, AI 한도({@link RecommendCourseRequest#MAX_PLACES})까지 고른다.
-    private List<OutingCollectionPrivate> recentDistinctPlaces(Long memberId) {
+    /// 코스를 짤 후보 장소. 원래는 출발지 반경으로 1차 필터링해야 하지만, 장소 좌표를 아직 모으지 못해
+    /// 최근 등록 순으로 AI 한도({@link RecommendCourseRequest#MAX_PLACES})까지 보낸다.
+    private List<OutingGuide> candidatePlaces() {
+        return outingGuideRepository.findTop50ByOrderByIdDesc();
+    }
+
+    /// 취향 계산용 이력. 회원이 저장한 장소를 최근 순으로, 같은 장소는 한 번만, AI 한도까지 고른다.
+    private List<OutingCollectionPrivate> recentSavedPlaces(Long memberId) {
         Set<Long> seenGuideIds = new HashSet<>();
         return outingCollectionPrivateRepository.findAllByMemberIdOrderByIdDesc(memberId).stream()
                 .filter(saved -> saved.getOutingGuide() != null)

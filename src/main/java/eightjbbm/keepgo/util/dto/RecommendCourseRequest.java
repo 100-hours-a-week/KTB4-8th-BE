@@ -66,16 +66,18 @@ public record RecommendCourseRequest(
         }
     }
 
-    /// @param places 회원의 저장 장소. 장소(guide)가 겹치지 않고 최대 {@link #MAX_PLACES}개여야 한다
+    /// @param candidates 코스를 짤 후보 장소. 이름이 있고 최대 {@link #MAX_PLACES}개여야 한다
+    /// @param history 취향 계산용 회원의 저장 장소. 장소(guide)가 겹치지 않고 최대 {@link #MAX_PLACES}개여야 한다
     public static RecommendCourseRequest from(
             String query,
-            List<OutingCollectionPrivate> places,
+            List<OutingGuide> candidates,
+            List<OutingCollectionPrivate> history,
             SlotValue slot
     ) {
         return new RecommendCourseRequest(
                 query == null ? "" : query,
-                places.stream().map(k -> RecommendCandidate.from(k.getOutingGuide())).toList(),
-                places.stream().map(RecommendHistoryPlaceId::from).toList(),
+                candidates.stream().map(RecommendCandidate::from).toList(),
+                history.stream().map(RecommendHistoryPlaceId::from).toList(),
                 AiSlot.formatAvailableTime(slot.getAvailableTime()),
                 AiSlot.filterCategories(slot.getCategory()),
                 AiSlot.formatDatetime(slot.getDatetime()),

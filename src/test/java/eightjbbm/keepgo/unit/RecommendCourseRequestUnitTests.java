@@ -5,7 +5,9 @@ import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationCommand;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.service.RecommendationService;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
@@ -41,8 +43,9 @@ import static org.mockito.Mockito.when;
 
 /// 코스 추천 요청 단위 테스트
 ///
-/// 슬롯을 읽지 못하고(null), 전 회원의 저장 장소를 보내며, AI 스키마와 다른 형식으로
-/// 요청하던 문제(2026-10-02)의 회귀 테스트
+/// 2026-10-02 회귀 테스트
+/// - 슬롯을 읽지 못하고(null), AI 스키마와 다른 형식으로 요청하던 문제
+/// - 후보(candidates)와 취향 이력(history_place_ids)을 같은 목록으로 보내던 문제
 public class RecommendCourseRequestUnitTests {
 
     private static final Long MEMBER_ID = 1L;
@@ -59,7 +62,7 @@ public class RecommendCourseRequestUnitTests {
                 new Coordinate(37.5f, 127.0364f), "서울 강남구", LocalDateTime.of(2026, 10, 9, 13, 0), 360, List.of("카페", "산책")
         );
 
-        JsonNode json = MAPPER.valueToTree(RecommendCourseRequest.from(null, List.of(saved(7L)), slot));
+        JsonNode json = MAPPER.valueToTree(RecommendCourseRequest.from(null, List.of(place(7L)), List.of(saved(3L)), slot));
 
         assertThat(json.get("query").asString()).isEmpty();
         assertThat(json.get("available_time").asString()).isEqualTo("360");
@@ -71,6 +74,7 @@ public class RecommendCourseRequestUnitTests {
         assertThat(candidate.get("place_id").asString()).isEqualTo("7");
         assertThat(candidate.get("summary").asString()).isEmpty();
         assertThat(candidate.get("business_hours").asString()).isEqualTo("정보 없음");
+        assertThat(json.get("history_place_ids").get(0).get("place_id").asString()).isEqualTo("3");
         assertThat(json.get("history_place_ids").get(0).get("saved_at").isString()).isTrue();
     }
 
@@ -90,14 +94,16 @@ public class RecommendCourseRequestUnitTests {
 
     @Test
     @DisplayName("""
-            회원의 저장 장소만, 같은 장소는 한 번만 후보로 보낸다
+            후보는 전체 장소 풀에서, 이력은 회원의 저장 장소에서 중복 없이 보낸다
             """)
-    void memberPlacesOnlyAndDistinct() {
+    void candidatesAndHistoryAreSeparate() {
         var fixture = new Fixture();
         when(fixture.slotCacheService.getSlot(MEMBER_ID))
                 .thenReturn(Optional.of(SlotValue.from(null, null, null, null, null)));
-        when(fixture.repository.findAllByMemberIdOrderByIdDesc(MEMBER_ID))
-                .thenReturn(List.of(saved(3L), saved(3L), saved(5L)));
+        when(fixture.guideRepository.findTop50ByOrderByIdDesc())
+                .thenReturn(List.of(place(9L), place(5L)));
+        when(fixture.collectionRepository.findAllByMemberIdOrderByIdDesc(MEMBER_ID))
+                .thenReturn(List.of(saved(3L), saved(3L), saved(4L)));
         when(fixture.aiServerApiClient.recommendCourse(any())).thenThrow(new IllegalStateException("stop"));
 
         assertThatThrownBy(() -> fixture.service.requestRecommendation(new RequestRecommendationCommand(MEMBER_ID)));
@@ -106,7 +112,10 @@ public class RecommendCourseRequestUnitTests {
         verify(fixture.aiServerApiClient).recommendCourse(captor.capture());
         assertThat(captor.getValue().candidates())
                 .extracting(RecommendCourseRequest.RecommendCandidate::placeId)
-                .containsExactly("3", "5");
+                .containsExactly("9", "5");
+        assertThat(captor.getValue().historyPlaceIds())
+                .extracting(RecommendCourseRequest.RecommendHistoryPlaceId::placeId)
+                .containsExactly("3", "4");
     }
 
     @Test
@@ -119,8 +128,8 @@ public class RecommendCourseRequestUnitTests {
         ReflectionTestUtils.setField(event, "id", 9L);
         when(fixture.slotCacheService.getSlot(MEMBER_ID))
                 .thenReturn(Optional.of(SlotValue.from(null, "서울 성동구", null, null, null)));
-        when(fixture.repository.findAllByMemberIdOrderByIdDesc(MEMBER_ID))
-                .thenReturn(List.of(saved(5L), new OutingCollectionPrivate(null, event)));
+        when(fixture.guideRepository.findTop50ByOrderByIdDesc())
+                .thenReturn(List.of(place(5L), event));
         when(fixture.aiServerApiClient.recommendCourse(any())).thenReturn(new RecommendCourseResponse("ok", new RecommendData(List.of(
                 new RecommendCourse("성수 코스", List.of(
                         new RecommendPlace("5", "장소5", 0, "10:00", 60, "조용함"),
@@ -136,19 +145,25 @@ public class RecommendCourseRequestUnitTests {
         assertThat(result.metadata().scheduledTime()).isNull();
     }
 
-    private static OutingCollectionPrivate saved(Long guideId) {
+    private static OutingGuide place(Long guideId) {
         var place = new OutingPlace("카페", "장소" + guideId, null);
         ReflectionTestUtils.setField(place, "id", guideId);
-        return new OutingCollectionPrivate(null, place);
+        return place;
+    }
+
+    private static OutingCollectionPrivate saved(Long guideId) {
+        return new OutingCollectionPrivate(null, place(guideId));
     }
 
     private static class Fixture {
         final AiServerApiClient aiServerApiClient = mock(AiServerApiClient.class);
-        final OutingCollectionPrivateRepository repository = mock(OutingCollectionPrivateRepository.class);
+        final OutingCollectionPrivateRepository collectionRepository = mock(OutingCollectionPrivateRepository.class);
+        final OutingGuideRepository guideRepository = mock(OutingGuideRepository.class);
         final SlotCacheService slotCacheService = mock(SlotCacheService.class);
         final RecommendationService service = new RecommendationService(
                 aiServerApiClient,
-                repository,
+                collectionRepository,
+                guideRepository,
                 mock(QueryCacheService.class),
                 slotCacheService,
                 mock(RecommendationJobCacheService.class)
