@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriBuilder;
 
 @Component
 @RequiredArgsConstructor
@@ -15,13 +14,7 @@ public class AiServerApiClient {
 
     public RecommendCourseResponse recommendCourse(RecommendCourseRequest request) {
         return aiServerRestClient.post()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path("/v1/recommend-courses");
-                            return builder.build();
-                        }
-                )
+                .uri("/v1/recommend-courses")
                 .body(request)
                 .retrieve()
                 .body(RecommendCourseResponse.class);
@@ -29,24 +22,14 @@ public class AiServerApiClient {
 
     public void stopRecommendation(Long jobId) {
         aiServerRestClient.post()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path("/v1/recommend-courses/" + jobId + "/cancel");
-                            return builder.build();
-                        }
-                ).retrieve().body(Void.class);
+                .uri("/v1/recommend-courses/{jobId}/cancel", jobId)
+                .retrieve()
+                .body(Void.class);
     }
 
     public ExtractSlotResponse extractSlot(ExtractSlotRequest request) {
         return aiServerRestClient.post()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path("/v1/extract");
-                            return builder.build();
-                        }
-                )
+                .uri("/v1/extract")
                 .body(request)
                 .retrieve()
                 .body(ExtractSlotResponse.class);
@@ -54,13 +37,7 @@ public class AiServerApiClient {
 
     public AnalyzeVideoResponse analyzeVideo(AnalyzeVideoRequest request) {
         return aiServerRestClient.post()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path("/v1/analyze-video");
-                            return builder.build();
-                        }
-                )
+                .uri("/v1/analyze-video")
                 .body(request)
                 .retrieve()
                 .body(AnalyzeVideoResponse.class);
