@@ -79,4 +79,16 @@ public class GetReplyFailureUnitTests {
                 .isEqualTo("안녕하세요");
         assertThat(service.poll(MEMBER_ID)).isEmpty();
     }
+
+    @Test
+    @DisplayName("""
+            새 채팅을 만들면 이전 채팅의 꺼내지 않은 결과를 버린다
+            """)
+    void newChatResetsStaleResult() {
+        repository.fail(MEMBER_ID);
+
+        repository.create(MEMBER_ID);
+
+        assertThat(service.poll(MEMBER_ID)).isEmpty();
+    }
 }

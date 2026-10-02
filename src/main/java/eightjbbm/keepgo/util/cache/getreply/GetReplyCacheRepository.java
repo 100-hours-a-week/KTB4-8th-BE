@@ -17,8 +17,10 @@ public class GetReplyCacheRepository {
     /// 챗봇 응답 생성에 실패했음을 나타내는 값
     public enum Failure { INSTANCE }
 
+    /// 새 채팅마다 처리 중 상태로 되돌린다.
+    /// 이전 채팅에서 꺼내지 않은 응답·실패 표시가 남아 있으면 새 채팅 폴링에 그 결과가 나가기 때문이다.
     public void create(Long memberId) {
-        getReplyCache().putIfAbsent(memberId, null);
+        getReplyCache().put(memberId, null);
     }
 
     /// 완료된 결과({@link ExtractSlotResponse.ExtractData} 또는 {@link Failure})를 꺼내고 지운다.
