@@ -1,21 +1,20 @@
 package eightjbbm.keepgo.util.dto;
 
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
 
 import java.time.LocalDate;
 
 public record ExtractSlotRequest(
         String chat,
         LocalDate date,
-        SlotValue prevSlot,
+        AiSlot prevSlot,
         String prevQuery
 ) {
     public static ExtractSlotRequest from(GetReplyRequest request) {
         return new ExtractSlotRequest(
                 request.content(),
                 request.createdDate(),
-                request.slot(),
+                AiSlot.from(request.slot()),
                 request.query()
         );
     }

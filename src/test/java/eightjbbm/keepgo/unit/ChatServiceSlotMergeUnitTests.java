@@ -1,7 +1,7 @@
 package eightjbbm.keepgo.unit;
 
 import eightjbbm.keepgo.chat.dto.GetReplyCommand;
-import eightjbbm.keepgo.chat.dto.GetReplyResponse;
+import eightjbbm.keepgo.util.dto.AiSlot;
 import eightjbbm.keepgo.chat.dto.GetReplyResult;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.service.ChatService;
@@ -59,7 +59,7 @@ public class ChatServiceSlotMergeUnitTests {
     void mergeWhenPreviousDatetimeIsNull() {
         slotCacheService.updateSlot(new UpdateSlotCacheRequest(MEMBER_ID, null, null, null, 180, null));
         when(getReplyCacheService.poll(MEMBER_ID)).thenReturn(Optional.of(new ExtractSlotResponse.ExtractData(
-                new GetReplyResponse.Slot(null, "서울 강남구", null, null, null), "", "강남으로 찾아볼게요."
+                new AiSlot(null, "서울 강남구", null, null, null), "", "강남으로 찾아볼게요."
         )));
 
         GetReplyResult result = chatService.getReply(new GetReplyCommand(MEMBER_ID, 1L));
@@ -79,7 +79,7 @@ public class ChatServiceSlotMergeUnitTests {
         LocalDateTime saturday = LocalDateTime.of(2026, 10, 3, 15, 0);
         slotCacheService.updateSlot(new UpdateSlotCacheRequest(MEMBER_ID, null, "서울 성동구", saturday, 360, List.of("카페")));
         when(getReplyCacheService.poll(MEMBER_ID)).thenReturn(Optional.of(new ExtractSlotResponse.ExtractData(
-                new GetReplyResponse.Slot(null, null, null, null, null), "", "알겠어요."
+                new AiSlot(null, null, null, null, null), "", "알겠어요."
         )));
 
         chatService.getReply(new GetReplyCommand(MEMBER_ID, 1L));
@@ -89,6 +89,29 @@ public class ChatServiceSlotMergeUnitTests {
         assertThat(slot.getDatetime()).isEqualTo(saturday);
         assertThat(slot.getAvailableTime()).isEqualTo(360);
         assertThat(slot.getCategory()).containsExactly("카페");
+    }
+
+    @Test
+    @DisplayName("""
+            AI 형식 값을 BE 슬롯으로 병합하고, 같은 날짜면 기존 시각을 유지한다
+            """)
+    void mergeAiFormatValues() {
+        LocalDateTime saturday3pm = LocalDateTime.of(2026, 10, 3, 15, 0);
+        slotCacheService.updateSlot(new UpdateSlotCacheRequest(MEMBER_ID, null, null, saturday3pm, null, null));
+        when(getReplyCacheService.poll(MEMBER_ID)).thenReturn(Optional.of(new ExtractSlotResponse.ExtractData(
+                new AiSlot("강남역", null, "2026-10-03", "540", List.of("카페", "전시")), "", "좋아요"
+        )));
+
+        GetReplyResult result = chatService.getReply(new GetReplyCommand(MEMBER_ID, 1L));
+
+        SlotValue slot = slotCacheService.getSlot(MEMBER_ID).orElseThrow();
+        assertThat(slot.getDatetime()).isEqualTo(saturday3pm);
+        assertThat(slot.getAvailableTime()).isEqualTo(540);
+        assertThat(slot.getCategory()).containsExactly("카페", "전시");
+        assertThat(slot.getOrigin()).isNull();
+        var completed = (GetReplyResult.Completed) result;
+        assertThat(completed.slot().category()).isEqualTo("카페");
+        assertThat(completed.slot().datetime()).isEqualTo(saturday3pm.toLocalDate());
     }
 
     @Test
