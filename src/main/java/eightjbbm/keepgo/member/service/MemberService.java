@@ -115,7 +115,7 @@ public class MemberService {
                                                 response.getCategory(),
                                                 response.getName(),
                                                 response.getSummary(),
-                                                null,
+                                                OutingPlace.emptyPlace(),
                                                 response.data().eventStartDate(),
                                                 response.data().eventEndDate()
                                         ))
