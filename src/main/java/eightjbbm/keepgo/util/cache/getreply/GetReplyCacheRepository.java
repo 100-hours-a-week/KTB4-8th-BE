@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
+import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -17,15 +18,15 @@ public class GetReplyCacheRepository {
         getReplyCache().putIfAbsent(memberId, null);
     }
 
-    public Optional<String> poll(Long memberId) {
-        Optional<String> content = Optional.ofNullable(getReplyCache().get(memberId, String.class));
+    public Optional<ExtractSlotResponse.ExtractData> poll(Long memberId) {
+        Optional<ExtractSlotResponse.ExtractData> content = Optional.ofNullable(getReplyCache().get(memberId, ExtractSlotResponse.ExtractData.class));
         if (content.isPresent()) {
             evict(memberId);
         }
         return content;
     }
 
-    public void update(Long memberId, String content) {
+    public void update(Long memberId, ExtractSlotResponse.ExtractData content) {
         getReplyCache().put(memberId, content);
     }
 
