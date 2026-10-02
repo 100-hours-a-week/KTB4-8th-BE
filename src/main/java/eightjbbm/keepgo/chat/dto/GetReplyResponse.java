@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.chat.dto;
 
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.cache.slot.SlotValue;
 
 import java.time.LocalDate;
 
@@ -21,13 +22,29 @@ public sealed interface GetReplyResponse
         }
     }
 
+    /// FE에 내려주는 슬롯
+    ///
+    /// @param category FE는 카테고리를 하나만 받으므로 첫 번째 값만 내려준다
     public record Slot(
         Coordinate origin,
         String region,
         LocalDate datetime,
         Integer availableTime,
         String category
-    ) {}
+    ) {
+        public static Slot from(SlotValue slot) {
+            if (slot == null) {
+                return new Slot(null, null, null, null, null);
+            }
+            return new Slot(
+                    slot.getOrigin(),
+                    slot.getRegion(),
+                    slot.getDatetime() == null ? null : slot.getDatetime().toLocalDate(),
+                    slot.getAvailableTime(),
+                    slot.getCategory() == null || slot.getCategory().isEmpty() ? null : slot.getCategory().getFirst()
+            );
+        }
+    }
 
     public record InProgress(
             String status,

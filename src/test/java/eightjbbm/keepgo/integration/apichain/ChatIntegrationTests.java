@@ -14,6 +14,7 @@ import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheRepository;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
+import eightjbbm.keepgo.util.dto.AiSlot;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import org.junit.jupiter.api.AfterEach;
@@ -178,8 +179,9 @@ public class ChatIntegrationTests {
                 .thenAnswer(invocation -> {
                     Thread.sleep(Duration.ofSeconds(5));
                     IO.println("Job Done!");
-                    getReplyCacheRepository.update(member.getId(), null);
-                    return null;
+                    return new ExtractSlotResponse("extract_success", new ExtractSlotResponse.ExtractData(
+                            new AiSlot(null, null, null, null, null), "", "어디로 가고 싶으세요?"
+                    ));
                 });
 
         var request = new SendChatRequest("hello");

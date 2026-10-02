@@ -13,6 +13,7 @@ import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
+import eightjbbm.keepgo.util.dto.AiSlot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -61,26 +62,53 @@ public class ChatService {
 
     /// 채팅 대답 폴링 API
     public GetReplyResult getReply(GetReplyCommand command) {
-        Optional<SlotValue> slotValue = slotCacheService.getSlot(command.memberId());
         return getReplyCacheService.poll(command.memberId())
                 .map(response -> {
-                    slotCacheService.updateSlot(new UpdateSlotCacheRequest(
-                            command.memberId(),
-                            Optional.ofNullable(response.slot().origin()).orElse(slotValue.map(SlotValue::getOrigin).orElse(null)),
-                            Optional.ofNullable(response.slot().region()).orElse(slotValue.map(SlotValue::getRegion).orElse(null)),
-                            Optional.ofNullable(
-                                    Optional.ofNullable(response.slot().datetime()).orElse(slotValue.map(k -> k.getDatetime().toLocalDate()).orElse(null))
-                            ).map(
-                                    k -> k.atTime(
-                                            LocalTime.now()
-                                    )
-                            ).orElse(null),
-                            Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.map(SlotValue::getAvailableTime).orElse(null)),
-                            Optional.ofNullable(response.slot().category()).map(List::of).orElse(slotValue.map(SlotValue::getCategory).orElse(null))
-                    ));
-                    return GetReplyResult.Completed.from("COMPLETED", response);
+                    queryCacheService.updateQuery(command.memberId(), response.query());
+                    return GetReplyResult.Completed.from(
+                            "COMPLETED", response, mergeSlot(command.memberId(), response.slot())
+                    );
                 })
                 .orElseGet(() -> GetReplyResult.InProgress.from("IN_PROGRESS", 1));
+    }
+
+    /// AI가 돌려준 슬롯 중 값이 있는 필드만 기존 슬롯에 덮어쓰고, 병합 결과를 돌려준다.
+    ///
+    /// poll()이 응답을 캐시에서 이미 꺼낸 뒤라, 여기서 예외가 나면 챗봇 답변이 사라진다.
+    /// 그래서 기존 슬롯이나 그 필드가 비어 있어도 예외 없이 병합해야 한다.
+    /// 출발지는 BE가 좌표로 관리하므로 AI가 준 출발지 이름으로 덮어쓰지 않는다.
+    private SlotValue mergeSlot(Long memberId, AiSlot next) {
+        SlotValue prev = slotCacheService.getSlot(memberId)
+                .orElse(SlotValue.from(null, null, null, null, null));
+        if (next == null) {
+            return prev;
+        }
+        var request = new UpdateSlotCacheRequest(
+                memberId,
+                prev.getOrigin(),
+                firstNonNull(next.region(), prev.getRegion()),
+                mergeDatetime(AiSlot.parseDatetime(next.datetime()), prev.getDatetime()),
+                firstNonNull(AiSlot.parseAvailableTime(next.availableTime()), prev.getAvailableTime()),
+                firstNonNull(next.category(), prev.getCategory())
+        );
+        slotCacheService.updateSlot(request);
+        return slotCacheService.getSlot(memberId).orElseThrow();
+    }
+
+    /// AI가 날짜만 줬고(00:00) 기존 슬롯이 같은 날짜에 시각까지 갖고 있으면 기존 시각을 유지한다.
+    private static LocalDateTime mergeDatetime(LocalDateTime next, LocalDateTime prev) {
+        if (next == null) {
+            return prev;
+        }
+        boolean dateOnly = next.toLocalTime().equals(LocalTime.MIDNIGHT);
+        if (dateOnly && prev != null && prev.toLocalDate().equals(next.toLocalDate())) {
+            return prev;
+        }
+        return next;
+    }
+
+    private static <T> T firstNonNull(T next, T prev) {
+        return next != null ? next : prev;
     }
 
     /// 채팅 내역 조회 API
@@ -101,12 +129,16 @@ public class ChatService {
 
     /// 채팅 내역 초기화 API
     ///
-    /// 1차 구현 완료
+    /// 대화에서 쌓은 슬롯·정성 조건과 아직 꺼내지 않은 응답도 함께 지운다.
+    /// 남겨 두면 새 대화가 이전 조건을 그대로 물려받는다.
     /// @param command {@link ResetChatroomCommand}
     @Transactional
     public void resetChatroom(ResetChatroomCommand command) {
         List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.memberId());
         allByMemberId.forEach(Chat::delete);
+        slotCacheService.deleteSlot(command.memberId());
+        queryCacheService.deleteQuery(command.memberId());
+        getReplyCacheService.discard(command.memberId());
     }
 
     /// 의도 카드 수정 API

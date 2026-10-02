@@ -30,6 +30,9 @@ public class AiServerApiClientConfig {
                 .build();
 
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        // AI가 응답하지 않으면 워커 스레드가 무한정 묶이므로 상한을 둔다.
+        // 가장 긴 AI 작업(영상 분석 120초)보다 길게 잡는다.
+        requestFactory.setReadTimeout(Duration.ofSeconds(130));
 
         return builder
                 .requestFactory(requestFactory)

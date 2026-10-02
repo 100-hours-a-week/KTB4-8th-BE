@@ -34,6 +34,10 @@ public class SlotCacheRepository {
         getSlotCache().put(memberId, slotValue);
     }
 
+    public void delete(Long memberId) {
+        getSlotCache().evictIfPresent(memberId);
+    }
+
     private Cache getSlotCache() {
         Cache cache = cacheManager.getCache(cacheName);
 

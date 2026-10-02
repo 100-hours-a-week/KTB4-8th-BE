@@ -28,4 +28,12 @@ public class OutingCollectionPrivate {
         this.member = member;
         this.outingGuide = outingGuide;
     }
+
+    /// 저장 시각은 코스 추천의 취향 계산(history_place_ids.saved_at)에 쓰인다.
+    @PrePersist
+    void prePersist() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
 }
