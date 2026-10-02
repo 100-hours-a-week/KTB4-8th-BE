@@ -7,6 +7,7 @@ import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.service.ChatService;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
+import eightjbbm.keepgo.util.cache.query.QueryCacheRepository;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheRepository;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
@@ -40,18 +41,21 @@ public class ChatServiceSlotMergeUnitTests {
 
     private GetReplyCacheService getReplyCacheService;
     private SlotCacheService slotCacheService;
+    private QueryCacheService queryCacheService;
     private ChatService chatService;
 
     @BeforeEach
     void setUp() {
         getReplyCacheService = mock(GetReplyCacheService.class);
-        slotCacheService = new SlotCacheService(new SlotCacheRepository(new ConcurrentMapCacheManager("slot")));
+        var cacheManager = new ConcurrentMapCacheManager("slot", "query");
+        slotCacheService = new SlotCacheService(new SlotCacheRepository(cacheManager));
+        queryCacheService = new QueryCacheService(new QueryCacheRepository(cacheManager));
         chatService = new ChatService(
                 mock(MemberRepository.class),
                 mock(ChatRepository.class),
                 getReplyCacheService,
                 slotCacheService,
-                mock(QueryCacheService.class),
+                queryCacheService,
                 mock(GeoCodingApiClient.class)
         );
     }
@@ -103,7 +107,7 @@ public class ChatServiceSlotMergeUnitTests {
         LocalDateTime saturday3pm = LocalDateTime.of(2026, 10, 3, 15, 0);
         slotCacheService.updateSlot(new UpdateSlotCacheRequest(MEMBER_ID, null, null, saturday3pm, null, null));
         when(getReplyCacheService.poll(MEMBER_ID)).thenReturn(Optional.of(new ExtractSlotResponse.ExtractData(
-                new AiSlot("강남역", null, "2026-10-03", "540", List.of("카페", "전시")), "", "좋아요"
+                new AiSlot("강남역", null, "2026-10-03", "540", List.of("카페", "전시")), "조용한 곳", "좋아요"
         )));
 
         GetReplyResult result = chatService.getReply(new GetReplyCommand(MEMBER_ID, 1L));
@@ -116,6 +120,7 @@ public class ChatServiceSlotMergeUnitTests {
         var completed = (GetReplyResult.Completed) result;
         assertThat(completed.slot().category()).isEqualTo("카페");
         assertThat(completed.slot().datetime()).isEqualTo(saturday3pm.toLocalDate());
+        assertThat(queryCacheService.getQuery(MEMBER_ID)).isEqualTo("조용한 곳");
     }
 
     @Test
@@ -131,14 +136,16 @@ public class ChatServiceSlotMergeUnitTests {
 
     @Test
     @DisplayName("""
-            대화를 초기화하면 슬롯과 대기 중인 응답도 지운다
+            대화를 초기화하면 슬롯·정성 조건과 대기 중인 응답도 지운다
             """)
     void resetClearsSlotAndPendingReply() {
         slotCacheService.updateSlot(new UpdateSlotCacheRequest(MEMBER_ID, null, "서울 강남구", null, 180, null));
+        queryCacheService.updateQuery(MEMBER_ID, "조용한 곳");
 
         chatService.resetChatroom(new ResetChatroomCommand(MEMBER_ID));
 
         assertThat(slotCacheService.getSlot(MEMBER_ID)).isEmpty();
+        assertThat(queryCacheService.getQuery(MEMBER_ID)).isNull();
         verify(getReplyCacheService).discard(MEMBER_ID);
     }
 }

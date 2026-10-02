@@ -51,6 +51,16 @@ public class CacheConfig {
                         .build()
         );
 
+        // 슬롯과 같은 대화 단위라 TTL도 맞춘다.
+        var query = new CaffeineCache(
+                "query",
+                Caffeine.newBuilder()
+                        .maximumSize(1000)
+                        .expireAfterWrite(Duration.ofSeconds(600))
+                        .recordStats()
+                        .build()
+        );
+
         var atBlacklist = new CaffeineCache(
                 "atBlacklist",
                 Caffeine.newBuilder()
@@ -69,7 +79,7 @@ public class CacheConfig {
                         .build()
         );
 
-        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist, rtHash));
+        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, query, atBlacklist, rtHash));
         return cacheManager;
     }
 }

@@ -63,9 +63,12 @@ public class ChatService {
     /// 채팅 대답 폴링 API
     public GetReplyResult getReply(GetReplyCommand command) {
         return getReplyCacheService.poll(command.memberId())
-                .map(response -> GetReplyResult.Completed.from(
-                        "COMPLETED", response, mergeSlot(command.memberId(), response.slot())
-                ))
+                .map(response -> {
+                    queryCacheService.updateQuery(command.memberId(), response.query());
+                    return GetReplyResult.Completed.from(
+                            "COMPLETED", response, mergeSlot(command.memberId(), response.slot())
+                    );
+                })
                 .orElseGet(() -> GetReplyResult.InProgress.from("IN_PROGRESS", 1));
     }
 
@@ -126,7 +129,7 @@ public class ChatService {
 
     /// 채팅 내역 초기화 API
     ///
-    /// 대화에서 쌓은 슬롯과 아직 꺼내지 않은 응답도 함께 지운다.
+    /// 대화에서 쌓은 슬롯·정성 조건과 아직 꺼내지 않은 응답도 함께 지운다.
     /// 남겨 두면 새 대화가 이전 조건을 그대로 물려받는다.
     /// @param command {@link ResetChatroomCommand}
     @Transactional
@@ -134,6 +137,7 @@ public class ChatService {
         List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.memberId());
         allByMemberId.forEach(Chat::delete);
         slotCacheService.deleteSlot(command.memberId());
+        queryCacheService.deleteQuery(command.memberId());
         getReplyCacheService.discard(command.memberId());
     }
 
