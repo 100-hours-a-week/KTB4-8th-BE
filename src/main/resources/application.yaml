@@ -50,6 +50,11 @@ keepgo:
     rt-hash:
       maximum-size: 1000
       expire-after-write: 1d
+  recommendation:
+    # 코스 추천 후보 출처 (임시, 2026-10)
+    # web: 사용자 저장 데이터 없이 대화 조건만 보내 AI가 웹검색으로 코스를 짠다
+    # saved: DB 장소를 후보로, 회원 저장 장소를 취향 이력으로 보낸다 (되돌릴 때 이 값)
+    candidate-source: ${KEEPGO_RECOMMENDATION_CANDIDATE_SOURCE:web}
 
 management:
   server:

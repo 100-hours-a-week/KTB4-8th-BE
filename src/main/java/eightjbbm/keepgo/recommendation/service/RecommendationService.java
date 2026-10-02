@@ -12,6 +12,7 @@ import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -34,14 +35,25 @@ public class RecommendationService {
     private final SlotCacheService slotCacheService;
     private final RecommendationJobCacheService recommendationJobCacheService;
 
+    /// 추천 후보 출처 (임시, 2026-10)
+    ///
+    /// - web: 사용자 저장 데이터를 쓰지 않는다. 후보·이력을 비워 보내면 AI가 대화 조건으로 웹검색해 코스를 짠다.
+    /// - saved: DB 장소를 후보로, 회원의 저장 장소를 취향 이력으로 보낸다.
+    ///
+    /// 영상 분석 결과 대부분이 장소명 없이 저장돼 saved로는 추천할 장소가 없어 web을 기본값으로 둔다.
+    /// 되돌리려면 keepgo.recommendation.candidate-source(KEEPGO_RECOMMENDATION_CANDIDATE_SOURCE)를 saved로 바꾼다.
+    @Value("${keepgo.recommendation.candidate-source:web}")
+    private String candidateSource;
+
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         Long memberId = command.memberId();
         String query = queryCacheService.getQuery(memberId);
         SlotValue slot = slotCacheService.getSlot(memberId).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.BAD_REQUEST, "추천 조건이 없습니다. 의도 카드를 먼저 저장해 주세요."
         ));
-        List<OutingGuide> candidates = candidatePlaces();
-        List<OutingCollectionPrivate> history = recentSavedPlaces(memberId);
+        boolean useSaved = "saved".equals(candidateSource);
+        List<OutingGuide> candidates = useSaved ? candidatePlaces() : List.of();
+        List<OutingCollectionPrivate> history = useSaved ? recentSavedPlaces(memberId) : List.of();
         recommendationJobCacheService.createJob(memberId, 0L);
 
         var recommendCourseResponse = aiServerApiClient.recommendCourse(RecommendCourseRequest.from(
@@ -51,6 +63,7 @@ public class RecommendationService {
         recommendationJobCacheService.completeJob(command.memberId());
 
         // AI의 place_id는 후보로 보낸 OutingGuide id다. 보낸 후보 안에서 찾는다.
+        // web 모드의 장소(place_id "web-*")는 DB에 없어 null이며, 응답의 카테고리만 비게 된다.
         Map<String, OutingGuide> candidateById = candidates.stream()
                 .collect(Collectors.toMap(guide -> guide.getId().toString(), Function.identity()));
 
