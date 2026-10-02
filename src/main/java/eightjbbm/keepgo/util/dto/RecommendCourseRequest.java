@@ -50,10 +50,13 @@ public record RecommendCourseRequest(
             String placeId,
             LocalDate savedAt
     ) {
+        /// 저장 시각을 기록하기 전에 저장된 장소는 createdAt이 비어 있어 오늘 날짜로 보낸다.
         public static RecommendHistoryPlaceId from(OutingCollectionPrivate place) {
             return new RecommendHistoryPlaceId(
                     place.getOutingGuide().getId().toString(),
-                    place.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
+                    place.getCreatedAt() == null
+                            ? LocalDate.now()
+                            : place.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
             );
         }
     }
