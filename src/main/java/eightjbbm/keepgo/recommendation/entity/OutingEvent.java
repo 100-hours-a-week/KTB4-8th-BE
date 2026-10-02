@@ -11,15 +11,17 @@ import java.time.Instant;
 @DiscriminatorValue("EVENT")
 @NoArgsConstructor
 public class OutingEvent extends OutingGuide{
+    /*
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id")
     private OutingPlace place;
+    */
     private Instant startAt;
     private Instant endAt;
 
-    public OutingEvent(String category, String name, String description, OutingPlace place, Instant startAt, Instant endAt) {
+    public OutingEvent(String category, String name, String description, /*OutingPlace place, */Instant startAt, Instant endAt) {
         super(category, name, description);
-        this.place = place;
+        //this.place = place;
         this.startAt = startAt;
         this.endAt = endAt;
     }
