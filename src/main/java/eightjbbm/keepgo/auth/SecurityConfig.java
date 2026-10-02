@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.micrometer.metrics.autoconfigure.export.prometheus.PrometheusScrapeEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -135,6 +136,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 EndpointRequest.to(HealthEndpoint.class)
+                        ).permitAll()
+                        // 관리 포트(8081)는 모니터링 보안 그룹에만 열린다.
+                        .requestMatchers(
+                                EndpointRequest.to(PrometheusScrapeEndpoint.class)
                         ).permitAll()
                         .requestMatchers("/public/**")
                         .permitAll()
