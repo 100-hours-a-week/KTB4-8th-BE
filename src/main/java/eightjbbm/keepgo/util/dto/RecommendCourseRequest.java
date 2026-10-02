@@ -18,6 +18,7 @@ import java.util.List;
 /// @param category {@code List<String>} AI가 허용하는 카테고리 목록
 /// @param datetime {@code String} 희망 일시 "yyyy-MM-dd" 또는 "yyyy-MM-dd HH:mm"
 /// @param origin {@code Coordinate} 사용자의 출발 위치
+/// @param region {@code String} 대화·의도 카드에서 정한 지역. 후보가 비어 있을 때 AI가 웹검색 지역으로 쓴다
 public record RecommendCourseRequest(
         String query,
         List<RecommendCandidate> candidates,
@@ -25,7 +26,8 @@ public record RecommendCourseRequest(
         String availableTime,
         List<String> category,
         String datetime,
-        Coordinate origin
+        Coordinate origin,
+        String region
 ) {
     /// AI가 받는 후보·이력 최대 개수
     public static final int MAX_PLACES = 50;
@@ -66,20 +68,23 @@ public record RecommendCourseRequest(
         }
     }
 
-    /// @param places 회원의 저장 장소. 장소(guide)가 겹치지 않고 최대 {@link #MAX_PLACES}개여야 한다
+    /// @param candidates 코스를 짤 후보 장소. 이름이 있고 최대 {@link #MAX_PLACES}개여야 한다
+    /// @param history 취향 계산용 회원의 저장 장소. 장소(guide)가 겹치지 않고 최대 {@link #MAX_PLACES}개여야 한다
     public static RecommendCourseRequest from(
             String query,
-            List<OutingCollectionPrivate> places,
+            List<OutingGuide> candidates,
+            List<OutingCollectionPrivate> history,
             SlotValue slot
     ) {
         return new RecommendCourseRequest(
                 query == null ? "" : query,
-                places.stream().map(k -> RecommendCandidate.from(k.getOutingGuide())).toList(),
-                places.stream().map(RecommendHistoryPlaceId::from).toList(),
+                candidates.stream().map(RecommendCandidate::from).toList(),
+                history.stream().map(RecommendHistoryPlaceId::from).toList(),
                 AiSlot.formatAvailableTime(slot.getAvailableTime()),
                 AiSlot.filterCategories(slot.getCategory()),
                 AiSlot.formatDatetime(slot.getDatetime()),
-                validOrigin(slot.getOrigin())
+                validOrigin(slot.getOrigin()),
+                slot.getRegion()
         );
     }
 
