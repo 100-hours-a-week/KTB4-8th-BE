@@ -22,7 +22,7 @@ public class AiServerApiClient {
 
     public void stopRecommendation(Long jobId) {
         aiServerRestClient.post()
-                .uri("/v1/recommend-course/{jobId}/cancel", jobId)
+                .uri("/v1/recommend-courses/{jobId}/cancel", jobId)
                 .retrieve()
                 .body(Void.class);
     }

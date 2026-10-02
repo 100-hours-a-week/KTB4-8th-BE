@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
+import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +21,7 @@ public class GetReplyCacheService {
         );
     }
 
-    public Optional<String> poll(Long memberId) {
+    public Optional<ExtractSlotResponse.ExtractData> poll(Long memberId) {
         return getReplyCacheRepository.poll(memberId);
     }
 }

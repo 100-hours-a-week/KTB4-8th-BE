@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.util.cache.slot;
 
+import eightjbbm.keepgo.chat.dto.GetReplyResponse;
 import eightjbbm.keepgo.util.Coordinate;
 
 import java.time.LocalDateTime;

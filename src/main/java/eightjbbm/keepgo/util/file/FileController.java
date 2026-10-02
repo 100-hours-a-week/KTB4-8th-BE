@@ -8,6 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RequestMapping("/api/v1")
 @RestController
@@ -32,7 +33,23 @@ public class FileController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .header("Location", uploadPath)
+                .header("Location", toFullUrl(uploadPath))
                 .build();
+    }
+
+    public static String toFullUrl(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return null;
+        }
+        // 이미 http로 시작하면 변환 없이 반환
+        if (relativePath.startsWith("http")) {
+            return relativePath;
+        }
+
+        String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .build()
+                .toUriString();
+
+        return baseUrl + relativePath;
     }
 }

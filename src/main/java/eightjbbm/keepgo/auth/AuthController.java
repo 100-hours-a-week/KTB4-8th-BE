@@ -23,17 +23,17 @@ public class AuthController {
     private final RefreshTokenManager refreshTokenManager;
 
     @PostMapping("/api/v1/user/auth-session")
-    public ResponseEntity<Void> login(
+    public /*ResponseEntity<Void>*/void login(
             @RequestBody LoginRequest request
     ) {
         URI location = URI.create(
             "/oauth2/authorization/" + request.provider()
         );
 
-        return ResponseEntity
+        /*return ResponseEntity
                 .status(HttpStatus.SEE_OTHER)
                 .location(location)
-                .build();
+                .build();*/
     }
 
     @DeleteMapping("/api/v1/user/auth-session")

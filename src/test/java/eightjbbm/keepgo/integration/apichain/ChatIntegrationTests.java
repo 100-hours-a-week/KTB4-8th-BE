@@ -178,7 +178,7 @@ public class ChatIntegrationTests {
                 .thenAnswer(invocation -> {
                     Thread.sleep(Duration.ofSeconds(5));
                     IO.println("Job Done!");
-                    getReplyCacheRepository.update(member.getId(), "hi");
+                    getReplyCacheRepository.update(member.getId(), null);
                     return null;
                 });
 
