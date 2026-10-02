@@ -5,6 +5,7 @@ import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.chat.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/user/chat-messages")
 @RequiredArgsConstructor
@@ -88,6 +90,9 @@ public class ChatController {
             case GetReplyResult.InProgress inProgress -> GetReplyResponse.InProgress.from(inProgress);
             case GetReplyResult.Completed completed -> GetReplyResponse.Completed.from(completed);
         };
+
+        log.info(response.toString());
+
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(response);
