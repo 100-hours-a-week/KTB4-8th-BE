@@ -1,19 +1,33 @@
 package eightjbbm.keepgo.chat.dto;
 
+import eightjbbm.keepgo.util.Coordinate;
+
+import java.time.LocalDate;
+
 public sealed interface GetReplyResponse
         permits GetReplyResponse.Completed, GetReplyResponse.InProgress {
 
     public record Completed(
             String status,
-            Chat chat
+            Chat chat,
+            Slot slot
     ) implements GetReplyResponse {
         public static Completed from(GetReplyResult.Completed completed) {
             return new Completed(
                     completed.status(),
-                    Chat.from(completed.chat())
+                    Chat.from(completed.chat()),
+                    completed.slot()
             );
         }
     }
+
+    public record Slot(
+        Coordinate origin,
+        String region,
+        LocalDate datetime,
+        Integer availableTime,
+        String category
+    ) {}
 
     public record InProgress(
             String status,

@@ -21,7 +21,7 @@ public class GetReplyWorker {
     @Transactional
     public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
         ExtractSlotResponse response = aiServerApiClient.extractSlot(request);
-        getReplyCacheRepository.update(memberId, response.data().botMessage());
+        getReplyCacheRepository.update(memberId, response.data());
         return CompletableFuture.completedFuture(null);
     }
 }

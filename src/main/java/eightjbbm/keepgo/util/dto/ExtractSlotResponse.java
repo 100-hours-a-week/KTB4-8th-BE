@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.util.dto;
 
+import eightjbbm.keepgo.chat.dto.GetReplyResponse;
+
 import java.time.LocalDate;
 
 public record ExtractSlotResponse(
@@ -7,7 +9,7 @@ public record ExtractSlotResponse(
         ExtractData data
 ) {
     public record ExtractData(
-            ExtractSlot slot,
+            GetReplyResponse.Slot slot,
             String query,
             String botMessage
     ) {

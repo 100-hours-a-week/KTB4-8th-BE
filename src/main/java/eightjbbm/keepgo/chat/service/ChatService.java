@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.util.List;
@@ -80,12 +81,14 @@ public class ChatService {
     ///
     /// 1차 구현 완료
     /// @param command {@link ResetChatroomCommand}
+    @Transactional
     public void resetChatroom(ResetChatroomCommand command) {
         List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.memberId());
         allByMemberId.forEach(Chat::delete);
     }
 
     /// 의도 카드 수정 API
+    @Transactional
     public UpdateSlotResult updateSlot(UpdateSlotCommand command) {
         Optional<SlotValue> slot = slotCacheService.getSlot(command.memberId());
         var request = ChatMapper.INSTANCE.toUpdateSlotCacheRequest(command);
