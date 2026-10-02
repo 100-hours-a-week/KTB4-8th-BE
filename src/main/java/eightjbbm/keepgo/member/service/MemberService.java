@@ -97,7 +97,7 @@ public class MemberService {
                 .map(GetLikedVideosResponse.Item::id)
                 .forEach(
                         url -> {
-                            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest(url));
+                            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
                             OutingGuide guide;
                             if (isPlaceOrEvent(response.getCategory())) {
                                 guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
