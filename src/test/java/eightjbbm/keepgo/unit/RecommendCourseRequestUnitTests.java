@@ -45,6 +45,7 @@ import static org.mockito.Mockito.when;
 ///
 /// 2026-10-02 회귀 테스트
 /// - 슬롯을 읽지 못하고(null), AI 스키마와 다른 형식으로 요청하던 문제
+/// - 이름 없는 장소가 후보에 섞여 AI가 422를 내던 문제
 /// - 후보(candidates)와 취향 이력(history_place_ids)을 같은 목록으로 보내던 문제
 public class RecommendCourseRequestUnitTests {
 
@@ -100,7 +101,7 @@ public class RecommendCourseRequestUnitTests {
         var fixture = new Fixture();
         when(fixture.slotCacheService.getSlot(MEMBER_ID))
                 .thenReturn(Optional.of(SlotValue.from(null, null, null, null, null)));
-        when(fixture.guideRepository.findTop50ByOrderByIdDesc())
+        when(fixture.guideRepository.findTop50ByNameIsNotNullOrderByIdDesc())
                 .thenReturn(List.of(place(9L), place(5L)));
         when(fixture.collectionRepository.findAllByMemberIdOrderByIdDesc(MEMBER_ID))
                 .thenReturn(List.of(saved(3L), saved(3L), saved(4L)));
@@ -120,6 +121,29 @@ public class RecommendCourseRequestUnitTests {
 
     @Test
     @DisplayName("""
+            이름이 비어 있는 장소는 후보에서 뺀다
+            """)
+    void skipBlankNamedCandidates() {
+        var fixture = new Fixture();
+        var blank = new OutingPlace("기타", " ", null);
+        ReflectionTestUtils.setField(blank, "id", 353L);
+        when(fixture.slotCacheService.getSlot(MEMBER_ID))
+                .thenReturn(Optional.of(SlotValue.from(null, null, null, null, null)));
+        when(fixture.guideRepository.findTop50ByNameIsNotNullOrderByIdDesc())
+                .thenReturn(List.of(place(9L), blank, place(5L)));
+        when(fixture.aiServerApiClient.recommendCourse(any())).thenThrow(new IllegalStateException("stop"));
+
+        assertThatThrownBy(() -> fixture.service.requestRecommendation(new RequestRecommendationCommand(MEMBER_ID)));
+
+        var captor = ArgumentCaptor.forClass(RecommendCourseRequest.class);
+        verify(fixture.aiServerApiClient).recommendCourse(captor.capture());
+        assertThat(captor.getValue().candidates())
+                .extracting(RecommendCourseRequest.RecommendCandidate::placeId)
+                .containsExactly("9", "5");
+    }
+
+    @Test
+    @DisplayName("""
             AI가 고른 장소를 후보로 보낸 장소(guide id)에서 찾는다
             """)
     void mapResponsePlacesByGuideId() {
@@ -128,7 +152,7 @@ public class RecommendCourseRequestUnitTests {
         ReflectionTestUtils.setField(event, "id", 9L);
         when(fixture.slotCacheService.getSlot(MEMBER_ID))
                 .thenReturn(Optional.of(SlotValue.from(null, "서울 성동구", null, null, null)));
-        when(fixture.guideRepository.findTop50ByOrderByIdDesc())
+        when(fixture.guideRepository.findTop50ByNameIsNotNullOrderByIdDesc())
                 .thenReturn(List.of(place(5L), event));
         when(fixture.aiServerApiClient.recommendCourse(any())).thenReturn(new RecommendCourseResponse("ok", new RecommendData(List.of(
                 new RecommendCourse("성수 코스", List.of(
