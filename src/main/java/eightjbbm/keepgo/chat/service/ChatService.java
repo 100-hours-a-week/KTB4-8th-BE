@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
@@ -68,12 +69,10 @@ public class ChatService {
                             Optional.ofNullable(response.slot().origin()).orElse(slotValue.map(SlotValue::getOrigin).orElse(null)),
                             Optional.ofNullable(response.slot().region()).orElse(slotValue.map(SlotValue::getRegion).orElse(null)),
                             Optional.ofNullable(
-                                 response.slot().datetime()
+                                    Optional.ofNullable(response.slot().datetime()).orElse(slotValue.map(k -> k.getDatetime().toLocalDate()).orElse(null))
                             ).map(
                                     k -> k.atTime(
-                                            slotValue
-                                                    .map(s -> s.getDatetime().toLocalTime())
-                                                    .orElse(null)
+                                            LocalTime.now()
                                     )
                             ).orElse(null),
                             Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.map(SlotValue::getAvailableTime).orElse(null)),
