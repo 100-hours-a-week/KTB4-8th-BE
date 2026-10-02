@@ -31,4 +31,8 @@ public class SlotCacheService {
                 )
         );
     }
+
+    public void deleteSlot(Long memberId) {
+        slotCacheRepository.delete(memberId);
+    }
 }

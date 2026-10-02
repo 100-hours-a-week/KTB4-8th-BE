@@ -23,6 +23,11 @@ public class GetReplyCacheService {
         );
     }
 
+    /// 아직 꺼내지 않은 응답을 버린다. 대화 초기화 뒤 이전 대화의 답변이 새 대화에 나오지 않게 한다.
+    public void discard(Long memberId) {
+        getReplyCacheRepository.delete(memberId);
+    }
+
     /// 응답 생성이 실패했으면 502를 던져, FE가 폴링 한도까지 기다리지 않고 바로 실패를 보여주게 한다.
     public Optional<ExtractSlotResponse.ExtractData> poll(Long memberId) {
         return getReplyCacheRepository.poll(memberId)

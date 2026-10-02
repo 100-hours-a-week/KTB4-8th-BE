@@ -126,12 +126,15 @@ public class ChatService {
 
     /// 채팅 내역 초기화 API
     ///
-    /// 1차 구현 완료
+    /// 대화에서 쌓은 슬롯과 아직 꺼내지 않은 응답도 함께 지운다.
+    /// 남겨 두면 새 대화가 이전 조건을 그대로 물려받는다.
     /// @param command {@link ResetChatroomCommand}
     @Transactional
     public void resetChatroom(ResetChatroomCommand command) {
         List<Chat> allByMemberId = chatRepository.findAllByMemberId(command.memberId());
         allByMemberId.forEach(Chat::delete);
+        slotCacheService.deleteSlot(command.memberId());
+        getReplyCacheService.discard(command.memberId());
     }
 
     /// 의도 카드 수정 API

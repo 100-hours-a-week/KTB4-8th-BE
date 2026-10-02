@@ -1,8 +1,8 @@
 package eightjbbm.keepgo.unit;
 
 import eightjbbm.keepgo.chat.dto.GetReplyCommand;
-import eightjbbm.keepgo.util.dto.AiSlot;
 import eightjbbm.keepgo.chat.dto.GetReplyResult;
+import eightjbbm.keepgo.chat.dto.ResetChatroomCommand;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.service.ChatService;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -13,6 +13,7 @@ import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
+import eightjbbm.keepgo.util.dto.AiSlot;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,11 +26,14 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/// 챗봇 응답 조회 시 슬롯 병합 단위 테스트
+/// 챗봇 슬롯 병합·초기화 단위 테스트
 ///
-/// 기존 슬롯이 있고 그 날짜가 비어 있을 때 응답 조회가 NPE로 500을 내던 문제(2026-10-02)의 회귀 테스트
+/// 2026-10-02 회귀 테스트
+/// - 기존 슬롯의 날짜가 비어 있을 때 응답 조회가 NPE로 500을 내던 문제
+/// - 대화를 초기화해도 슬롯이 남아 새 대화가 이전 조건을 물려받던 문제
 public class ChatServiceSlotMergeUnitTests {
 
     private static final Long MEMBER_ID = 1L;
@@ -123,5 +127,18 @@ public class ChatServiceSlotMergeUnitTests {
 
         assertThat(chatService.getReply(new GetReplyCommand(MEMBER_ID, 1L)))
                 .isInstanceOf(GetReplyResult.InProgress.class);
+    }
+
+    @Test
+    @DisplayName("""
+            대화를 초기화하면 슬롯과 대기 중인 응답도 지운다
+            """)
+    void resetClearsSlotAndPendingReply() {
+        slotCacheService.updateSlot(new UpdateSlotCacheRequest(MEMBER_ID, null, "서울 강남구", null, 180, null));
+
+        chatService.resetChatroom(new ResetChatroomCommand(MEMBER_ID));
+
+        assertThat(slotCacheService.getSlot(MEMBER_ID)).isEmpty();
+        verify(getReplyCacheService).discard(MEMBER_ID);
     }
 }

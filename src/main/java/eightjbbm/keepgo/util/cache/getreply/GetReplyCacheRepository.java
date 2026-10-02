@@ -40,6 +40,10 @@ public class GetReplyCacheRepository {
         getReplyCache().put(memberId, Failure.INSTANCE);
     }
 
+    public void delete(Long memberId) {
+        evict(memberId);
+    }
+
     private void evict(Long memberId) {
         getReplyCache().evictIfPresent(memberId);
     }
