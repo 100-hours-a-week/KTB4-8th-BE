@@ -6,6 +6,7 @@ import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -56,8 +58,19 @@ public class ChatService {
 
     /// 채팅 대답 폴링 API
     public GetReplyResult getReply(GetReplyCommand command) {
+        SlotValue slotValue = slotCacheService.getSlot(command.memberId()).orElse(null);
         return getReplyCacheService.poll(command.memberId())
-                .map(content -> GetReplyResult.Completed.from("COMPLETED", content))
+                .map(response -> {
+                    slotCacheService.updateSlot(new UpdateSlotCacheRequest(
+                            command.memberId(),
+                            Optional.ofNullable(response.slot().origin()).orElse(Optional.ofNullable(slotValue.getOrigin()).orElse(null)),
+                            Optional.ofNullable(response.slot().region()).orElse(slotValue.getRegion()),
+                            Optional.ofNullable(response.slot().datetime()).orElse(slotValue.getDatetime().toLocalDate()).atTime(slotValue.getDatetime().toLocalTime()),
+                            Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.getAvailableTime()),
+                            Optional.ofNullable(response.slot().category()).map(List::of).orElse(slotValue.getCategory())
+                    ));
+                    return GetReplyResult.Completed.from("COMPLETED", response);
+                })
                 .orElseGet(() -> GetReplyResult.InProgress.from("IN_PROGRESS", 1));
     }
 
