@@ -51,13 +51,23 @@ keepgo:
       expire-after-write: 1d
 
 management:
+  server:
+    # Actuator는 관리 포트로만 노출한다. (모니터링 보안 그룹에만 개방)
+    port: 8081
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    distribution:
+      # 자동 대량 bucket 대신 메트릭 계약 v1의 HTTP 경계만 사용한다.
+      percentiles-histogram:
+        http.server.requests: false
+      slo:
+        http.server.requests: 50ms,100ms,250ms,500ms,1s,2s,5s,10s,30s,60s,120s,300s
 
 logging:
   level:
