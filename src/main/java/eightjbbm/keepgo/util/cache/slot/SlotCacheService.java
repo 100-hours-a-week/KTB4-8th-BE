@@ -10,11 +10,6 @@ import java.util.Optional;
 public class SlotCacheService {
     private final SlotCacheRepository slotCacheRepository;
 
-    public SlotValue read(Long memberId) {
-
-        return null;
-    }
-
     public Optional<SlotValue> getSlot(Long memberId) {
         return slotCacheRepository.read(memberId);
     }

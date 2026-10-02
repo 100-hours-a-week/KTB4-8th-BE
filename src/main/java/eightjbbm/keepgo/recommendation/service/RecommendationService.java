@@ -11,9 +11,13 @@ import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -28,8 +32,10 @@ public class RecommendationService {
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         Long memberId = command.memberId();
         String query = queryCacheService.getQuery(memberId);
-        List<OutingCollectionPrivate> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
-        SlotValue slot = slotCacheService.read(memberId);
+        List<OutingCollectionPrivate> collection = recentDistinctPlaces(memberId);
+        SlotValue slot = slotCacheService.getSlot(memberId).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "추천 조건이 없습니다. 의도 카드를 먼저 저장해 주세요."
+        ));
         recommendationJobCacheService.createJob(memberId, 0L);
 
         var recommendCourseResponse = aiServerApiClient.recommendCourse(RecommendCourseRequest.from(
@@ -45,6 +51,16 @@ public class RecommendationService {
                         .orElseThrow()
                         .getOutingGuide())
         );
+    }
+
+    /// 회원이 저장한 장소를 최근 순으로, 같은 장소는 한 번만, AI 한도({@link RecommendCourseRequest#MAX_PLACES})까지 고른다.
+    private List<OutingCollectionPrivate> recentDistinctPlaces(Long memberId) {
+        Set<Long> seenGuideIds = new HashSet<>();
+        return outingCollectionPrivateRepository.findAllByMemberIdOrderByIdDesc(memberId).stream()
+                .filter(saved -> saved.getOutingGuide() != null)
+                .filter(saved -> seenGuideIds.add(saved.getOutingGuide().getId()))
+                .limit(RecommendCourseRequest.MAX_PLACES)
+                .toList();
     }
 
     public void stopRecommendation(StopRecommendationCommand command) {
