@@ -2,11 +2,13 @@ package eightjbbm.keepgo.util.client.ai;
 
 import eightjbbm.keepgo.util.dto.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AiServerApiClient {
@@ -14,7 +16,7 @@ public class AiServerApiClient {
     private final RestClient aiServerRestClient;
 
     public RecommendCourseResponse recommendCourse(RecommendCourseRequest request) {
-        return aiServerRestClient.post()
+        var response = aiServerRestClient.post()
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
@@ -25,6 +27,8 @@ public class AiServerApiClient {
                 .body(request)
                 .retrieve()
                 .body(RecommendCourseResponse.class);
+        log.info(response.toString());
+        return response;
     }
 
     public void stopRecommendation(Long jobId) {
@@ -39,7 +43,7 @@ public class AiServerApiClient {
     }
 
     public ExtractSlotResponse extractSlot(ExtractSlotRequest request) {
-        return aiServerRestClient.post()
+        var response = aiServerRestClient.post()
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
@@ -50,10 +54,12 @@ public class AiServerApiClient {
                 .body(request)
                 .retrieve()
                 .body(ExtractSlotResponse.class);
+        log.info(response.toString());
+        return response;
     }
 
     public AnalyzeVideoResponse analyzeVideo(AnalyzeVideoRequest request) {
-        return aiServerRestClient.post()
+        var response = aiServerRestClient.post()
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
@@ -64,5 +70,7 @@ public class AiServerApiClient {
                 .body(request)
                 .retrieve()
                 .body(AnalyzeVideoResponse.class);
+        log.info(response.toString());
+        return response;
     }
 }
