@@ -32,7 +32,7 @@ public class AiServerApiClient {
                 .uri(
                         uriBuilder -> {
                             UriBuilder builder = uriBuilder
-                                    .path("/v1/recommend-course/" + jobId + "/cancel");
+                                    .path("/v1/recommend-courses/" + jobId + "/cancel");
                             return builder.build();
                         }
                 ).retrieve().body(Void.class);
