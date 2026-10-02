@@ -5,9 +5,9 @@ import jakarta.persistence.Embeddable;
 
 @Embeddable
 public record Coordinate(
-        @Column(name = "lat", nullable = false)
+        @Column(name = "lat", nullable = true)
         Float lat,
-        @Column(name = "lng", nullable = false)
+        @Column(name = "lng", nullable = true)
         Float lng
 ) {
     public boolean equals(Coordinate other) {

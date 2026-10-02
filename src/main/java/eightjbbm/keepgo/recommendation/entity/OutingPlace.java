@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @DiscriminatorValue("PLACE")
 @NoArgsConstructor
 public class OutingPlace extends OutingGuide {
-    private Coordinate coordinate;
+    private Coordinate coordinate = new Coordinate(0.0f, 0.0f);
 
     public OutingPlace(String category, String name, String description) {
         super(category, name, description);
