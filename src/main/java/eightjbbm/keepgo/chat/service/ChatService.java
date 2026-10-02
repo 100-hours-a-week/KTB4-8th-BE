@@ -61,26 +61,36 @@ public class ChatService {
 
     /// 채팅 대답 폴링 API
     public GetReplyResult getReply(GetReplyCommand command) {
-        Optional<SlotValue> slotValue = slotCacheService.getSlot(command.memberId());
         return getReplyCacheService.poll(command.memberId())
                 .map(response -> {
-                    slotCacheService.updateSlot(new UpdateSlotCacheRequest(
-                            command.memberId(),
-                            Optional.ofNullable(response.slot().origin()).orElse(slotValue.map(SlotValue::getOrigin).orElse(null)),
-                            Optional.ofNullable(response.slot().region()).orElse(slotValue.map(SlotValue::getRegion).orElse(null)),
-                            Optional.ofNullable(
-                                    Optional.ofNullable(response.slot().datetime()).orElse(slotValue.map(k -> k.getDatetime().toLocalDate()).orElse(null))
-                            ).map(
-                                    k -> k.atTime(
-                                            LocalTime.now()
-                                    )
-                            ).orElse(null),
-                            Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.map(SlotValue::getAvailableTime).orElse(null)),
-                            Optional.ofNullable(response.slot().category()).map(List::of).orElse(slotValue.map(SlotValue::getCategory).orElse(null))
-                    ));
+                    mergeSlot(command.memberId(), response.slot());
                     return GetReplyResult.Completed.from("COMPLETED", response);
                 })
                 .orElseGet(() -> GetReplyResult.InProgress.from("IN_PROGRESS", 1));
+    }
+
+    /// AI가 돌려준 슬롯 중 값이 있는 필드만 기존 슬롯에 덮어쓴다.
+    ///
+    /// poll()이 응답을 캐시에서 이미 꺼낸 뒤라, 여기서 예외가 나면 챗봇 답변이 사라진다.
+    /// 그래서 기존 슬롯이나 그 필드가 비어 있어도 예외 없이 병합해야 한다.
+    private void mergeSlot(Long memberId, GetReplyResponse.Slot next) {
+        if (next == null) {
+            return;
+        }
+        SlotValue prev = slotCacheService.getSlot(memberId)
+                .orElse(SlotValue.from(null, null, null, null, null));
+        slotCacheService.updateSlot(new UpdateSlotCacheRequest(
+                memberId,
+                firstNonNull(next.origin(), prev.getOrigin()),
+                firstNonNull(next.region(), prev.getRegion()),
+                next.datetime() != null ? next.datetime().atTime(LocalTime.now()) : prev.getDatetime(),
+                firstNonNull(next.availableTime(), prev.getAvailableTime()),
+                next.category() != null ? List.of(next.category()) : prev.getCategory()
+        ));
+    }
+
+    private static <T> T firstNonNull(T next, T prev) {
+        return next != null ? next : prev;
     }
 
     /// 채팅 내역 조회 API
