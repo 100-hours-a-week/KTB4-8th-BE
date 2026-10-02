@@ -25,6 +25,7 @@ spring:
               - openid
               - profile
               - email
+              - https://www.googleapis.com/auth/youtube.readonly
 
 keepgo:
   security:
