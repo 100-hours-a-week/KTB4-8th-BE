@@ -20,6 +20,7 @@ import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MemberService {
@@ -87,7 +89,9 @@ public class MemberService {
             );
         }
         String oAuth2AccessToken = client.getAccessToken().getTokenValue();
-        googleApiClient.getLikedVideos(oAuth2AccessToken)
+        var likedVideos = googleApiClient.getLikedVideos(oAuth2AccessToken);
+        log.info(likedVideos.toString());
+        likedVideos
                 .items()
                 .stream()
                 .map(GetLikedVideosResponse.Item::id)
