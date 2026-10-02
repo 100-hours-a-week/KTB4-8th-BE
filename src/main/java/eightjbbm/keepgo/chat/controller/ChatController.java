@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 @Slf4j
-@Slf4j
 @RestController
 @RequestMapping("/api/v1/user/chat-messages")
 @RequiredArgsConstructor
