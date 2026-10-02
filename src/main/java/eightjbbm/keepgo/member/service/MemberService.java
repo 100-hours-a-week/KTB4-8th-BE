@@ -102,8 +102,6 @@ public class MemberService {
                             if (isPlaceOrEvent(response.getCategory())) {
                                 guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
                                         () -> outingPlaceRepository.save(new OutingPlace(
-                                                0.0f,
-                                                0.0f,
                                                 response.getCategory(),
                                                 response.getName(),
                                                 response.getSummary()

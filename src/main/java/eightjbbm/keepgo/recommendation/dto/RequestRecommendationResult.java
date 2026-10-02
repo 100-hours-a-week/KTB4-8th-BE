@@ -77,8 +77,13 @@ public record RequestRecommendationResult(
                     place.placeName(),
                     outingPlace.getCategory(),
                     place.travelMinutes().toString(),
+                    /*
                     outingPlace.getLat(),
                     outingPlace.getLng()
+
+                     */
+                    0.0f,
+                    0.0f
             );
         }
     }
