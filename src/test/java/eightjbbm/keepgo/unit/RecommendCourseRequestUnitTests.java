@@ -77,6 +77,7 @@ public class RecommendCourseRequestUnitTests {
         assertThat(candidate.get("business_hours").asString()).isEqualTo("정보 없음");
         assertThat(json.get("history_place_ids").get(0).get("place_id").asString()).isEqualTo("3");
         assertThat(json.get("history_place_ids").get(0).get("saved_at").isString()).isTrue();
+        assertThat(json.get("region").asString()).isEqualTo("서울 강남구");
     }
 
     @Test
