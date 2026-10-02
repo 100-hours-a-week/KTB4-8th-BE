@@ -19,6 +19,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
@@ -58,16 +60,24 @@ public class ChatService {
 
     /// 채팅 대답 폴링 API
     public GetReplyResult getReply(GetReplyCommand command) {
-        SlotValue slotValue = slotCacheService.getSlot(command.memberId()).orElse(null);
+        Optional<SlotValue> slotValue = slotCacheService.getSlot(command.memberId());
         return getReplyCacheService.poll(command.memberId())
                 .map(response -> {
                     slotCacheService.updateSlot(new UpdateSlotCacheRequest(
                             command.memberId(),
-                            Optional.ofNullable(response.slot().origin()).orElse(Optional.ofNullable(slotValue.getOrigin()).orElse(null)),
-                            Optional.ofNullable(response.slot().region()).orElse(slotValue.getRegion()),
-                            Optional.ofNullable(response.slot().datetime()).orElse(slotValue.getDatetime().toLocalDate()).atTime(slotValue.getDatetime().toLocalTime()),
-                            Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.getAvailableTime()),
-                            Optional.ofNullable(response.slot().category()).map(List::of).orElse(slotValue.getCategory())
+                            Optional.ofNullable(response.slot().origin()).orElse(slotValue.map(SlotValue::getOrigin).orElse(null)),
+                            Optional.ofNullable(response.slot().region()).orElse(slotValue.map(SlotValue::getRegion).orElse(null)),
+                            Optional.ofNullable(
+                                 response.slot().datetime()
+                            ).map(
+                                    k -> k.atTime(
+                                            slotValue
+                                                    .map(s -> s.getDatetime().toLocalTime())
+                                                    .orElse(null)
+                                    )
+                            ).orElse(null),
+                            Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.map(SlotValue::getAvailableTime).orElse(null)),
+                            Optional.ofNullable(response.slot().category()).map(List::of).orElse(slotValue.map(SlotValue::getCategory).orElse(null))
                     ));
                     return GetReplyResult.Completed.from("COMPLETED", response);
                 })
