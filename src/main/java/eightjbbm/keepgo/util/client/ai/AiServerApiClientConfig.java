@@ -26,10 +26,11 @@ public class AiServerApiClientConfig {
     ) {
         var httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(5))
+                .connectTimeout(Duration.ofSeconds(60))
                 .build();
 
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofSeconds(130));
 
         return builder
                 .requestFactory(requestFactory)
