@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 /// @param query {@code String} 사용자 채팅의 쿼리 (짬통 키워드)
 /// @param candidates {@code List<RecommendCandidate>} 장소 후보 (거리 기반으로 1차 필터링이 된 상태)
@@ -22,7 +23,7 @@ public record RecommendCourseRequest(
         List<RecommendCandidate> candidates,
         List<RecommendHistoryPlaceId> historyPlaceIds,
         Integer availableTime,
-        List<String> category,
+        Set<String> category,
         LocalDateTime dateTime,
         Coordinate origin
 ) {

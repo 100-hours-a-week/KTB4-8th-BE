@@ -3,6 +3,8 @@ package eightjbbm.keepgo.chat.dto;
 import eightjbbm.keepgo.util.Coordinate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Set;
 
 public sealed interface GetReplyResponse
         permits GetReplyResponse.Completed, GetReplyResponse.InProgress {
@@ -16,7 +18,13 @@ public sealed interface GetReplyResponse
             return new Completed(
                     completed.status(),
                     Chat.from(completed.chat()),
-                    completed.slot()
+                    new Slot(
+                            completed.slot().origin(),
+                            completed.slot().region(),
+                            completed.slot().datetime(),
+                            completed.slot().availableTime(),
+                            completed.slot().category()
+                    )
             );
         }
     }
@@ -24,9 +32,9 @@ public sealed interface GetReplyResponse
     public record Slot(
         Coordinate origin,
         String region,
-        LocalDate datetime,
+        LocalDateTime datetime,
         Integer availableTime,
-        String category
+        Set<String> category
     ) {}
 
     public record InProgress(

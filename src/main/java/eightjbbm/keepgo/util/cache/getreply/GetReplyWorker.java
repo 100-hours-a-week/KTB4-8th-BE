@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
+import eightjbbm.keepgo.util.cache.slot.SlotCacheRepository;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
@@ -17,14 +18,16 @@ public class GetReplyWorker {
 
     private final AiServerApiClient aiServerApiClient;
     private final GetReplyCacheRepository getReplyCacheRepository;
+    private final SlotCacheRepository slotCacheRepository;
 
     @Async("httpTaskExecutor")
     public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
         ExtractSlotResponse response = aiServerApiClient.extractSlot(request);
         if (response instanceof ExtractSlotResponse.Success successResponse) {
-            getReplyCacheRepository.update(memberId, successResponse.data());
+            getReplyCacheRepository.update(memberId, successResponse.data().botMessage());
+            slotCacheRepository.update(memberId, successResponse.data());
         } else {
-            throw new ServiceUnavailableException();
+            getReplyCacheRepository.setStatusAsFail(memberId);
         }
         return CompletableFuture.completedFuture(null);
     }

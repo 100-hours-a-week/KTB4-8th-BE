@@ -15,7 +15,7 @@ public class GetReplyCacheRepository {
     private final CacheManager cacheManager;
 
     public void create(Long memberId) {
-        getReplyCache().putIfAbsent(memberId, null);
+        getReplyCache().putIfAbsent(memberId, GetReplyValue.emptyValue());
     }
 
     public Optional<ExtractSlotResponse.Success.ExtractData> poll(Long memberId) {
@@ -26,7 +26,19 @@ public class GetReplyCacheRepository {
         return content;
     }
 
-    public void update(Long memberId, ExtractSlotResponse.Success.ExtractData content) {
+    public GetReplyJobStatus getStatus(Long memberId) {
+        return getReplyCache().get(memberId, GetReplyValue.class).getStatus();
+    }
+
+    public Optional<String> getReply(Long memberId) {
+        return Optional.ofNullable(getReplyCache().get(memberId, GetReplyValue.class).getReply());
+    }
+
+    public void setStatusAsFail(Long memberId) {
+        getReplyCache().get(memberId, GetReplyValue.class).setStatusAsFail();
+    }
+
+    public void update(Long memberId, String content) {
         getReplyCache().put(memberId, content);
     }
 

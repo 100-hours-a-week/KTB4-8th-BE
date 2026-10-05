@@ -30,6 +30,14 @@ public class GetReplyCacheService {
                 });
     }
 
+    public GetReplyJobStatus checkStatus(Long memberId) {
+        return getReplyCacheRepository.getStatus(memberId);
+    }
+
+    public String getReply(Long memberId) {
+        return getReplyCacheRepository.getReply(memberId).get();
+    }
+
     public Optional<ExtractSlotResponse.Success.ExtractData> poll(Long memberId) {
         return getReplyCacheRepository.poll(memberId);
     }

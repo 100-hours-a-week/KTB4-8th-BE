@@ -6,6 +6,7 @@ import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.util.cache.getreply.GetReplyJobStatus;
 import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
@@ -13,6 +14,7 @@ import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
 import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -45,7 +47,7 @@ public class ChatService {
         Member member = memberRepository.findById(memberId).orElseThrow();
         Chat userChat = chatRepository.save(Chat.from(member, command.content()));
         SlotValue slot = slotCacheService.getSlot(memberId).orElse(
-                SlotValue.from(null, null, null, null, null)
+                SlotValue.createEmptySlotValue()
         );
         String query = queryCacheService.getQuery(memberId);
         getReplyCacheService.createRequest(
@@ -61,26 +63,21 @@ public class ChatService {
 
     /// 채팅 대답 폴링 API
     public GetReplyResult getReply(GetReplyCommand command) {
-        Optional<SlotValue> slotValue = slotCacheService.getSlot(command.memberId());
-        return getReplyCacheService.poll(command.memberId())
-                .map(response -> {
-                    slotCacheService.updateSlot(new UpdateSlotCacheRequest(
-                            command.memberId(),
-                            Optional.ofNullable(response.slot().origin()).orElse(slotValue.map(SlotValue::getOrigin).orElse(null)),
-                            Optional.ofNullable(response.slot().region()).orElse(slotValue.map(SlotValue::getRegion).orElse(null)),
-                            Optional.ofNullable(
-                                    Optional.ofNullable(response.slot().datetime()).orElse(slotValue.map(k -> k.getDatetime().toLocalDate()).orElse(null))
-                            ).map(
-                                    k -> k.atTime(
-                                            LocalTime.now()
-                                    )
-                            ).orElse(null),
-                            Optional.ofNullable(response.slot().availableTime()).orElse(slotValue.map(SlotValue::getAvailableTime).orElse(null)),
-                            Optional.ofNullable(response.slot().category()).map(List::of).orElse(slotValue.map(SlotValue::getCategory).orElse(null))
-                    ));
-                    return GetReplyResult.Completed.from("COMPLETED", response);
-                })
-                .orElseGet(() -> GetReplyResult.InProgress.from("IN_PROGRESS", 1));
+        // getReply 상태 확인
+        GetReplyJobStatus status = getReplyCacheService.checkStatus(command.memberId());
+        switch (status) {
+            case PENDING -> { return GetReplyResult.InProgress.from("IN_PROGRESS", 1); }
+            case FAILED -> throw new ServiceUnavailableException();
+            case SUCCESS -> {
+                String reply = getReplyCacheService.getReply(command.memberId());
+                return GetReplyResult.Completed.from(
+                        "COMPLETED",
+                        reply,
+                        slotCacheService.getSlot(command.memberId()).get()
+                );
+            }
+        }
+        return null;
     }
 
     /// 채팅 내역 조회 API

@@ -1,6 +1,11 @@
 package eightjbbm.keepgo.chat.dto;
 
+import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
+
+import java.time.LocalDateTime;
+import java.util.Set;
 
 public sealed interface GetReplyResult
         permits GetReplyResult.Completed, GetReplyResult.InProgress {
@@ -8,14 +13,29 @@ public sealed interface GetReplyResult
     record Completed(
             String status,
             Chat chat,
-            GetReplyResponse.Slot slot
+            Slot slot
     ) implements GetReplyResult {
-        public static GetReplyResult from(String status, ExtractSlotResponse.Success.ExtractData response) {
+        public static GetReplyResult from(String status, String content, SlotValue slotValue) {
             return new Completed(
-                    status, new Chat(response.botMessage(), true), response.slot()
+                    status, new Chat(content, true),
+                    new Slot(
+                            slotValue.getOrigin(),
+                            slotValue.getRegion(),
+                            slotValue.getDatetime(),
+                            slotValue.getAvailableTime(),
+                            slotValue.getCategory()
+                    )
             );
         }
     }
+
+    public record Slot(
+            Coordinate origin,
+            String region,
+            LocalDateTime datetime,
+            Integer availableTime,
+            Set<String> category
+    ) {}
 
     record InProgress(
             String status,

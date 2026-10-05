@@ -31,7 +31,7 @@ public class RecommendationService {
         Long memberId = command.memberId();
         String query = queryCacheService.getQuery(memberId);
         List<OutingCollectionPrivate> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
-        SlotValue slot = slotCacheService.read(memberId);
+        SlotValue slot = slotCacheService.getSlot(memberId).orElseThrow();
         recommendationJobCacheService.createJob(memberId, 0L);
 
         RecommendCourseResponse recommendCourseResponse = aiServerApiClient.recommendCourse(RecommendCourseRequest.from(

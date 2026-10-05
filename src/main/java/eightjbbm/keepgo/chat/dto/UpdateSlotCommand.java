@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public record UpdateSlotCommand(
         Long memberId,
@@ -12,5 +13,5 @@ public record UpdateSlotCommand(
         String requestedLocationName,
         LocalDateTime requestedDateTime,
         Integer availableTime,
-        List<String> categories
+        Set<String> categories
 ) {}

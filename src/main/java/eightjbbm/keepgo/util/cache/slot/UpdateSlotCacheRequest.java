@@ -5,6 +5,7 @@ import eightjbbm.keepgo.util.Coordinate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public record UpdateSlotCacheRequest(
         Long memberId,
@@ -12,7 +13,7 @@ public record UpdateSlotCacheRequest(
         String requestedLocationName,
         LocalDateTime requestedDateTime,
         Integer availableTime,
-        List<String> categories
+        Set<String> categories
 ) {
     public static UpdateSlotCacheRequest from(
             Long memberId,
@@ -20,7 +21,7 @@ public record UpdateSlotCacheRequest(
             String requestedLocationName,
             LocalDateTime requestedDateTime,
             Integer availableTime,
-            List<String> categories
+            Set<String> categories
     ) {
         return new UpdateSlotCacheRequest(
                 memberId, coordinate, requestedLocationName, requestedDateTime, availableTime, categories

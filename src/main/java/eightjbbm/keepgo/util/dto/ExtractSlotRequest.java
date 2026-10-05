@@ -7,6 +7,7 @@ import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public record ExtractSlotRequest(
         String chat,
@@ -19,7 +20,7 @@ public record ExtractSlotRequest(
             String region,
             LocalDate datetime,
             Integer availableTime,
-            List<String> category
+            Set<String> category
     ) {
 
     }
