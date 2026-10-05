@@ -36,7 +36,7 @@ public record ExtractSlotRequest(
                         request.slot().getAvailableTime(),
                         request.slot().getCategory()
                 ),
-                request.query()
+                request.slot().getQuery()
         );
     }
 }
