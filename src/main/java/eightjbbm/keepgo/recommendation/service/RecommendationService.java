@@ -10,6 +10,8 @@ import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
+import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,19 +34,22 @@ public class RecommendationService {
         SlotValue slot = slotCacheService.read(memberId);
         recommendationJobCacheService.createJob(memberId, 0L);
 
-        var recommendCourseResponse = aiServerApiClient.recommendCourse(RecommendCourseRequest.from(
+        RecommendCourseResponse recommendCourseResponse = aiServerApiClient.recommendCourse(RecommendCourseRequest.from(
                 query, collection, slot
         ));
 
-        recommendationJobCacheService.completeJob(command.memberId());
-
-        return RequestRecommendationResult.from(
-                slot, recommendCourseResponse,
-                (k -> (OutingPlace) outingCollectionPrivateRepository
-                        .findById(Long.valueOf(k.placeId()))
-                        .orElseThrow()
-                        .getOutingGuide())
-        );
+        if (recommendCourseResponse instanceof RecommendCourseResponse.Success successResponse) {
+            recommendationJobCacheService.completeJob(command.memberId());
+            return RequestRecommendationResult.from(
+                    slot, successResponse,
+                    (k -> (OutingPlace) outingCollectionPrivateRepository
+                            .findById(Long.valueOf(k.placeId()))
+                            .orElseThrow()
+                            .getOutingGuide())
+            );
+        } else {
+            throw new ServiceUnavailableException();
+        }
     }
 
     public void stopRecommendation(StopRecommendationCommand command) {

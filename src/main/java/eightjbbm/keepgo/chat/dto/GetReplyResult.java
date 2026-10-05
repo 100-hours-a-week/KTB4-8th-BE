@@ -10,7 +10,7 @@ public sealed interface GetReplyResult
             Chat chat,
             GetReplyResponse.Slot slot
     ) implements GetReplyResult {
-        public static GetReplyResult from(String status, ExtractSlotResponse.ExtractData response) {
+        public static GetReplyResult from(String status, ExtractSlotResponse.Success.ExtractData response) {
             return new Completed(
                     status, new Chat(response.botMessage(), true), response.slot()
             );

@@ -98,27 +98,30 @@ public class MemberService {
                 .forEach(
                         url -> {
                             AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
-                            OutingGuide guide;
-                            if (isPlaceOrEvent(response.getCategory())) {
-                                guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
-                                        () -> outingPlaceRepository.save(new OutingPlace(
-                                                response.getCategory(),
-                                                response.getName(),
-                                                response.getSummary()
-                                        ))
-                                );
-                            } else {
-                                guide = outingEventRepository.findByName(response.getName()).orElseGet(
-                                        () -> outingEventRepository.save(new OutingEvent(
-                                                response.getCategory(),
-                                                response.getName(),
-                                                response.getSummary(),
-                                                response.data().eventStartDate(),
-                                                response.data().eventEndDate()
-                                        ))
-                                );
+                            if (response instanceof AnalyzeVideoResponse.Success successResponse) {
+                                OutingGuide guide;
+                                if (isPlaceOrEvent(successResponse.getCategory())) {
+                                    guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
+                                            () -> outingPlaceRepository.save(new OutingPlace(
+                                                    successResponse.getCategory(),
+                                                    successResponse.getName(),
+                                                    successResponse.getSummary()
+                                            ))
+                                    );
+                                } else {
+                                    guide = outingEventRepository.findByName(successResponse.getName()).orElseGet(
+                                            () -> outingEventRepository.save(new OutingEvent(
+                                                    successResponse.getCategory(),
+                                                    successResponse.getName(),
+                                                    successResponse.getSummary(),
+                                                    successResponse.data().eventStartDate(),
+                                                    successResponse.data().eventEndDate()
+                                            ))
+                                    );
+                                }
+                                outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
                             }
-                            outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
+
                         }
                 );
     }

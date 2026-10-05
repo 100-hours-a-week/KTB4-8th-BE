@@ -2,10 +2,13 @@ package eightjbbm.keepgo.util.cache.getreply;
 
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 @RequiredArgsConstructor
@@ -18,10 +21,16 @@ public class GetReplyCacheService {
         worker.requestGetReply(
                 request.memberId(),
                 ExtractSlotRequest.from(request)
-        );
+        ).orTimeout(10, TimeUnit.SECONDS)
+                .exceptionally(error -> {
+                    if (error instanceof TimeoutException) {
+                        throw new ServiceUnavailableException();
+                    }
+                    return null;
+                });
     }
 
-    public Optional<ExtractSlotResponse.ExtractData> poll(Long memberId) {
+    public Optional<ExtractSlotResponse.Success.ExtractData> poll(Long memberId) {
         return getReplyCacheRepository.poll(memberId);
     }
 }

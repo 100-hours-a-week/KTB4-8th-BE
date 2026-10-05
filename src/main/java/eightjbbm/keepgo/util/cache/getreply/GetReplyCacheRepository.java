@@ -18,15 +18,15 @@ public class GetReplyCacheRepository {
         getReplyCache().putIfAbsent(memberId, null);
     }
 
-    public Optional<ExtractSlotResponse.ExtractData> poll(Long memberId) {
-        Optional<ExtractSlotResponse.ExtractData> content = Optional.ofNullable(getReplyCache().get(memberId, ExtractSlotResponse.ExtractData.class));
+    public Optional<ExtractSlotResponse.Success.ExtractData> poll(Long memberId) {
+        Optional<ExtractSlotResponse.Success.ExtractData> content = Optional.ofNullable(getReplyCache().get(memberId, ExtractSlotResponse.Success.ExtractData.class));
         if (content.isPresent()) {
             evict(memberId);
         }
         return content;
     }
 
-    public void update(Long memberId, ExtractSlotResponse.ExtractData content) {
+    public void update(Long memberId, ExtractSlotResponse.Success.ExtractData content) {
         getReplyCache().put(memberId, content);
     }
 
