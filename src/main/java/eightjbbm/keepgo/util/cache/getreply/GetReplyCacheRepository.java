@@ -18,12 +18,8 @@ public class GetReplyCacheRepository {
         getReplyCache().putIfAbsent(memberId, GetReplyValue.emptyValue());
     }
 
-    public Optional<ExtractSlotResponse.Success.ExtractData> poll(Long memberId) {
-        Optional<ExtractSlotResponse.Success.ExtractData> content = Optional.ofNullable(getReplyCache().get(memberId, ExtractSlotResponse.Success.ExtractData.class));
-        if (content.isPresent()) {
-            evict(memberId);
-        }
-        return content;
+    public boolean exists(Long memberId) {
+        return getReplyCache().get(memberId, GetReplyValue.class) != null;
     }
 
     public GetReplyJobStatus getStatus(Long memberId) {

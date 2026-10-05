@@ -14,6 +14,8 @@ public class SlotCacheService {
         return slotCacheRepository.read(memberId);
     }
 
+    public Optional<String> getQuery(Long memberId) { return slotCacheRepository.read(memberId).map(SlotValue::getQuery); }
+
     public void updateSlot(UpdateSlotCacheRequest request) {
         slotCacheRepository.update(
                 request.memberId(),

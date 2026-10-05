@@ -36,7 +36,6 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final GetReplyCacheService getReplyCacheService;
     private final SlotCacheService slotCacheService;
-    private final QueryCacheService queryCacheService;
     private final GeoCodingApiClient geoCodingApiClient;
 
     /// 채팅 전송 API
@@ -49,13 +48,11 @@ public class ChatService {
         SlotValue slot = slotCacheService.getSlot(memberId).orElse(
                 SlotValue.createEmptySlotValue()
         );
-        String query = queryCacheService.getQuery(memberId);
         getReplyCacheService.createRequest(
                 GetReplyRequest.from(
                         command,
                         userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        slot,
-                        query
+                        slot
                 )
         );
         return SendChatResult.from(userChat);
