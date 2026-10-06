@@ -31,8 +31,8 @@ public class RefreshFilterChainConfig {
                 .securityMatchers(
                         matchers -> matchers
                                 .requestMatchers(
-                                        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/user-session/refresh"),
-                                        PathPatternRequestMatcher.pathPattern(HttpMethod.DELETE, "/api/v1/auth/user-session")
+                                        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session/refresh"),
+                                        PathPatternRequestMatcher.pathPattern(HttpMethod.DELETE, "/api/v1/user/auth-session")
                                 )
                 )
                 .csrf(AbstractHttpConfigurer::disable)
