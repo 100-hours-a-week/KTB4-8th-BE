@@ -24,7 +24,8 @@ public class RefreshFilterChainConfig {
     @Bean
     public SecurityFilterChain rtFilterChain(
             HttpSecurity http,
-            RefreshTokenFailAuthenticationEntryPoint entryPoint
+            RefreshTokenFailAuthenticationEntryPoint entryPoint,
+            RefreshAuthenticationProvider provider
     ) throws Exception {
         var authManager = http.getSharedObject(AuthenticationManager.class);
         return http
@@ -40,6 +41,7 @@ public class RefreshFilterChainConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .oauth2Login(AbstractHttpConfigurer::disable)
+                .authenticationProvider(provider)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
