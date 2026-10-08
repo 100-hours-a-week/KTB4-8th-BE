@@ -10,25 +10,16 @@ import java.util.Optional;
 public class SlotCacheService {
     private final SlotCacheRepository slotCacheRepository;
 
-    public SlotValue read(Long memberId) {
-
-        return null;
-    }
-
     public Optional<SlotValue> getSlot(Long memberId) {
         return slotCacheRepository.read(memberId);
     }
 
+    public Optional<String> getQuery(Long memberId) { return slotCacheRepository.read(memberId).map(SlotValue::getQuery); }
+
     public void updateSlot(UpdateSlotCacheRequest request) {
         slotCacheRepository.update(
                 request.memberId(),
-                SlotValue.from(
-                        request.coordinate(),
-                        request.requestedLocationName(),
-                        request.requestedDateTime(),
-                        request.availableTime(),
-                        request.categories()
-                )
+                request
         );
     }
 }

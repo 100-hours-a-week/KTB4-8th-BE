@@ -6,12 +6,13 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public record UpdateSlotRequest(
-        @NotNull Coordinate location,
-        @NotBlank String requestedLocationName,
-        @NotNull LocalDateTime requestedDateTime,
-        @NotNull Integer availableTime,
-        @NotNull List<String> categories
+        Coordinate location,
+        String requestedLocationName,
+        LocalDateTime requestedDateTime,
+        Integer availableTime,
+        Set<String> categories
 ) {
 }

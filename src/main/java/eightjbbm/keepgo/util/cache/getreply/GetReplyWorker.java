@@ -1,8 +1,10 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
+import eightjbbm.keepgo.util.cache.slot.SlotCacheRepository;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -16,12 +18,17 @@ public class GetReplyWorker {
 
     private final AiServerApiClient aiServerApiClient;
     private final GetReplyCacheRepository getReplyCacheRepository;
+    private final SlotCacheRepository slotCacheRepository;
 
     @Async("httpTaskExecutor")
-    @Transactional
     public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
         ExtractSlotResponse response = aiServerApiClient.extractSlot(request);
-        getReplyCacheRepository.update(memberId, response.data());
+        if (response instanceof ExtractSlotResponse.Success successResponse) {
+            getReplyCacheRepository.update(memberId, successResponse.data().botMessage());
+            slotCacheRepository.update(memberId, successResponse.data());
+        } else {
+            getReplyCacheRepository.setStatusAsFail(memberId);
+        }
         return CompletableFuture.completedFuture(null);
     }
 }

@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.anyOf;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,7 +126,7 @@ public class ChatIntegrationTests {
                 "test",
                 LocalDateTime.now(),
                 180,
-                List.of("카페")
+                Set.of("카페")
         );
 
         var result = webTestClient

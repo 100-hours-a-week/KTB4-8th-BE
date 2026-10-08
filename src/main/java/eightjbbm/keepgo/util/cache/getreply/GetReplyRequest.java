@@ -12,21 +12,18 @@ public record GetReplyRequest(
         Long memberId,
         String content,
         LocalDate createdDate,
-        SlotValue slot,
-        String query
+        SlotValue slot
 ) {
     public static GetReplyRequest from(
           SendChatCommand command,
           LocalDate date,
-          SlotValue slot,
-          String query
+          SlotValue slot
     ) {
         return new GetReplyRequest(
                 command.memberId(),
                 command.content(),
                 date,
-                slot,
-                query
+                slot
         );
     }
 }
