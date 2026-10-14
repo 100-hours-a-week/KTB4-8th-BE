@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.recommendation.service;
 
+import com.google.api.services.youtube.YouTube;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.*;

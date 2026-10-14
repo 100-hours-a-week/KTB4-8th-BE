@@ -105,7 +105,10 @@ public class MemberService {
                                             () -> outingPlaceRepository.save(new OutingPlace(
                                                     successResponse.getCategory(),
                                                     successResponse.getName(),
-                                                    successResponse.getSummary()
+                                                    successResponse.getSummary(),
+                                                    null,
+                                                    null,
+                                                    null
                                             ))
                                     );
                                 } else {
@@ -114,8 +117,11 @@ public class MemberService {
                                                     successResponse.getCategory(),
                                                     successResponse.getName(),
                                                     successResponse.getSummary(),
-                                                    successResponse.data().eventStartDate(),
-                                                    successResponse.data().eventEndDate()
+                                                    null, //successResponse.data().eventStartDate(),
+                                                    null, //successResponse.data().eventEndDate(),
+                                                    null,
+                                                    null,
+                                                    null
                                             ))
                                     );
                                 }

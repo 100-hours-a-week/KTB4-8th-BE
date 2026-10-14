@@ -27,5 +27,6 @@ public class OutingCollectionPrivate {
     public OutingCollectionPrivate(Member member, OutingGuide outingGuide) {
         this.member = member;
         this.outingGuide = outingGuide;
+        this.createdAt = Instant.now();
     }
 }
