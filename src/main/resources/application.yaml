@@ -33,7 +33,7 @@ keepgo:
     jwt:
       access-token-ttl: 30m
       key-id: placeholder
-      issuer: https://auth.example.com
+      issuer: https://auth.keepgo.kr
       audience: placeholder
       client-id: placeholder
       public-key: classpath:keys/public_key.pem
