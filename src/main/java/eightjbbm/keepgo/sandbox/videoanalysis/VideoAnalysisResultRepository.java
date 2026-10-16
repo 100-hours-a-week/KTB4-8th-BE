@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface VideoAnalysisResultRepository extends JpaRepository<VideoAnalysisResult, Long> {
@@ -14,11 +15,9 @@ public interface VideoAnalysisResultRepository extends JpaRepository<VideoAnalys
     @Query("""
         select v.outingGuide
         from VideoAnalysisResult v
-        where v.memberId = :memberId
-            and v.videoAnalysis.id in :videoAnalysisIds
+        where v.videoAnalysis.id in :videoAnalysisIds
     """)
-    public List<OutingGuide> findOutingGuidesByVideoAnalysisIds(
-            @Param("memberId") Long memberId,
-            @Param("videoAnalysisIds") List<Long> videoAnalysisIds
+    Set<OutingGuide> findOutingGuidesByVideoAnalysisIdIn(
+            @Param("videoAnalysisIds") Set<Long> videoAnalysisIds
     );
 }

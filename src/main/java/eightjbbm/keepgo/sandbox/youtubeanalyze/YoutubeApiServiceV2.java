@@ -8,6 +8,7 @@ import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import eightjbbm.keepgo.sandbox.YoutubeAuthorizedClientService;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ public class YoutubeApiServiceV2 {
     public VideoListResponse getVideoLists(
             Long memberId,
             String pageToken
-            ) throws Exception {
+            ) {
         OAuth2AccessToken accessToken = authorizedClientService.getAccessToken(memberId);
         var credentials = GoogleCredentials.create(
                 new AccessToken(
@@ -36,22 +37,26 @@ public class YoutubeApiServiceV2 {
         );
 
         var youtube = new YouTube.Builder(
-                httpTransport,
-                jsonFactory,
-                new HttpCredentialsAdapter(credentials)
-        )
+                    httpTransport,
+                    jsonFactory,
+                    new HttpCredentialsAdapter(credentials)
+                )
                 .setApplicationName("keepgo")
                 .build();
 
-        var builder = youtube
-                .videos()
-                .list(List.of("id", "snippet", "contentDetails"))
-                .setMyRating("like");
+        try {
+            var builder = youtube
+                    .videos()
+                    .list(List.of("id", "snippet", "contentDetails"))
+                    .setMyRating("like");
 
-        if (pageToken != null) {
-            builder = builder.setPageToken(pageToken);
+            if (pageToken != null) {
+                builder = builder.setPageToken(pageToken);
+            }
+
+            return builder.execute();
+        } catch (Exception e) {
+            throw new ServiceUnavailableException();
         }
-
-        return builder.execute();
     }
 }
