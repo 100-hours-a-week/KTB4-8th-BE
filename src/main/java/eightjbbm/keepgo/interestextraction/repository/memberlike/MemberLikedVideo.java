@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.memberlike;
+package eightjbbm.keepgo.interestextraction.repository.memberlike;
 
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.sandbox.ds.VideoId;

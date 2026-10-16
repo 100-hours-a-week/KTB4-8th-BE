@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.videoanalysis;
+package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.sandbox.ds.VideoId;
 import org.springframework.data.jpa.repository.JpaRepository;

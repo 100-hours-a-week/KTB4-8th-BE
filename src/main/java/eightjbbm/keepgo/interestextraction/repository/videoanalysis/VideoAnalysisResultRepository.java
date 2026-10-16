@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.videoanalysis;
+package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import org.springframework.data.jpa.repository.JpaRepository;
