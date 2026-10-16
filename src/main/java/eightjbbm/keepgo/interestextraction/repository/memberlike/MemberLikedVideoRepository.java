@@ -12,6 +12,8 @@ import java.util.List;
 public interface MemberLikedVideoRepository extends JpaRepository<MemberLikedVideo, Long> {
     Long countByMemberId(Long memberId);
 
+    List<VideoId> findAllByMemberId(Long memberId);
+
     @Query("""
         select m.videoInfo
         from MemberLikedVideo m

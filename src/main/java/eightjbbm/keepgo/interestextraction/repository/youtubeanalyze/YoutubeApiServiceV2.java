@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.interestextraction.repository.youtubeanalyze;
+package eightjbbm.keepgo.sandbox.youtubeanalyze;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
