@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.youtubeanalyze;
+package eightjbbm.keepgo.interestextraction.repository.youtubeanalyze;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -7,7 +7,7 @@ import com.google.api.services.youtube.model.VideoListResponse;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
-import eightjbbm.keepgo.sandbox.YoutubeAuthorizedClientService;
+import eightjbbm.keepgo.interestextraction.service.YoutubeAuthorizedClientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;

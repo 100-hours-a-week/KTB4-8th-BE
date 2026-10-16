@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.videoanalysis;
+package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 public enum VideoAnalysisStatus {
     SUCCESS,

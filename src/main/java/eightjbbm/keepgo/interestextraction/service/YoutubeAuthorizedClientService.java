@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox;
+package eightjbbm.keepgo.interestextraction.service;
 
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;

@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.memberlike;
+package eightjbbm.keepgo.interestextraction.repository.memberlike;
 
 import eightjbbm.keepgo.sandbox.ds.VideoId;
 import org.springframework.data.jpa.repository.JpaRepository;
