@@ -1,8 +1,7 @@
 package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.sandbox.ds.VideoId;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -12,9 +11,11 @@ import java.time.Instant;
 @Getter
 @NoArgsConstructor
 public class VideoAnalysis {
+    @Id @GeneratedValue
     private Long id;
     @Embedded
     private VideoId videoId;
+    @Enumerated(EnumType.STRING)
     private VideoAnalysisStatus status;
     private Instant createDatetime;
 

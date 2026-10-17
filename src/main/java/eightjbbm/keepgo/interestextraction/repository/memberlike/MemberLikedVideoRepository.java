@@ -24,4 +24,15 @@ public interface MemberLikedVideoRepository extends JpaRepository<MemberLikedVid
             @Param("memberId") Long memberId,
             @Param("videoIdList") List<VideoId> videoIdList
     );
+
+    @Query("""
+        select m.videoInfo
+        from MemberLikedVideo m
+        where m.member.id = :memberId
+            and m.videoinfo not in :videoIdList
+        """)
+    List<VideoId> findUnexistingVideoIds(
+            @Param("memberId") Long memberId,
+            @Param("videoIdList") List<VideoId> videoIdList
+    );
 }

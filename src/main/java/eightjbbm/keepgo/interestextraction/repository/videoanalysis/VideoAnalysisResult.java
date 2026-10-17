@@ -1,7 +1,7 @@
 package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import jakarta.persistence.Entity;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,8 +11,12 @@ import java.time.Instant;
 @Getter
 @NoArgsConstructor
 public class VideoAnalysisResult {
+    @Id @GeneratedValue
     private Long id;
+    @ManyToOne
+    @JoinColumn(name = "video_analysis_id")
     private VideoAnalysis videoAnalysis;
+    @JoinColumn(name = "outing_guide_id")
     private OutingGuide outingGuide;
     private Instant createDatetime;
 

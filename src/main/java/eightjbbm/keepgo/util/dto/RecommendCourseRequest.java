@@ -42,7 +42,7 @@ public record RecommendCourseRequest(
                     place.getDescription(),
                     null,
                     null,
-                    place.getBusinessHours()
+                    null
             );
         }
     }

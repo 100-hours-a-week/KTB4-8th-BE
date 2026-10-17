@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessHours;
+import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
@@ -21,12 +21,12 @@ public class OutingPlace extends OutingGuide {
             String description,
             String address,
             Coordinate coordinate,
-            @Nullable BusinessHours businessHours) {
-        super(category, name, description, address, coordinate, businessHours);
+            @Nullable BusinessSchedule businessSchedule) {
+        super(category, name, description, address, coordinate, businessSchedule);
     }
 
     @Override
     public boolean isAvailable(Instant instant) {
-        return this.getBusinessHours() != null && this.getBusinessHours().isAvailable(instant);
+        return this.getBusinessSchedule() != null && this.getBusinessSchedule().isAvailable(instant);
     }
 }

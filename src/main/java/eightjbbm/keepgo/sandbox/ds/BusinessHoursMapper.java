@@ -6,10 +6,10 @@ import java.time.LocalTime;
 import java.util.*;
 
 public class BusinessHoursMapper {
-    public static BusinessHours toBusinessHours(BusinessHoursDto dto) {
+    public static BusinessSchedule toBusinessHours(BusinessHoursDto dto) {
         if (dto == null) return null;
 
-        return new BusinessHours(
+        return new BusinessSchedule(
                 dto.timezone(),
                 dto.estimated(),
                 convertWeeklyHours(dto.weeklyHours()),

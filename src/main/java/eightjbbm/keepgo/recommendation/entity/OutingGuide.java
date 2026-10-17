@@ -1,7 +1,7 @@
 package eightjbbm.keepgo.recommendation.entity;
 
 import eightjbbm.keepgo.sandbox.ds.Address;
-import eightjbbm.keepgo.sandbox.ds.BusinessHours;
+import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.file.File;
 import jakarta.annotation.Nullable;
@@ -26,7 +26,7 @@ public abstract class OutingGuide {
     private Address address;
     private Coordinate coordinate;
     @Nullable
-    private BusinessHours businessHours;
+    private BusinessSchedule businessSchedule;
 
     @OneToOne
     @JoinColumn(name = "image_id")
@@ -38,13 +38,13 @@ public abstract class OutingGuide {
             String description,
             String address,
             Coordinate coordinate,
-            @Nullable BusinessHours businessHours) {
+            @Nullable BusinessSchedule businessSchedule) {
         this.category = category;
         this.name = name;
         this.description = description;
         this.address = new Address(address);
         this.coordinate = coordinate;
-        this.businessHours = businessHours;
+        this.businessSchedule = businessSchedule;
     }
 
     public abstract boolean isAvailable(Instant instant);

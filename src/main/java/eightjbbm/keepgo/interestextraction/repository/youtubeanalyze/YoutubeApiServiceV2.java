@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.youtubeanalyze;
+package eightjbbm.keepgo.interestextraction.repository.youtubeanalyze;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -45,7 +45,7 @@ public class YoutubeApiServiceV2 {
 
         var builder = youtube
                 .videos()
-                .list(List.of("id", "snippet", "contentDetails"))
+                .list(List.of("id", "status", "snippet", "contentDetails"))
                 .setMyRating("like");
 
         if (pageToken != null) {

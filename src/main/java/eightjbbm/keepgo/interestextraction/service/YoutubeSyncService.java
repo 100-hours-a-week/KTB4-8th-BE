@@ -1,19 +1,22 @@
-package eightjbbm.keepgo.sandbox;
+package eightjbbm.keepgo.interestextraction.service;
 
 import com.google.api.services.youtube.model.Video;
+import com.google.api.services.youtube.model.VideoListResponse;
+import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVideo;
+import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVideoRepository;
+import eightjbbm.keepgo.interestextraction.repository.videoanalysis.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.sandbox.OutingGuideFactory;
+import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.sandbox.aiv2.AiServerService;
 import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.sandbox.ds.Address;
 import eightjbbm.keepgo.sandbox.ds.VideoId;
 import eightjbbm.keepgo.sandbox.ds.VideoIds;
-import eightjbbm.keepgo.sandbox.memberlike.MemberLikedVideo;
-import eightjbbm.keepgo.sandbox.memberlike.MemberLikedVideoRepository;
-import eightjbbm.keepgo.sandbox.videoanalysis.*;
 import eightjbbm.keepgo.sandbox.youtubeanalyze.YoutubeApiServiceV2;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +48,12 @@ public class YoutubeSyncService {
         VideoIds memberLikedVideoIds = VideoIds.fromVideoIds(memberLikedVideoRepository.findAllByMemberId(memberId));
 
         while (true) {
-            var response = youtubeApiService.getVideoLists(memberId, pageToken);
+            VideoListResponse response;
+            try {
+                response = youtubeApiService.getVideoLists(memberId, pageToken);
+            } catch (Exception e) {
+                throw new ServiceUnavailableException();
+            }
             // 시스템에서 관리하는 좋아요 목록과 대조, 최신화되지 못한 영상 목록 추출
             List<Video> unsyncedVideos = response.getItems().stream()
                     .filter(video -> !memberLikedVideoIds.contains(video.getId()))

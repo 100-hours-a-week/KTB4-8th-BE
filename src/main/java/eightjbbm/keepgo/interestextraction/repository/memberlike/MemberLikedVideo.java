@@ -2,10 +2,7 @@ package eightjbbm.keepgo.interestextraction.repository.memberlike;
 
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.sandbox.ds.VideoId;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -19,6 +16,9 @@ public class MemberLikedVideo {
     private Long id;
     @Embedded
     private VideoId videoId;
+
+    @ManyToOne
+    @JoinColumn(name = "member_id")
     private Member member;
     private Instant createDatetime;
 

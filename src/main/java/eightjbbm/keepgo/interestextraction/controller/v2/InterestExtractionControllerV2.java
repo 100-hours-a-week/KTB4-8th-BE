@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.interestextraction.controller.v2;
 
-import eightjbbm.keepgo.interestextraction.service.YoutubeAnalyzeService;
+import eightjbbm.keepgo.interestextraction.service.YoutubeSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class InterestExtractionControllerV2 {
-    private final YoutubeAnalyzeService youtubeAnalyzeService;
+    private final YoutubeSyncService youtubeSyncService;
 
     @PostMapping("/api/v2/member/youtube-sync")
     public ResponseEntity<Void> foo(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        youtubeAnalyzeService.analyzeVideo(memberId);
+        youtubeSyncService.getLikedVideos(memberId);
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
                 .build();
