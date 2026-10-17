@@ -1,19 +1,17 @@
 package eightjbbm.keepgo.chat.service;
 
-import eightjbbm.keepgo.chat.entity.Chat;
 import eightjbbm.keepgo.chat.ChatMapper;
-import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.dto.*;
+import eightjbbm.keepgo.chat.entity.Chat;
+import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.util.cache.getreply.GetReplyJobStatus;
-import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
-import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
+import eightjbbm.keepgo.util.cache.getreply.GetReplyJobStatus;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
-import eightjbbm.keepgo.util.cache.query.QueryCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
+import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -21,12 +19,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Service

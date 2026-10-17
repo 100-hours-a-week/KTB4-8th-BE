@@ -12,6 +12,7 @@ import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.client.ai.AnalyzeVideoRequest;
 import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
@@ -97,10 +98,11 @@ public class MemberService {
                 .map(GetLikedVideosResponse.Item::id)
                 .forEach(
                         url -> {
+                            /*
                             AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
-                            if (response instanceof AnalyzeVideoResponse.Success successResponse) {
+                            if (response instanceof AnalyzeVideoResponseV2.Success successResponse) {
                                 OutingGuide guide;
-                                if (isPlaceOrEvent(successResponse.getCategory())) {
+                                if (isPlaceOrEvent(successResponse.data())) {
                                     guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
                                             () -> outingPlaceRepository.save(new OutingPlace(
                                                     successResponse.getCategory(),
@@ -127,6 +129,8 @@ public class MemberService {
                                 }
                                 outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
                             }
+
+                             */
 
                         }
                 );

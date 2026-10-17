@@ -29,7 +29,7 @@ public interface MemberLikedVideoRepository extends JpaRepository<MemberLikedVid
         select m.videoInfo
         from MemberLikedVideo m
         where m.member.id = :memberId
-            and m.videoinfo not in :videoIdList
+            and m.videoInfo not in :videoIdList
         """)
     List<VideoId> findUnexistingVideoIds(
             @Param("memberId") Long memberId,

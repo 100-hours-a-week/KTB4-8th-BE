@@ -4,7 +4,6 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,17 +16,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 @Slf4j
 @Component
@@ -47,23 +43,6 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
         OidcUser oidcUser = (OidcUser) authentication.getPrincipal();
         if (!(authentication instanceof OAuth2AuthenticationToken oAuthToken)) {
             throw new IllegalStateException("OAuth2 인증 정보가 아님");
-        }
-
-        String registrationId = oAuthToken.getAuthorizedClientRegistrationId();
-        String principalName = oAuthToken.getName();
-        OAuth2AuthorizedClient authorizedClient = oAuth2AuthorizedClientService.loadAuthorizedClient(
-                registrationId,
-                principalName
-        );
-
-        if (authorizedClient == null) {
-            throw new IllegalStateException("OAuth2AuthorizedClient를 찾지 못했음");
-        }
-
-        OAuth2AccessToken oAuth2AccessToken = authorizedClient.getAccessToken();
-
-        if (oAuth2AccessToken == null) {
-            throw new IllegalStateException("Google Access Token이 없음");
         }
 
         Optional<OAuthAccount> oauthAccount = oAuthAccountRepository.findByIssuerAndSubject(

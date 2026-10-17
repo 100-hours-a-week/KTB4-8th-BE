@@ -21,6 +21,7 @@ public class OutingGuideFactory {
                     result.placeName(),
                     result.summary(),
                     result.address(),
+                    result.locationDetail(),
                     new Coordinate(result.lat(), result.lng()),
                     BusinessHoursMapper.toBusinessHours(result.businessHours())
             ); }
@@ -29,6 +30,7 @@ public class OutingGuideFactory {
                     result.placeName(),
                     result.summary(),
                     result.address(),
+                    result.locationDetail(),
                     new Coordinate(result.lat(), result.lng()),
                     BusinessHoursMapper.toBusinessHours(result.businessHours()),
                     startDatetime,

@@ -8,13 +8,16 @@ import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import eightjbbm.keepgo.interestextraction.service.YoutubeAuthorizedClientService;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class YoutubeApiServiceV2 {
@@ -26,7 +29,7 @@ public class YoutubeApiServiceV2 {
     public VideoListResponse getVideoLists(
             Long memberId,
             String pageToken
-            ) throws Exception {
+    ) {
         OAuth2AccessToken accessToken = authorizedClientService.getAccessToken(memberId);
         var credentials = GoogleCredentials.create(
                 new AccessToken(
@@ -43,15 +46,19 @@ public class YoutubeApiServiceV2 {
                 .setApplicationName("keepgo")
                 .build();
 
-        var builder = youtube
-                .videos()
-                .list(List.of("id", "status", "snippet", "contentDetails"))
-                .setMyRating("like");
+        try {
+            var builder = youtube
+                    .videos()
+                    .list(List.of("id", "status", "snippet", "contentDetails"))
+                    .setMyRating("like");
 
-        if (pageToken != null) {
-            builder = builder.setPageToken(pageToken);
+            if (pageToken != null) {
+                builder = builder.setPageToken(pageToken);
+            }
+            return builder.execute();
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            throw new ServiceUnavailableException();
         }
-
-        return builder.execute();
     }
 }

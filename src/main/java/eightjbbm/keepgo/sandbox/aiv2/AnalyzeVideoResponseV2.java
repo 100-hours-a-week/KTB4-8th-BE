@@ -21,6 +21,7 @@ public sealed interface AnalyzeVideoResponseV2 {
                 String error,
                 String placeName,
                 String address,
+                String locationDetail,
                 String category,
                 @Nullable BusinessHoursDto businessHours,
                 @Nullable LocalDate eventStartDate,

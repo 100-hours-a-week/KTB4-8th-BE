@@ -24,12 +24,13 @@ public class OutingEvent extends OutingGuide{
             String category,
             String name,
             String description,
+            String locationDetail,
             String address,
             Coordinate coordinate,
             @Nullable BusinessSchedule businessSchedule,
             @Nullable Instant startDatetime,
             @Nullable Instant endDatetime) {
-        super(category, name, description, address, coordinate, businessSchedule);
+        super(category, name, description, locationDetail, address, coordinate, businessSchedule);
         this.startDatetime = startDatetime;
         this.endDatetime = endDatetime;
     }

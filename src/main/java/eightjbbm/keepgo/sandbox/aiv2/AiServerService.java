@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.sandbox.aiv2;
 
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -33,5 +34,11 @@ public class AiServerService {
                 })
                 .toList();
         return new AnalyzeVideoRequestV2(videoUrls);
+    }
+
+    public void embedPlaces(List<OutingGuide> newOutingGuides) {
+        restClient.post()
+                .uri("/v1/embed-places")
+                .body(EmbedPlaceRequestV2.from(newOutingGuides));
     }
 }

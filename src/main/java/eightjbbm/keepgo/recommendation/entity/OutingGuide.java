@@ -23,6 +23,7 @@ public abstract class OutingGuide {
     private String name;
     private String category;
     private String description;
+    private String locationDetail;
     private Address address;
     private Coordinate coordinate;
     @Nullable
@@ -36,16 +37,23 @@ public abstract class OutingGuide {
             String category,
             String name,
             String description,
+            String locationDetail,
             String address,
             Coordinate coordinate,
             @Nullable BusinessSchedule businessSchedule) {
         this.category = category;
         this.name = name;
         this.description = description;
+        this.locationDetail = locationDetail;
         this.address = new Address(address);
         this.coordinate = coordinate;
         this.businessSchedule = businessSchedule;
     }
 
     public abstract boolean isAvailable(Instant instant);
+
+    public boolean isSameAs(OutingGuide outingGuide) {
+        return this.address.equals(outingGuide.getAddress())
+                && this.name.equals(outingGuide.getName());
+    }
 }
