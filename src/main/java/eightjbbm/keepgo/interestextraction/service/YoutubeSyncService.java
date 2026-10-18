@@ -7,9 +7,9 @@ import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVide
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.*;
 import eightjbbm.keepgo.interestextraction.repository.youtubeanalyze.YoutubeApiServiceV2;
 import eightjbbm.keepgo.member.entity.Member;
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.sandbox.OutingGuideFactory;
 import eightjbbm.keepgo.sandbox.OutingGuideRepository;

@@ -1,8 +1,7 @@
 package eightjbbm.keepgo.recommendation.service;
 
-import com.google.api.services.youtube.YouTube;
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
-import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.dto.*;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;

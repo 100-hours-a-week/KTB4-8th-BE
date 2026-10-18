@@ -1,5 +1,6 @@
-package eightjbbm.keepgo.member.entity;
+package eightjbbm.keepgo.outingwishlist.application.domain.model;
 
+import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import jakarta.persistence.*;
 import lombok.Getter;

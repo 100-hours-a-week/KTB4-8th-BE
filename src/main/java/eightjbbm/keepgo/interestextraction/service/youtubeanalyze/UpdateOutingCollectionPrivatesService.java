@@ -1,9 +1,9 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
