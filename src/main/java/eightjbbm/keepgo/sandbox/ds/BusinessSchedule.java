@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.sandbox.ds;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
 import java.time.*;
@@ -13,11 +15,12 @@ public class BusinessSchedule {
     private final Map<DayOfWeek, List<TimeInterval>> weeklyHours;
     private final Map<LocalDate, List<TimeInterval>> exceptions;
 
+    @JsonCreator
     public BusinessSchedule(
-            String timezone,
-            boolean estimated,
-            Map<DayOfWeek, List<TimeInterval>> weeklyHours,
-            Map<LocalDate, List<TimeInterval>> exceptions
+            @JsonProperty("timezone") String timezone,
+            @JsonProperty("estimated") boolean estimated,
+            @JsonProperty("weeklyHours") Map<DayOfWeek, List<TimeInterval>> weeklyHours,
+            @JsonProperty("exceptions") Map<LocalDate, List<TimeInterval>> exceptions
     ) {
         this.timezone = ZoneId.of(timezone);
         this.estimated = estimated;

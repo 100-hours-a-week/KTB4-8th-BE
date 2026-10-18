@@ -22,8 +22,4 @@ public interface OutingGuideRepository extends JpaRepository<OutingGuide, Long> 
     List<OutingGuide> findAllByAddresses(
             @Param("addresses") List<Address> addresses
     );
-
-    List<OutingGuide> findAllByAddressAndPlaceName(
-            @Param("addresses") List<Address> addresses
-    );
 }

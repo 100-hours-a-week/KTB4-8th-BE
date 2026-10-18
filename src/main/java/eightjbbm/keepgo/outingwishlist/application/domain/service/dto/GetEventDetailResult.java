@@ -22,7 +22,7 @@ public record GetEventDetailResult(
         @Nullable LocalDate endDate,
         @Nullable Place place
 ) {
-    record Place(
+    public record Place(
             String name,
             String addressSg,
             String addressRoad,

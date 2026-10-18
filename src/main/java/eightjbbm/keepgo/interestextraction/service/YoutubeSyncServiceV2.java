@@ -50,7 +50,7 @@ public class YoutubeSyncServiceV2 {
     // 최신화 필요 영상 처리 모듈
     public void processVideos(Long memberId, List<Video> videos) {
         // 3분 이하의 공개 상태인 업로드된 영상 중 MemberLikedVideo가 없는 영상
-        List<VideoId> unexistingVideoIds = memberLikedVideoRepository
+        List<String> unexistingVideoIds = memberLikedVideoRepository
                 .findUnexistingVideoIds(
                         memberId,
                         videos.stream()
@@ -59,7 +59,6 @@ public class YoutubeSyncServiceV2 {
                                         && video.getStatus().getPrivacyStatus().equals("public")
                                         && video.getStatus().getUploadStatus().equals("uploaded"))
                                 .map(Video::getId)
-                                .map(VideoId::new)
                                 .toList()
                 );
 

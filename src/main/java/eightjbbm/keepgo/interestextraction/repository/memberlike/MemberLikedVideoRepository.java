@@ -10,29 +10,17 @@ import java.util.List;
 
 @Repository
 public interface MemberLikedVideoRepository extends JpaRepository<MemberLikedVideo, Long> {
-    Long countByMemberId(Long memberId);
 
-    List<VideoId> findAllByMemberId(Long memberId);
-
-    @Query("""
-        select m.videoInfo
-        from MemberLikedVideo m
-        where m.member.id = :memberId
-            and m.videoinfo in :videoIdList
-        """)
-    List<VideoId> findExistingVideoIds(
-            @Param("memberId") Long memberId,
-            @Param("videoIdList") List<VideoId> videoIdList
-    );
+    List<String> findAllByMemberId(Long memberId);
 
     @Query("""
-        select m.videoInfo
+        select m.videoId
         from MemberLikedVideo m
         where m.member.id = :memberId
-            and m.videoInfo not in :videoIdList
+            and m.videoId not in :videoIdList
         """)
-    List<VideoId> findUnexistingVideoIds(
+    List<String> findUnexistingVideoIds(
             @Param("memberId") Long memberId,
-            @Param("videoIdList") List<VideoId> videoIdList
+            @Param("videoIdList") List<String> videoIdList
     );
 }

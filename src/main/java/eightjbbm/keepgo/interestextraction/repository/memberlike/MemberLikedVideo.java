@@ -14,8 +14,7 @@ import java.time.Instant;
 public class MemberLikedVideo {
     @Id @GeneratedValue
     private Long id;
-    @Embedded
-    private VideoId videoId;
+    private String videoId;
 
     @ManyToOne
     @JoinColumn(name = "member_id")
@@ -23,7 +22,7 @@ public class MemberLikedVideo {
     private Instant createDatetime;
 
     public MemberLikedVideo(String videoId, Member member) {
-        this.videoId = VideoId.fromVideoId(videoId);
+        this.videoId = videoId;
         this.member = member;
         this.createDatetime = Instant.now();
     }

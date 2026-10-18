@@ -14,7 +14,7 @@ public record GetEventListResult(
         @Nullable String nextCursor,
         List<Event> events
 ) {
-    record Event(
+    public record Event(
             Long eventId,
             String name,
             String category,
@@ -24,7 +24,7 @@ public record GetEventListResult(
             @Nullable Place place
     ) {}
 
-    record Place(
+    public record Place(
             String name,
             String addressSg
     ) {}

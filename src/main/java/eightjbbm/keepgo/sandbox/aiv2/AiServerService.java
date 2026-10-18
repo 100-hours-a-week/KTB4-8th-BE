@@ -2,16 +2,20 @@ package eightjbbm.keepgo.sandbox.aiv2;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class AiServerService {
 
     private final RestClient restClient;
+
+    public AiServerService(@Qualifier("aiServerRestClient") RestClient restClient) {
+        this.restClient = restClient;
+    }
 
     public AnalyzeVideoResponseV2 analyzeVideoV2(List<String> urls) {
         return restClient.post()

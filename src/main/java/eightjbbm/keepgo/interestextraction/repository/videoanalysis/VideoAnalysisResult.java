@@ -16,6 +16,7 @@ public class VideoAnalysisResult {
     @ManyToOne
     @JoinColumn(name = "video_analysis_id")
     private VideoAnalysis videoAnalysis;
+    @ManyToOne
     @JoinColumn(name = "outing_guide_id")
     private OutingGuide outingGuide;
     private Instant createDatetime;

@@ -11,7 +11,7 @@ public record GetPlaceListResult(
         String nextCursor,
         List<Place> places
 ) {
-    record Place(
+    public record Place(
             Long placeId,
             String name,
             String category,

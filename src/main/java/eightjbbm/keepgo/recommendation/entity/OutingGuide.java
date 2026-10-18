@@ -8,6 +8,8 @@ import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -27,6 +29,8 @@ public abstract class OutingGuide {
     private Address address;
     private Coordinate coordinate;
     @Nullable
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "business_schedule", columnDefinition = "json")
     private BusinessSchedule businessSchedule;
 
     @OneToOne

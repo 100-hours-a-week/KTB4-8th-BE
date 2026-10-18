@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service;
 
 import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
+import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
 import java.time.DateTimeException;
@@ -8,6 +9,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 
+@Component
 public final class PageTokenCodec {
 
     private static final int PAYLOAD_SIZE =
@@ -59,10 +61,10 @@ public final class PageTokenCodec {
                 return Optional.empty();
             }
 
-            return new PageToken(
-                    id,
-                    Instant.ofEpochSecond(epochSecond, nano)
-            );
+            return Optional.of(
+                    new PageToken(
+                            id,
+                            Instant.ofEpochSecond(epochSecond, nano))) ;
         } catch (IllegalArgumentException | DateTimeException exception) {
             return Optional.empty();
         }

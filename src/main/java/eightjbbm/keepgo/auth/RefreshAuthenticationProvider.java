@@ -7,9 +7,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+@Component
 @RequiredArgsConstructor
 public class RefreshAuthenticationProvider implements AuthenticationProvider {
     private final RefreshTokenManager refreshTokenManager;
