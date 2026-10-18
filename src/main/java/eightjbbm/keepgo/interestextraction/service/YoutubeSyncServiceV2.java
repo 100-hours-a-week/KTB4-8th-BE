@@ -2,24 +2,17 @@ package eightjbbm.keepgo.interestextraction.service;
 
 import com.google.api.services.youtube.model.Video;
 import com.google.api.services.youtube.model.VideoListResponse;
-import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVideo;
 import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVideoRepository;
-import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisRepository;
 import eightjbbm.keepgo.interestextraction.repository.youtubeanalyze.YoutubeApiServiceV2;
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
-import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.sandbox.ds.VideoId;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

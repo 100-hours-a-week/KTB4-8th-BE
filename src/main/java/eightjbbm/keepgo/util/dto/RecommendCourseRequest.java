@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.util.dto;
 
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;

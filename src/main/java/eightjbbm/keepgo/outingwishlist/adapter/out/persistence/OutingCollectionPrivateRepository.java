@@ -1,19 +1,21 @@
-package eightjbbm.keepgo.member.repository;
+package eightjbbm.keepgo.outingwishlist.adapter.out.persistence;
 
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.sandbox.ds.Address;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Repository
-public interface OutingCollectionPrivateRepository extends JpaRepository<OutingCollectionPrivate, Long> {
+public interface OutingCollectionPrivateRepository extends JpaRepository<OutingCollectionPrivate, Long>, QuerydslPredicateExecutor<OutingCollectionPrivate> {
 
     @Query("""
         select o
@@ -28,7 +30,7 @@ public interface OutingCollectionPrivateRepository extends JpaRepository<OutingC
 
     @Query("""
         select distinct og.address
-        from OutingcollectionPrivate ocp
+        from OutingCollectionPrivate ocp
         join ocp.outingGuide og
         where ocp.member.id = :memberId
             and og in :outingGuides
@@ -37,4 +39,15 @@ public interface OutingCollectionPrivateRepository extends JpaRepository<OutingC
             @Param("memberId") Long memberId,
             @Param("outingGuides") Collection<OutingGuide> outingGuides
     );
+
+    @Query("""
+        select ocp
+        from OutingCollectionPrivate ocp
+        join fetch ocp.outingGuide og
+        where ocp.member.id = :memberId
+           and og.id = :outingGuideId
+    """)
+    Optional<OutingCollectionPrivate> findByMemberIdAndTypeAndOutingGuideId(
+            @Param("memberId") Long memberId,
+            @Param("outingGuideId") Long outingGuideId);
 }

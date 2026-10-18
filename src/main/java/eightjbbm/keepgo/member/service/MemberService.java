@@ -3,35 +3,20 @@ package eightjbbm.keepgo.member.service;
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
-import eightjbbm.keepgo.recommendation.entity.OutingEvent;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
-import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
-import eightjbbm.keepgo.util.client.ai.AnalyzeVideoRequest;
 import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
-import eightjbbm.keepgo.util.file.File;
 import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
-import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
