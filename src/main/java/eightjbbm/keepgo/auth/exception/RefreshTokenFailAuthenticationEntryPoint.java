@@ -28,7 +28,8 @@ public class RefreshTokenFailAuthenticationEntryPoint implements org.springframe
             AuthenticationException authException
     ) throws IOException, ServletException {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/problem+json");
         var body = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
         body.setType(URI.create(errorType));
         body.setTitle(errorTitle);

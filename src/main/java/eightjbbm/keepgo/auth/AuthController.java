@@ -3,7 +3,10 @@ package eightjbbm.keepgo.auth;
 import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.dto.LoginRequest;
 import eightjbbm.keepgo.auth.dto.RefreshResponse;
+import eightjbbm.keepgo.auth.refreshtokenhash.RefreshTokenManager;
+import eightjbbm.keepgo.auth.refreshtokenhash.repository.RefreshTokenHashProperties;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -18,47 +21,61 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@EnableConfigurationProperties(JwtProperties.class)
 public class AuthController {
 
+    private final JwtProperties jwtProperties;
     private final AccessTokenManager accessTokenManager;
     private final RefreshTokenManager refreshTokenManager;
 
     @PostMapping("/api/v1/user/auth-session")
-    public /*ResponseEntity<Void>*/void login(
+    public void login(
             @RequestBody LoginRequest request
     ) {
         URI location = URI.create(
             "/oauth2/authorization/" + request.provider()
         );
-
-        /*return ResponseEntity
-                .status(HttpStatus.SEE_OTHER)
-                .location(location)
-                .build();*/
     }
 
     @DeleteMapping("/api/v1/user/auth-session")
     public ResponseEntity<Void> logout(
             @AuthenticationPrincipal Jwt jwt,
-            @CookieValue(name = "refresh_token") String refreshToken
+            @CookieValue(name = "refresh-token", required = false) String refreshToken
     ) {
         accessTokenManager.revoke(jwt.getId());
-        refreshTokenManager.revoke(refreshToken);
+
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenManager.revoke(refreshToken);
+        }
+
+        String deletedCookie = ResponseCookie
+                .from("refresh-token", "")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Lax")
+                .path("/api/v1/user/auth-session")
+                .maxAge(Duration.ZERO)
+                .build()
+                .toString();
 
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
+                .header(HttpHeaders.SET_COOKIE, deletedCookie)
                 .build();
     }
 
     @PostMapping("/api/v1/user/auth-session/refresh")
     public ResponseEntity<RefreshResponse> refresh(
-            @CookieValue(name = "refresh_token") String refreshToken
+            @CookieValue(name = "refresh-token") String refreshToken
     ) {
-        String newAccessToken = accessTokenManager.issue(0L, List.of());
+        Long memberId = refreshTokenManager.get(refreshToken)
+                .orElseThrow()
+                .memberId();
+        String newAccessToken = accessTokenManager.issue(memberId, List.of());
         String newRefreshToken = refreshTokenManager.rotate(refreshToken);
 
         String refreshTokenCookie = ResponseCookie
-                .from("refresh_token", newRefreshToken)
+                .from("refresh-token", newRefreshToken)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
@@ -72,7 +89,7 @@ public class AuthController {
                 .body(RefreshResponse.from(
                         newAccessToken,
                         "Bearer",
-                        3600
+                        Math.toIntExact(jwtProperties.accessTokenTtl().toSeconds())
                 ));
     }
 }
