@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.auth;
+package eightjbbm.keepgo.auth.refreshtokenhash;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,14 +17,17 @@ public class RefreshFilter extends AuthenticationFilter {
     }
 
     private static Authentication convert(HttpServletRequest request) {
-        String refreshToken = Arrays.stream(request.getCookies())
-                .filter(cookie -> cookie
-                        .getName()
-                        .equals("refresh-token")
-                )
+        Cookie[] cookies = request.getCookies();
+        String refreshToken = Arrays.stream(
+                cookies == null
+                        ? new Cookie[0]
+                        : cookies)
+                .filter(cookie -> "refresh-token".equals(cookie.getName()))
                 .map(Cookie::getValue)
+                .filter(value -> value != null && !value.isBlank())
                 .findFirst()
-                .orElseThrow(() -> new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT));
+                .orElseThrow(() -> new OAuth2AuthenticationException(
+                        OAuth2ErrorCodes.INVALID_GRANT));
         return RefreshAuthentication.authenticationToken(refreshToken);
     }
 }

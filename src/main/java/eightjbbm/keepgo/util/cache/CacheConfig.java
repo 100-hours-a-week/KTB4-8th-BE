@@ -16,10 +16,7 @@ import java.util.List;
 @EnableCaching
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(RtHashCacheProperties.class)
 public class CacheConfig {
-
-    private final RtHashCacheProperties rtHashCacheProperties;
 
     @Bean
     public CacheManager cacheManager() {
@@ -60,16 +57,7 @@ public class CacheConfig {
                         .build()
         );
 
-        var rtHash = new CaffeineCache(
-                "rtHash",
-                Caffeine.newBuilder()
-                        .maximumSize(rtHashCacheProperties.maximumSize())
-                        .expireAfterWrite(rtHashCacheProperties.expireAfterWrite())
-                        .recordStats()
-                        .build()
-        );
-
-        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist, rtHash));
+        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist));
         return cacheManager;
     }
 }

@@ -1,5 +1,6 @@
-package eightjbbm.keepgo.auth;
+package eightjbbm.keepgo.auth.refreshtokenhash;
 
+import eightjbbm.keepgo.auth.refreshtokenhash.repository.RefreshTokenState;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -8,8 +9,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -27,15 +26,15 @@ public class RefreshAuthenticationProvider implements AuthenticationProvider {
     }
 
     private void validateRefreshToken(String refreshToken) {
-        var rtValue = refreshTokenManager.get(refreshToken)
+        var refreshTokenHash = refreshTokenManager.get(refreshToken)
                 .orElseThrow(
-                        () -> new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT)
-                );
-        if (!rtValue.getState().equals(RefreshTokenState.ACTIVE)) {
-            throw new RuntimeException(); //무효화된 토큰으로 한 번 시도함
-        }
-        if (rtValue.getExpiresAt().isBefore(Instant.now())) {
-            throw new RuntimeException(); //유효 기간 지남, 재로그인
+                        () -> new OAuth2AuthenticationException(
+                                OAuth2ErrorCodes.INVALID_GRANT));
+        if (refreshTokenHash.state() != RefreshTokenState.ACTIVE
+                || refreshTokenHash.isExpired()) {
+            throw new OAuth2AuthenticationException(
+                    OAuth2ErrorCodes.INVALID_GRANT
+            );
         }
     }
 

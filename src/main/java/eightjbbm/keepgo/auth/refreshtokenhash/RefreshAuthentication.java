@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.auth;
+package eightjbbm.keepgo.auth.refreshtokenhash;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

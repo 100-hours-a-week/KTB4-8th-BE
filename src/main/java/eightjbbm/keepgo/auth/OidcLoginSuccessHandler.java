@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.auth;
 
 import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
+import eightjbbm.keepgo.auth.refreshtokenhash.RefreshTokenManager;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -77,7 +78,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
         String refreshToken = refreshTokenManager.issue(member.getId());
 
         String refreshTokenCookie = ResponseCookie
-                .from("refresh_token", refreshToken)
+                .from("refresh-token", refreshToken)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")

@@ -2,7 +2,7 @@ package eightjbbm.keepgo.integration.refreshchain;
 
 import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
-import eightjbbm.keepgo.auth.RefreshTokenManager;
+import eightjbbm.keepgo.auth.refreshtokenhash.RefreshTokenManager;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import org.junit.jupiter.api.AfterEach;
