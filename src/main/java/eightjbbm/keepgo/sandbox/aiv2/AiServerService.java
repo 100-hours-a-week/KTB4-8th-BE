@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.sandbox.aiv2;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
