@@ -1,17 +1,10 @@
 package eightjbbm.keepgo.integration.apichain;
 
-import eightjbbm.keepgo.auth.AccessTokenManager;
+import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
 import eightjbbm.keepgo.member.entity.Member;
-import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.recommendation.dto.RequestRecommendationRequest;
-import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
-import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
-import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
-import org.aspectj.lang.annotation.Before;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,14 +20,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import javax.swing.*;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 /// 추천 도메인 통합 테스트
 ///

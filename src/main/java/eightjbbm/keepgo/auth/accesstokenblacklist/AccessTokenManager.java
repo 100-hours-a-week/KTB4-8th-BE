@@ -1,9 +1,11 @@
-package eightjbbm.keepgo.auth;
+package eightjbbm.keepgo.auth.accesstokenblacklist;
 
-import eightjbbm.keepgo.util.cache.atblacklist.AtBlacklistCacheRepository;
+import eightjbbm.keepgo.auth.JwtProperties;
+import eightjbbm.keepgo.auth.accesstokenblacklist.repository.AccessTokenBlacklisted;
+import eightjbbm.keepgo.auth.accesstokenblacklist.repository.AccessTokenBlacklistedProperties;
+import eightjbbm.keepgo.auth.accesstokenblacklist.repository.AccessTokenBlacklistedRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
@@ -17,12 +19,16 @@ import java.util.UUID;
 ///
 @Service
 @RequiredArgsConstructor
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({
+        JwtProperties.class,
+        AccessTokenBlacklistedProperties.class
+})
 public class AccessTokenManager {
 
     private final JwtEncoder jwtEncoder;
     private final JwtProperties jwtProperties;
-    private final AtBlacklistCacheRepository atBlacklistCacheRepository;
+    private final AccessTokenBlacklistedProperties accessTokenBlacklistedProperties;
+    private final AccessTokenBlacklistedRepository accessTokenBlacklistedRepository;
 
     public String issue(
             Long memberId,
@@ -57,10 +63,13 @@ public class AccessTokenManager {
     }
 
     public boolean checkBlacklist(String jti) {
-        return atBlacklistCacheRepository.read(jti).isPresent();
+        return accessTokenBlacklistedRepository.existsById(jti);
     }
 
     public void revoke(String jti) {
-        atBlacklistCacheRepository.create(jti);
+        accessTokenBlacklistedRepository.save(
+                new AccessTokenBlacklisted(
+                        jti,
+                        Instant.now().plus(accessTokenBlacklistedProperties.ttl())));
     }
 }

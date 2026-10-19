@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.auth;
 
+import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.dto.LoginRequest;
 import eightjbbm.keepgo.auth.dto.RefreshResponse;
 import lombok.RequiredArgsConstructor;

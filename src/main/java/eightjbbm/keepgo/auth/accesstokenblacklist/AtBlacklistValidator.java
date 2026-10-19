@@ -1,6 +1,5 @@
-package eightjbbm.keepgo.util.cache.atblacklist;
+package eightjbbm.keepgo.auth.accesstokenblacklist;
 
-import eightjbbm.keepgo.auth.AccessTokenManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
