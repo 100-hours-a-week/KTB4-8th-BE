@@ -67,6 +67,6 @@ public class OutingWishlistQueryRepository {
         return ocp.createdAt.lt(cursorCreateDatetime)
                 .or(
                         ocp.createdAt.eq(cursorCreateDatetime)
-                                .and(ocp.id.lt(cursorId)));
+                                .and(ocp.id.lte(cursorId)));
     }
 }

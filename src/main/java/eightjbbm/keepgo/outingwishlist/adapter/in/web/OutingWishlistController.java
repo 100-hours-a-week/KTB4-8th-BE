@@ -29,7 +29,7 @@ public class OutingWishlistController {
     ///
     @GetMapping("/api/v2/member/outing-wishlist/places")
     public ResponseEntity<GetPlaceListResponse> getPlaceList(
-            @RequestParam(required = false) @NotBlank String location,
+            @RequestParam(required = false) String location,
             @RequestParam(required = false) String cursor,
             @AuthenticationPrincipal @NotNull Jwt jwt
     ) {
@@ -65,8 +65,8 @@ public class OutingWishlistController {
     ///
     @GetMapping("/api/v2/member/outing-wishlist/events")
     public ResponseEntity<GetEventListResponse> getEventList(
-            @RequestParam(required = false) @NotBlank boolean ongoing,
-            @RequestParam(required = false) @NotBlank String cursor,
+            @RequestParam(required = false) boolean ongoing,
+            @RequestParam(required = false) String cursor,
             @AuthenticationPrincipal @NotNull Jwt jwt
     ) {
         Long memberId = Long.valueOf(jwt.getSubject());

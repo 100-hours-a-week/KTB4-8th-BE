@@ -45,9 +45,9 @@ public interface OutingCollectionPrivateRepository extends JpaRepository<OutingC
         from OutingCollectionPrivate ocp
         join fetch ocp.outingGuide og
         where ocp.member.id = :memberId
-           and og.id = :outingGuideId
+           and ocp.id = :outingWishlistEntryId
     """)
-    Optional<OutingCollectionPrivate> findByMemberIdAndTypeAndOutingGuideId(
+    Optional<OutingCollectionPrivate> findByMemberIdAndTypeAndOutingWishlistEntryId(
             @Param("memberId") Long memberId,
-            @Param("outingGuideId") Long outingGuideId);
+            @Param("outingWishlistEntryId") Long outingWishlistEntryId);
 }
