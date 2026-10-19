@@ -1,12 +1,10 @@
 package eightjbbm.keepgo.integration.refreshchain;
 
-import eightjbbm.keepgo.auth.AccessTokenManager;
+import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
 import eightjbbm.keepgo.auth.RefreshTokenManager;
 import eightjbbm.keepgo.member.entity.Member;
-import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

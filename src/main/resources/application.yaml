@@ -7,6 +7,11 @@ spring:
     name: keepgo
   jackson:
     property-naming-strategy: SNAKE_CASE
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
   datasource:
     url: jdbc:${DB_VENDOR:mysql}://${DB_HOST:172.25.96.1}:${DB_PORT:3306}/${DB_NAME:keepgo}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}
     username: ${DB_USERNAME:keepgo}
@@ -50,6 +55,14 @@ keepgo:
     rt-hash:
       maximum-size: 1000
       expire-after-write: 1d
+  ephemeral:
+    provider: ${EPHEMERAL_DATABASE:caffeine}
+    access-token-blacklist:
+      name: access-token-blacklist
+      ttl: 35m
+    refresh-token-hash:
+      name: refresh-token-hashes
+      ttl: 14d
 
 management:
   server:
