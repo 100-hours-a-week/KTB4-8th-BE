@@ -122,4 +122,18 @@ public class OutingWishlistService {
         }
         return GetEventDetailResult.from(wishlistEntry);
     }
+
+    @Transactional(readOnly = true)
+    public GetOutingCourseListResult getOutingCourseList(
+            GetOutingCourseListCommand command
+    ) {
+
+    }
+
+    @Transactional(readOnly = true)
+    public GetOutingCourseDetailResult getOutingCourseDetail(
+            GetOutingCourseDetailCommand command
+    ) {
+
+    }
 }

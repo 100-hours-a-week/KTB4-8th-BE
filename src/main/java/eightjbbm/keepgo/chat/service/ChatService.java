@@ -1,16 +1,14 @@
 package eightjbbm.keepgo.chat.service;
 
-import eightjbbm.keepgo.chat.ChatMapper;
 import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.chat.entity.Chat;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyJobStatus;
-import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
-import eightjbbm.keepgo.util.cache.slot.SlotCacheService;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +27,7 @@ public class ChatService {
     private final MemberRepository memberRepository;
     private final ChatRepository chatRepository;
     private final GetReplyCacheService getReplyCacheService;
-    private final SlotCacheService slotCacheService;
+    private final OutingCriteriaRepository outingCriteriaRepository;
     private final GeoCodingApiClient geoCodingApiClient;
 
     /// 채팅 전송 API
@@ -39,16 +37,14 @@ public class ChatService {
         Long memberId = command.memberId();
         Member member = memberRepository.findById(memberId).orElseThrow();
         Chat userChat = chatRepository.save(Chat.from(member, command.content()));
-        SlotValue slot = slotCacheService.getSlot(memberId).orElse(
-                SlotValue.createEmptySlotValue()
-        );
+        OutingCriteria outingCriteria = outingCriteriaRepository
+                .findById(memberId)
+                .orElse(OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
         getReplyCacheService.createRequest(
-                GetReplyRequest.from(
-                        command,
-                        userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        slot
-                )
-        );
+                command.memberId(),
+                command.content(),
+                userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
+                outingCriteria);
         return SendChatResult.from(userChat);
     }
 
@@ -64,7 +60,7 @@ public class ChatService {
                 return GetReplyResult.Completed.from(
                         "COMPLETED",
                         reply,
-                        slotCacheService.getSlot(command.memberId()).get()
+                        outingCriteriaRepository.findById(command.memberId()).get()
                 );
             }
         }
@@ -98,21 +94,26 @@ public class ChatService {
     }
 
     /// 의도 카드 수정 API
+    ///
     @Transactional
     public UpdateSlotResult updateSlot(UpdateSlotCommand command) {
-        Optional<SlotValue> slot = slotCacheService.getSlot(command.memberId());
-        var request = ChatMapper.INSTANCE.toUpdateSlotCacheRequest(command);
-        slotCacheService.updateSlot(request);
-        String result = null;
-        if (slot.isEmpty() || slot.map(SlotValue::getOrigin).equals(command.userCoordinate())) {
-            var response = geoCodingApiClient.mapCoordinatesToLocationName(
-                            command.userCoordinate().lat(),
-                            command.userCoordinate().lng());
+        OutingCriteria outingCriteria = outingCriteriaRepository.findById(command.memberId())
+                .orElse(OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
+        outingCriteriaRepository.save(
+                outingCriteria.update(
+                        command.userCoordinate(),
+                        command.requestedLocationName(),
+                        command.requestedDateTime().toInstant(ZoneOffset.UTC),
+                        command.availableTime(),
+                        command.categories(),
+                        null));
+        var response = geoCodingApiClient.mapCoordinatesToLocationName(
+                command.userCoordinate().lat(),
+                command.userCoordinate().lng());
 
-            String level2 = response.response().result().getFirst().structure().level2();
-            String level4A = response.response().result().getFirst().structure().level4A();
-            result = level2 + " " + level4A;
-        }
+        String level2 = response.response().result().getFirst().structure().level2();
+        String level4A = response.response().result().getFirst().structure().level4A();
+        String result = level2 + " " + level4A;
         return UpdateSlotResult.from(result);
     }
 }

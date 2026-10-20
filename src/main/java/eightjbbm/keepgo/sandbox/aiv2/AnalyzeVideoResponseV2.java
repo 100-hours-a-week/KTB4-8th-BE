@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.sandbox.aiv2;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessHoursDto;
+import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
 import jakarta.annotation.Nullable;
 
 import java.time.LocalDate;
@@ -23,7 +23,7 @@ public sealed interface AnalyzeVideoResponseV2 {
                 String address,
                 String locationDetail,
                 String category,
-                @Nullable BusinessHoursDto businessHours,
+                @Nullable BusinessScheduleDto businessHours,
                 @Nullable LocalDate eventStartDate,
                 @Nullable LocalDate eventEndDate,
                 Object eventPeriodUnresolved,

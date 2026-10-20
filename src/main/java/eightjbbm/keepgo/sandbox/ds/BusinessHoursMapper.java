@@ -6,7 +6,7 @@ import java.time.LocalTime;
 import java.util.*;
 
 public class BusinessHoursMapper {
-    public static BusinessSchedule toBusinessHours(BusinessHoursDto dto) {
+    public static BusinessSchedule toBusinessHours(BusinessScheduleDto dto) {
         if (dto == null) return null;
 
         return new BusinessSchedule(
@@ -18,7 +18,7 @@ public class BusinessHoursMapper {
     }
 
     private static Map<DayOfWeek, List<TimeInterval>> convertWeeklyHours(
-            Map<DayOfWeek, List<BusinessHoursDto.TimeIntervalDto>> dto
+            Map<DayOfWeek, List<BusinessScheduleDto.TimeIntervalDto>> dto
     ) {
         var result = new EnumMap<DayOfWeek, List<TimeInterval>>(DayOfWeek.class);
         if (dto == null) {
@@ -45,7 +45,7 @@ public class BusinessHoursMapper {
     }
 
     private static Map<LocalDate, List<TimeInterval>> convertExceptions(
-            Map<LocalDate, List<BusinessHoursDto.TimeIntervalDto>> dto
+            Map<LocalDate, List<BusinessScheduleDto.TimeIntervalDto>> dto
     ) {
         var result = new HashMap<LocalDate, List<TimeInterval>>();
 
@@ -74,7 +74,7 @@ public class BusinessHoursMapper {
         return result;
     }
 
-    private static List<TimeInterval> convertIntervals(List<BusinessHoursDto.TimeIntervalDto> intervals) {
+    private static List<TimeInterval> convertIntervals(List<BusinessScheduleDto.TimeIntervalDto> intervals) {
         return intervals.stream().map(k -> new TimeInterval(k.openTime(), k.closeTime())).toList();
     }
 }
