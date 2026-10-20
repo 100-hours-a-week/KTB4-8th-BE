@@ -1,13 +1,13 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
-import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import eightjbbm.keepgo.util.exception.ConflictException;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import java.time.LocalDate;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -17,14 +17,14 @@ public class GetReplyCacheService {
     private final GetReplyCacheRepository getReplyCacheRepository;
     private final GetReplyWorker worker;
 
-    public void createRequest(GetReplyRequest request) {
-        if (getReplyCacheRepository.exists(request.memberId())) {
+    public void createRequest(Long memberId, String content, LocalDate createdDate, OutingCriteria outingCriteria) {
+        if (getReplyCacheRepository.exists(memberId)) {
             throw new ConflictException();
         }
-        getReplyCacheRepository.create(request.memberId());
+        getReplyCacheRepository.create(memberId);
         worker.requestGetReply(
-                request.memberId(),
-                ExtractSlotRequest.from(request)
+                memberId,
+                new ExtractSlotRequest(content, createdDate, outingCriteria)
         ).orTimeout(10, TimeUnit.SECONDS)
                 .exceptionally(error -> {
                     if (error instanceof TimeoutException) {

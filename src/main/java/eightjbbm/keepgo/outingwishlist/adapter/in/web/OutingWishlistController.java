@@ -1,12 +1,8 @@
 package eightjbbm.keepgo.outingwishlist.adapter.in.web;
 
 import eightjbbm.keepgo.outingwishlist.adapter.in.web.dto.*;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetEventDetailCommand;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetEventListCommand;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetPlaceDetailCommand;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetPlaceListCommand;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistService;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +88,38 @@ public class OutingWishlistController {
                 new GetEventDetailCommand(
                         memberId,
                         eventId));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @GetMapping("/api/v2/member/outing-wishlist/outing-courses")
+    public ResponseEntity<GetOutingCourseListResponse> getOutingCourseList(
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String cursor,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getOutingCourseList(
+                new GetOutingCourseListCommand(
+                        memberId,
+                        location,
+                        cursor));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @GetMapping("/api/v2/member/outing-wishlist/outing-courses/{outingCourseId}")
+    public ResponseEntity<GetOutingCourseDetailResponse> getOutingCourseDetail(
+            @PathVariable @Positive Long outingCourseId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getOutingCourseDetail(
+                new GetOutingCourseDetailCommand(
+                        memberId,
+                        outingCourseId));
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));

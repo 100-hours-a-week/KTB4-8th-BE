@@ -1,9 +1,9 @@
 package eightjbbm.keepgo.util.dto;
 
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -62,7 +62,7 @@ public record RecommendCourseRequest(
     public static RecommendCourseRequest from(
             String query,
             List<OutingCollectionPrivate> places,
-            SlotValue slot
+            OutingCriteria outingCriteria
     ) {
 
         return new RecommendCourseRequest(
@@ -71,10 +71,10 @@ public record RecommendCourseRequest(
                         k -> RecommendCandidate.from(k.getOutingGuide())
                 ).toList(),
                 places.stream().map(RecommendHistoryPlaceId::from).toList(),
-                slot.getAvailableTime(),
-                slot.getCategory(),
-                slot.getDatetime(),
-                slot.getOrigin()
+                outingCriteria.getUserAvailableTimeMinutes(),
+                outingCriteria.getCategories(),
+                outingCriteria.getRequestedDatetime().atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                outingCriteria.getUserCoordinate()
         );
     }
 }

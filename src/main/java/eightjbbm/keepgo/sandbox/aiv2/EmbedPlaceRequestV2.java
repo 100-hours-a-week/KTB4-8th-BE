@@ -7,20 +7,22 @@ import java.util.List;
 public record EmbedPlaceRequestV2(
         List<Place> places
 ) {
-    record Place(
-            String placeId,
-            String placeName,
-            String summary
+    public record Place(
+       String placeId,
+       String placeName,
+       String summary
     ) {}
 
-    public static EmbedPlaceRequestV2 from(List<OutingGuide> places) {
+    public static EmbedPlaceRequestV2 from(List<OutingGuide> outingGuides) {
         return new EmbedPlaceRequestV2(
-                places.stream()
+                outingGuides.stream()
                         .map(outingGuide ->
                                 new Place(
                                         outingGuide.getId().toString(),
                                         outingGuide.getName(),
-                                        outingGuide.getDescription()))
-                        .toList());
+                                        outingGuide.getDescription()
+                                ))
+                        .toList()
+        );
     }
 }

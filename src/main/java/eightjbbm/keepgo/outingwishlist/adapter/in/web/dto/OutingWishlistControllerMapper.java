@@ -1,9 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.adapter.in.web.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetEventDetailResult;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetEventListResult;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetPlaceDetailResult;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.GetPlaceListResult;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
@@ -23,4 +20,8 @@ public interface OutingWishlistControllerMapper {
     GetEventListResponse fromResult(GetEventListResult result);
 
     GetEventDetailResponse fromResult(GetEventDetailResult result);
+
+    GetOutingCourseListResponse fromResult(GetOutingCourseListResult result);
+
+    GetOutingCourseDetailResponse fromResult(GetOutingCourseDetailResult result);
 }

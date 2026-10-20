@@ -14,6 +14,7 @@ import java.util.Set;
 
 @Getter
 @Setter
+@Deprecated
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class SlotValue {
     private String query;
@@ -39,29 +40,5 @@ public class SlotValue {
                 availableTime,
                 categories
         );
-    }
-
-    public static SlotValue createEmptySlotValue() {
-        return new SlotValue(
-                null,
-                new Coordinate(null, null),
-                null,
-                null,
-                null,
-                null
-        );
-    }
-
-    public void addCategory(String category) {
-        this.category.add(category);
-    }
-
-    public void updateDatetime(LocalDate date) {
-        if (this.datetime == null) {
-            this.datetime = date.atStartOfDay();
-        } else {
-            LocalTime time = this.datetime.toLocalTime();
-            this.datetime = date.atTime(time);
-        }
     }
 }

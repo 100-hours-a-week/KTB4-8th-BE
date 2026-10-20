@@ -1,42 +1,11 @@
 package eightjbbm.keepgo.util.dto;
 
-import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.cache.getreply.GetReplyRequest;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
 
 public record ExtractSlotRequest(
         String chat,
         LocalDate date,
-        Slot prevSlot,
-        String prevQuery
-) {
-    public record Slot(
-            Coordinate origin,
-            String region,
-            LocalDate datetime,
-            Integer availableTime,
-            Set<String> category
-    ) {
-
-    }
-
-    public static ExtractSlotRequest from(GetReplyRequest request) {
-        return new ExtractSlotRequest(
-                request.content(),
-                request.createdDate(),
-                new Slot(
-                        request.slot().getOrigin(),
-                        request.slot().getRegion(),
-                        request.slot().getDatetime().toLocalDate(),
-                        request.slot().getAvailableTime(),
-                        request.slot().getCategory()
-                ),
-                request.slot().getQuery()
-        );
-    }
-}
+        OutingCriteria outingCriteria
+) {}

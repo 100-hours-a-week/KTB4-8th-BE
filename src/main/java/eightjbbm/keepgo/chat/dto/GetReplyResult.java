@@ -1,10 +1,10 @@
 package eightjbbm.keepgo.chat.dto;
 
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
-import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Set;
 
 public sealed interface GetReplyResult
@@ -15,15 +15,15 @@ public sealed interface GetReplyResult
             Chat chat,
             Slot slot
     ) implements GetReplyResult {
-        public static GetReplyResult from(String status, String content, SlotValue slotValue) {
+        public static GetReplyResult from(String status, String content, OutingCriteria outingCriteria) {
             return new Completed(
                     status, new Chat(content, true),
                     new Slot(
-                            slotValue.getOrigin(),
-                            slotValue.getRegion(),
-                            slotValue.getDatetime(),
-                            slotValue.getAvailableTime(),
-                            slotValue.getCategory()
+                            outingCriteria.getUserCoordinate(),
+                            outingCriteria.getRequestedLocationName(),
+                            outingCriteria.getRequestedDatetime().atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                            outingCriteria.getUserAvailableTimeMinutes(),
+                            outingCriteria.getCategories()
                     )
             );
         }
