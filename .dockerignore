@@ -9,8 +9,8 @@
 #로컬 Gradle 캐시와 빌드 결과
 # Docker 안에서 새로 빌드하므로 전달하지 않는다
 **/.gradle
-**/build
-**/out
+build
+out
 
 # 로컬 환경변수와 인증 정보
 # TODO(Security): 이 규칙은 Docker Build Context만 제외한다.
