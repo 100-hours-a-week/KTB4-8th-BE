@@ -23,7 +23,7 @@ public class OutingCourse {
 
     private Address address;
 
-    @OneToMany(mappedBy = "outing_course_id")
+    @OneToMany(mappedBy = "outingCourse")
     private List<OutingStop> stops;
 
     private OutingCourse(

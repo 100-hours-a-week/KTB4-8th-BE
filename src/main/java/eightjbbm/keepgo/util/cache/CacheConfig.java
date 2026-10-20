@@ -13,7 +13,6 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 import java.util.List;
 
-@EnableCaching
 @Configuration
 @RequiredArgsConstructor
 public class CacheConfig {

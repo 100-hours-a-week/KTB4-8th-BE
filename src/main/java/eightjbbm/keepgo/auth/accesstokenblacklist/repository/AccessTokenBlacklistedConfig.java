@@ -16,7 +16,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import java.util.List;
 
 @Configuration
-@EnableCaching
 @EnableConfigurationProperties(AccessTokenBlacklistedProperties.class)
 public class AccessTokenBlacklistedConfig {
 

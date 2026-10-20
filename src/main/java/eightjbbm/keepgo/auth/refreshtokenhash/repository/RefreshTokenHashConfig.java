@@ -17,7 +17,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import java.util.List;
 
 @Configuration
-@EnableCaching
 @EnableConfigurationProperties(RefreshTokenHashProperties.class)
 public class RefreshTokenHashConfig {
     static final String CACHE_MANAGER_NAME = "refreshTokenHashCacheManager";
@@ -31,7 +30,7 @@ public class RefreshTokenHashConfig {
             havingValue = PROVIDER_NAME_CAFFEINE,
             matchIfMissing = true
     )
-    public CacheManager caffeineCacheManager(
+    public CacheManager caffeineRefreshTokenHashCacheManager(
             RefreshTokenHashProperties properties
     ) {
         var blacklist = new CaffeineCache(
