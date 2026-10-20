@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import eightjbbm.keepgo.chat.service.requeststore.ChatRequestGuard;
 
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -24,6 +25,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ChatService {
+
+    private final ChatRequestGuard requestGuard;
     private final MemberRepository memberRepository;
     private final ChatRepository chatRepository;
     private final GetReplyCacheService getReplyCacheService;
@@ -97,23 +100,26 @@ public class ChatService {
     ///
     @Transactional
     public UpdateSlotResult updateSlot(UpdateSlotCommand command) {
-        OutingCriteria outingCriteria = outingCriteriaRepository.findById(command.memberId())
-                .orElse(OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
-        outingCriteriaRepository.save(
-                outingCriteria.update(
-                        command.userCoordinate(),
-                        command.requestedLocationName(),
-                        command.requestedDateTime().toInstant(ZoneOffset.UTC),
-                        command.availableTime(),
-                        command.categories(),
-                        null));
-        var response = geoCodingApiClient.mapCoordinatesToLocationName(
-                command.userCoordinate().lat(),
-                command.userCoordinate().lng());
+        try (var lease = requestGuard.acquire(command.memberId())) {
+            // 기존 updateSlot() 본문 전체를 그대로 둡니다.
+            OutingCriteria outingCriteria = outingCriteriaRepository.findById(command.memberId())
+                    .orElse(OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
+            outingCriteriaRepository.save(
+                    outingCriteria.update(
+                            command.userCoordinate(),
+                            command.requestedLocationName(),
+                            command.requestedDateTime().atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+                            command.availableTime(),
+                            command.categories(),
+                            null));
+            var response = geoCodingApiClient.mapCoordinatesToLocationName(
+                    command.userCoordinate().lat(),
+                    command.userCoordinate().lng());
 
-        String level2 = response.response().result().getFirst().structure().level2();
-        String level4A = response.response().result().getFirst().structure().level4A();
-        String result = level2 + " " + level4A;
-        return UpdateSlotResult.from(result);
+            String level2 = response.response().result().getFirst().structure().level2();
+            String level4A = response.response().result().getFirst().structure().level4A();
+            String result = level2 + " " + level4A;
+            return UpdateSlotResult.from(result);
+        }
     }
 }

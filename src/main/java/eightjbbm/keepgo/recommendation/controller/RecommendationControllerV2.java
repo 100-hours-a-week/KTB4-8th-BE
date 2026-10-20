@@ -25,8 +25,6 @@ public class RecommendationControllerV2 {
             @AuthenticationPrincipal Jwt jwt
     ) {
         Long memberId = Long.valueOf(jwt.getSubject());
-
-
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .contentType(MediaType.TEXT_EVENT_STREAM)
