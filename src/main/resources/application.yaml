@@ -64,6 +64,12 @@ keepgo:
       name: refresh-token-hashes
       ttl: 14d
 
+recommendation:
+  candidate-radius-km: 5
+  jobs:
+    backend: caffeine
+    poll-interval-ms: 250
+
 management:
   server:
     # Actuator는 관리 포트로만 노출한다. (모니터링 보안 그룹에만 개방)

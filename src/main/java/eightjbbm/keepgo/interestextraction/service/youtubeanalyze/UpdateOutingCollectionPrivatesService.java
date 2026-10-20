@@ -42,7 +42,7 @@ public class UpdateOutingCollectionPrivatesService {
                 outingGuidesExtracted.stream()
                         .filter(outingGuide -> !wishlistedOutingGuides.contains(outingGuide))
                         .map(outingGuide ->
-                                new OutingCollectionPrivate(
+                                OutingCollectionPrivate.from(
                                         memberRepository.getReferenceById(memberId),
                                         outingGuide))
                         .toList());

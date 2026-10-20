@@ -54,7 +54,7 @@ public record RecommendCourseRequest(
         public static RecommendHistoryPlaceId from(OutingCollectionPrivate place) {
             return new RecommendHistoryPlaceId(
                     place.getOutingGuide().getId().toString(),
-                    place.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
+                    place.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate()
             );
         }
     }
