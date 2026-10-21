@@ -63,11 +63,18 @@ keepgo:
     refresh-token-hash:
       name: refresh-token-hashes
       ttl: 14d
+  storage:
+    provider: ${FILE_STORAGE_PROVIDER:local}
+    local:
+      root-path: ${FILE_STORAGE_LOCAL_PATH:uploads}
+    s3:
+      bucket: ${FILE_STORAGE_S3_BUCKET:}
+      region: ${FILE_STORAGE_S3_REGION:}
 
 recommendation:
   candidate-radius-km: 5
   jobs:
-    backend: caffeine
+    backend: ${EPHEMERAL_DATABASE:caffeine}
     poll-interval-ms: 250
 
 management:

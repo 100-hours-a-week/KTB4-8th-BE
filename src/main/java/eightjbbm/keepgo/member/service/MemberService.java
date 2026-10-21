@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import eightjbbm.keepgo.util.file.FileUtil;
 
 @Slf4j
 @Service
@@ -42,7 +43,11 @@ public class MemberService {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
 
-        fileRepository.findByStoragePath(command.profileImagePath()).ifPresent(member::updateProfileImage);
+        String profileImagePath =
+                FileUtil.extractPathFromUrl(command.profileImagePath());
+
+        fileRepository.findByStoragePath(profileImagePath)
+                .ifPresent(member::updateProfileImage);
         return UpdateMemberInfoResult.from(member);
     }
 

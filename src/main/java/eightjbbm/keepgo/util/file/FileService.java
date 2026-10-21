@@ -5,48 +5,60 @@ import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileService {
     private final FileRepository fileRepository;
+    private final FileStorage fileStorage;
+    private final FileStorageProperties storageProperties;
 
-    private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
-    private static final Path PROFILE_DIR = PROJECT_ROOT.resolve("uploads/profile");
-    private static final String PROFILE_URL = "/public/profile/";
     private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "gif");
 
+    @Transactional(rollbackFor = Exception.class)
     public String uploadProfileImage(MultipartFile file, Long userId) throws FileUploadException {
         return uploadFile(file, userId);
     }
 
-    public String uploadFile(MultipartFile file, Long userId) throws FileUploadException {
+    @Transactional(rollbackFor = Exception.class)
+    public String uploadFile(
+            MultipartFile file,
+            Long userId
+    ) throws FileUploadException {
         String extension = extractAndValidateExtension(file);
         String filename = generateFilename("profile", extension);
-        Path savePath = FileService.PROFILE_DIR.resolve(filename);
+        String storageKey = "profile/" + filename;
 
         try {
-            if (!Files.exists(FileService.PROFILE_DIR)) {
-                Files.createDirectories(FileService.PROFILE_DIR);
-            }
-            file.transferTo(savePath.toFile());
+            fileStorage.store(file, storageKey);
         } catch (IOException e) {
-            throw new RuntimeException("INTERNAL_SERVER_ERROR");
+            throw new RuntimeException("INTERNAL_SERVER_ERROR", e);
         }
 
-        String dbFilePath = FileService.PROFILE_URL + filename;
-        fileRepository.save(new File(dbFilePath));
-        return dbFilePath;
+        registerRollbackCleanup(storageKey);
+
+        var provider = storageProperties.provider();
+        boolean isS3 = provider == FileStorageProperties.Provider.S3;
+
+        File storedFile = fileRepository.save(new File(
+                provider,
+                storageKey,
+                isS3 ? storageProperties.s3().bucket() : null,
+                isS3 ? storageProperties.s3().region() : null
+        ));
+
+        return storedFile.getStoragePath();
     }
 
     private String extractAndValidateExtension(MultipartFile file) {
@@ -69,5 +81,39 @@ public class FileService {
                 .toString()
                 .substring(0, 8);
         return prefix + "-" + timestamp + "-" + uuid + "." + extension;
+    }
+
+    private void registerRollbackCleanup(String storageKey) {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status == STATUS_ROLLED_BACK) {
+                            deleteAfterRollback(storageKey);
+                        } else if (status == STATUS_UNKNOWN) {
+                            log.error(
+                                    "파일 메타데이터 트랜잭션 결과를 확인할 수 없습니다. "
+                                            + "파일 상태 확인이 필요합니다. provider={}, key={}",
+                                    storageProperties.provider(),
+                                    storageKey
+                            );
+                        }
+                    }
+                }
+        );
+    }
+
+    private void deleteAfterRollback(String storageKey) {
+        try {
+            fileStorage.delete(storageKey);
+        } catch (Exception e) {
+            log.error(
+                    "DB 롤백 후 파일 삭제에 실패했습니다. provider={}, key={}",
+                    storageProperties.provider(),
+                    storageKey,
+                    e
+            );
+        }
     }
 }

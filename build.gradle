@@ -30,7 +30,8 @@ repositories {
 }
 
 dependencies {
-
+	implementation platform('software.amazon.awssdk:bom:2.55.8')
+	implementation 'software.amazon.awssdk:s3'
 	implementation("com.google.apis:google-api-services-youtube:v3-rev20261001-2.0.0")
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-redis-test'
