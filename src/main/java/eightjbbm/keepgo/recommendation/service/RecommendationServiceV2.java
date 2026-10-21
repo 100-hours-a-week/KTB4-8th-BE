@@ -138,7 +138,7 @@ public class RecommendationServiceV2 {
 
             var data = requireSuccess(response);
             var result = resultMapper.map(criteria, candidates, data);
-
+            criteriaRepository.deleteById(criteria.getMemberId());
             complete(connection, "success", Map.of("result", result));
         } catch (RuntimeException error) {
             log.warn(
