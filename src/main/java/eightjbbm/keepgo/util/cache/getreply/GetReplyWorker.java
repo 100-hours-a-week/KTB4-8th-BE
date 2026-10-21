@@ -1,30 +1,29 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
+import eightjbbm.keepgo.chat.service.AiServerExtractSlotApiService;
+import eightjbbm.keepgo.chat.service.dto.ExtractSlotResponseV2;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
-import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
-import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.ZoneOffset;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
 public class GetReplyWorker {
 
-    private final AiServerApiClient aiServerApiClient;
+    private final AiServerExtractSlotApiService aiServerApiClient;
     private final GetReplyCacheRepository getReplyCacheRepository;
     private final OutingCriteriaRepository outingCriteriaRepository;
 
     @Async("httpTaskExecutor")
     public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
-        ExtractSlotResponse response = aiServerApiClient.extractSlot(request);
-        if (response instanceof ExtractSlotResponse.Success successResponse) {
+        ExtractSlotResponseV2 response = aiServerApiClient.extractSlot(request.chat(), request.outingCriteria());
+        if (response instanceof ExtractSlotResponseV2.Success successResponse) {
             getReplyCacheRepository.update(memberId, successResponse.data().botMessage());
             OutingCriteria outingCriteria = outingCriteriaRepository
                     .findById(memberId)
@@ -33,9 +32,9 @@ public class GetReplyWorker {
                     outingCriteria.update(
                             successResponse.data().slot().origin(),
                             successResponse.data().slot().region(),
-                            successResponse.data().slot().datetime().atStartOfDay().toInstant(ZoneOffset.UTC),
-                            successResponse.data().slot().availableTime(),
-                            Set.of(successResponse.data().slot().category()),
+                            successResponse.data().slot().datetime().toInstant(ZoneOffset.of("Asia/Seoul")),
+                            Integer.valueOf(successResponse.data().slot().availableTime()),
+                            successResponse.data().slot().category(),
                             successResponse.data().query()));
         } else {
             getReplyCacheRepository.setStatusAsFail(memberId);
