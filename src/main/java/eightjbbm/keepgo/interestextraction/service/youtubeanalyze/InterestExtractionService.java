@@ -30,6 +30,7 @@ public class InterestExtractionService {
 
     private final YoutubeApiServiceV2 youtubeApiService;
     private final UpdateMemberLikedVideoService updateMemberLikedVideoService;
+    private final UpdateOutingCollectionPrivatesService updateOutingCollectionPrivatesService;
     private final YoutubeAuthorizedClientService youtubeAuthorizedClientService;
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final OAuthAccountRepository oauthAccountRepository;
@@ -49,9 +50,12 @@ public class InterestExtractionService {
             var response = youtubeApiService.getVideoLists(memberId, pageToken);
             log.info("유튜브 API 호출 결과: " + response.getItems().size());
             // 비동기 논블로킹 필요
-            updateMemberLikedVideoService.updateMemberLikedVideos(
+            /*updateMemberLikedVideoService.updateMemberLikedVideos(
                     memberId,
                     response.getItems());
+
+             */
+            updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, response.getItems());
 
             pageToken = response.getNextPageToken();
         } while (pageToken != null);
