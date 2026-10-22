@@ -137,9 +137,8 @@ public class RecommendationServiceV2 {
             }
 
             var data = requireSuccess(response);
-            var result = resultMapper.map(criteria, candidates, data);
             criteriaRepository.deleteById(criteria.getMemberId());
-            complete(connection, "success", Map.of("result", result));
+            complete(connection, "success", Map.of("result", data));
         } catch (RuntimeException error) {
             log.warn(
                     "추천 처리 실패: jobId={}",
