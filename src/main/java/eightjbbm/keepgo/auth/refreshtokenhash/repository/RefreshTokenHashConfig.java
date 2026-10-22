@@ -1,11 +1,9 @@
 package eightjbbm.keepgo.auth.refreshtokenhash.repository;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import eightjbbm.keepgo.auth.accesstokenblacklist.repository.AccessTokenBlacklistedProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
@@ -17,7 +15,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import java.util.List;
 
 @Configuration
-@EnableCaching
 @EnableConfigurationProperties(RefreshTokenHashProperties.class)
 public class RefreshTokenHashConfig {
     static final String CACHE_MANAGER_NAME = "refreshTokenHashCacheManager";
@@ -31,7 +28,7 @@ public class RefreshTokenHashConfig {
             havingValue = PROVIDER_NAME_CAFFEINE,
             matchIfMissing = true
     )
-    public CacheManager caffeineCacheManager(
+    public CacheManager caffeineRefreshTokenHashCacheManager(
             RefreshTokenHashProperties properties
     ) {
         var blacklist = new CaffeineCache(

@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service;
 
+import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
@@ -8,8 +10,10 @@ import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.InvalidPageTokenException;
 import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
+import eightjbbm.keepgo.recommendation.entity.OutingCourse;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.util.exception.UnprocessableContentException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +25,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OutingWishlistService {
 
+    private final MemberRepository memberRepository;
+    private final OutingCourseRepository outingCourseRepository;
     private final OutingCollectionPrivateRepository outingWishlistRepository;
     private final OutingWishlistQueryRepository outingWishlistQueryRepository;
     private final PageTokenCodec pageTokenCodec;
@@ -48,7 +54,7 @@ public class OutingWishlistService {
                 : pageTokenCodec.encode(
                         new PageToken(
                                 wishlistEntries.getLast().getId(),
-                                wishlistEntries.getLast().getCreatedAt()));
+                                wishlistEntries.getLast().getCreateDatetime()));
         return GetPlaceListResult.from(
                 wishlistEntries.subList(
                         0,
@@ -96,7 +102,7 @@ public class OutingWishlistService {
                 : pageTokenCodec.encode(
                 new PageToken(
                         wishlistEntries.getLast().getId(),
-                        wishlistEntries.getLast().getCreatedAt()));
+                        wishlistEntries.getLast().getCreateDatetime()));
         return GetEventListResult.from(
                 wishlistEntries.subList(
                         0,
@@ -127,13 +133,68 @@ public class OutingWishlistService {
     public GetOutingCourseListResult getOutingCourseList(
             GetOutingCourseListCommand command
     ) {
+        var pageToken = command.cursor() == null
+                ? new PageToken(null, null)
+                : pageTokenCodec.decode(command.cursor())
+                .orElseThrow(InvalidPageTokenException::new);
 
+        if ((pageToken.id() == null)
+                != (pageToken.createDatetime() == null)) {
+            throw new InvalidPageTokenException();
+        }
+
+        var entries = outingWishlistQueryRepository.findCoursesByCursor(
+                command.memberId(),
+                command.location(),
+                pageToken,
+                PAGE_SIZE);
+
+        boolean hasNext = entries.size() > PAGE_SIZE;
+
+        var pageEntries = entries.subList(
+                0,
+                Math.min(entries.size(), PAGE_SIZE));
+
+        String nextCursor = null;
+
+        if (hasNext) {
+            var lastEntry = pageEntries.getLast();
+
+            nextCursor = pageTokenCodec.encode(
+                    new PageToken(
+                            lastEntry.getId(),
+                            lastEntry.getCreateDatetime()));
+        }
+
+        var courseIds = pageEntries.stream()
+                .map(entry -> entry.getOutingCourse().getId())
+                .distinct()
+                .toList();
+
+        var stops = outingWishlistQueryRepository
+                .findStopsByCourseIds(courseIds);
+
+        return GetOutingCourseListResult.from(
+                pageEntries,
+                stops,
+                nextCursor);
     }
 
     @Transactional(readOnly = true)
     public GetOutingCourseDetailResult getOutingCourseDetail(
             GetOutingCourseDetailCommand command
     ) {
+        var entry = outingWishlistQueryRepository
+                .findCourseDetail(
+                        command.memberId(),
+                        command.outingCourseId())
+                .orElseThrow(
+                        eightjbbm.keepgo.util.exception.NotFoundException::new);
+
+        return GetOutingCourseDetailResult.from(
+                entry,
+                java.time.Instant.now());
+    }
 
     @Transactional
     public AddOutingCourseResult addOutingCourse(

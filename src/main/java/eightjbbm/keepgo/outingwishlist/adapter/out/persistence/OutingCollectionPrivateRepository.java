@@ -18,6 +18,19 @@ import java.util.Set;
 public interface OutingCollectionPrivateRepository extends JpaRepository<OutingCollectionPrivate, Long>, QuerydslPredicateExecutor<OutingCollectionPrivate> {
 
     @Query("""
+    select distinct og
+    from OutingCollectionPrivate ocp
+    join ocp.outingGuide og
+    where ocp.member.id = :memberId
+        and ocp.deleteDatetime is null
+        and og.coordinate.lat is not null
+        and og.coordinate.lng is not null
+    """)
+    List<OutingGuide> findRecommendationCandidates(
+            @Param("memberId") Long memberId
+    );
+
+    @Query("""
         select o
         from OutingCollectionPrivate o
         where o.member.id = :memberId

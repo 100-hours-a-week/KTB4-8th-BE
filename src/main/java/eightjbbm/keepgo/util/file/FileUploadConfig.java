@@ -11,15 +11,22 @@ import java.nio.file.Paths;
 @RequiredArgsConstructor
 public class FileUploadConfig implements WebMvcConfigurer {
 
+    private final FileStorageProperties properties;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String rootPath = Paths.get(System.getProperty("user.dir"))
-                .toAbsolutePath()
-                .toString();
+        String resourceLocation =
+                Paths.get(properties.local().rootPath())
+                        .toAbsolutePath()
+                        .normalize()
+                        .toUri()
+                        .toString();
 
-        String uploadPath = "file:///" + rootPath + "/uploads/";
+        if (!resourceLocation.endsWith("/")) {
+            resourceLocation += "/";
+        }
 
         registry.addResourceHandler("/public/**")
-                .addResourceLocations(uploadPath);
+                .addResourceLocations(resourceLocation);
     }
 }

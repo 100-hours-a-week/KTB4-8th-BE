@@ -15,6 +15,6 @@ public record TimeInterval(
     }
 
     public boolean isBetween(LocalTime time) {
-        return startTime().isAfter(time) && endTime().isBefore(time);
+        return startTime().isBefore(time) && endTime().isAfter(time);
     }
 }

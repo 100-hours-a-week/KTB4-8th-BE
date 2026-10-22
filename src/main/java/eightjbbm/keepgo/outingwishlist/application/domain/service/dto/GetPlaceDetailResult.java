@@ -29,7 +29,7 @@ public record GetPlaceDetailResult(
                 place.getCategory(),
                 place.getDescription(),
                 null,
-                wishlistEntry.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
+                wishlistEntry.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
                 place.getAddress().toSg(),
                 place.getAddress().toRoad(),
                 place.getCoordinate()

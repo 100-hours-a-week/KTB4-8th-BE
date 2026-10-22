@@ -37,7 +37,7 @@ public record GetEventDetailResult(
                 event.getCategory(),
                 event.getDescription(),
                 null,
-                wishlistEntry.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
+                wishlistEntry.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
                 event.getStartDatetime() == null
                         ? null
                         : event.getStartDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),

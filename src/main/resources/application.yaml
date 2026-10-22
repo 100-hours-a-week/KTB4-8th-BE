@@ -24,13 +24,26 @@ spring:
       client:
         registration:
           google:
+            provider: google
             client-id: ${GOOGLE_CLIENT_ID:451367164829-umjho06iuhcmapqlk7f0ebesllrbsukq.apps.googleusercontent.com}
             client-secret: ${GOOGLE_CLIENT_SECRET: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}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - openid
               - profile
               - email
               - https://www.googleapis.com/auth/youtube.readonly
+          google-login:
+            provider: google
+            client-id: ${GOOGLE_LOGIN_CLIENT_ID}
+            client-secret: ${GOOGLE_LOGIN_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+              - email
 
 keepgo:
   security:
@@ -63,6 +76,19 @@ keepgo:
     refresh-token-hash:
       name: refresh-token-hashes
       ttl: 14d
+  storage:
+    provider: ${FILE_STORAGE_PROVIDER:local}
+    local:
+      root-path: ${FILE_STORAGE_LOCAL_PATH:uploads}
+    s3:
+      bucket: ${FILE_STORAGE_S3_BUCKET:}
+      region: ${FILE_STORAGE_S3_REGION:}
+
+recommendation:
+  candidate-radius-km: 5
+  jobs:
+    backend: ${EPHEMERAL_DATABASE:caffeine}
+    poll-interval-ms: 250
 
 management:
   server:

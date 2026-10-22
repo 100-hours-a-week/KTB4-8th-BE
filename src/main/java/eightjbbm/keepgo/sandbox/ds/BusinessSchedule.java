@@ -41,18 +41,17 @@ public class BusinessSchedule {
     }
 
     public boolean isAvailable(Instant datetime) {
-        var localDateTime = datetime.atZone(timezone).toLocalDateTime();
+        var local = datetime.atZone(timezone);
+        var date = local.toLocalDate();
 
-        if (exceptions.containsKey(localDateTime.toLocalDate())) {
-            for (TimeInterval timeInterval: exceptions.get(localDateTime.toLocalDate())) {
-                if (timeInterval.isBetween(localDateTime.toLocalTime())) return true;
-            }
-        } else {
-            for (TimeInterval timeInterval: weeklyHours.get(localDateTime.getDayOfWeek())) {
-                if (timeInterval.isBetween(localDateTime.toLocalTime())) return true;
-            }
-        }
+        List<TimeInterval> intervals = exceptions.containsKey(date)
+                ? exceptions.getOrDefault(date, List.of())
+                : weeklyHours.getOrDefault(
+                local.getDayOfWeek(),
+                List.of()
+        );
 
-        return false;
+        return intervals.stream()
+                .anyMatch(interval -> interval.isBetween(local.toLocalTime()));
     }
 }

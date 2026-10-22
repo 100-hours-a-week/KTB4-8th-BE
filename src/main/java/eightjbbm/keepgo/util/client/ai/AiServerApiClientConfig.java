@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.util.client.ai;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
 @EnableConfigurationProperties(AiServerApiClientProperties.class)
@@ -38,35 +40,25 @@ public class AiServerApiClientConfig {
                 .requestInterceptor((request, body, execution) -> {
                     String safeUri = request.getURI()
                             .toString()
-                            .replaceAll(
-                                    "([?&]key=)[^&]*",
-                                    "$1***"
-                            );
+                            .replaceAll("([?&]key=)[^&]*", "$1***");
 
-                    System.out.println(
-                            "RestClient request method = "
-                                    + request.getMethod()
-                    );
-                    System.out.println(
-                            "RestClient request URI = "
-                                    + safeUri
-                    );
+                    MediaType contentType = request.getHeaders().getContentType();
 
-                    request.getHeaders().forEach((name, values) -> {
-                        if (name.equalsIgnoreCase("Authorization")) {
-                            System.out.println(name + " = [***]");
-                        } else {
-                            System.out.println(name + " = " + values);
-                        }
-                    });
+                    var charset = contentType != null && contentType.getCharset() != null
+                            ? contentType.getCharset()
+                            : StandardCharsets.UTF_8;
 
-                    if (body.length > 0) {
-                        System.out.println(
-                                "RestClient request body = "
-                                        + new String(
-                                        body,
-                                        StandardCharsets.UTF_8
-                                )
+                    if (log.isInfoEnabled()) {
+                        String requestBody = body.length == 0
+                                ? "<empty>"
+                                : new String(body, charset);
+
+                        log.info(
+                                "AI HTTP request: method={}, uri={}, contentType={}, body={}",
+                                request.getMethod(),
+                                safeUri,
+                                contentType,
+                                requestBody
                         );
                     }
 
