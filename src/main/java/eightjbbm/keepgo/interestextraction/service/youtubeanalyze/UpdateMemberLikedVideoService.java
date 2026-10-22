@@ -37,6 +37,7 @@ public class UpdateMemberLikedVideoService {
         if (unupdatedVideos.isEmpty()) return;
         // 좋아요 이력을 최신화한다.
         updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, unupdatedVideos);
+        /*
         memberLikedVideoRepository.saveAll(
                 unupdatedVideos.stream()
                         .map(video ->
@@ -44,5 +45,7 @@ public class UpdateMemberLikedVideoService {
                                         video.getId(),
                                         memberRepository.getReferenceById(memberId)))
                         .toList());
+
+         */
     }
 }
