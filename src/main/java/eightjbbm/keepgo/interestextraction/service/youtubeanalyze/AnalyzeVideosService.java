@@ -31,7 +31,8 @@ public class AnalyzeVideosService {
     @Transactional
     public List<OutingGuide> analyzeVideos(List<Video> videos) {
         // 분석할 영상들이 비즈니스상 유효한 영상들인지 검증한다.
-        List<Video> videosValidated = validateVideos(videos);
+        //List<Video> videosValidated = validateVideos(videos);
+        List<Video> videosValidated = videos;
         log.info("analyzeVideos: videosValidated.size()=" + videosValidated.size());
         // 검증을 통과한 영상들을 분석하여 장소 및 행사 목록을 추출한다.
         // 블로킹 지점 (동기 논블로킹 필요?)
