@@ -53,28 +53,49 @@ public class BusinessHoursMapper {
             return result;
         }
 
-        dto.forEach((date, intervals) ->
-                {
-                    for (TimeInterval interval: convertIntervals(intervals)) {
-                        if (interval.crossesDateBoundary()) {
-                            result.get(date).add(new TimeInterval(interval.startTime(), LocalTime.MAX));
-                            result.computeIfAbsent(
-                                    date.plusDays(1),
-                                    _ -> new ArrayList<>()
-                            ).add(
-                                    new TimeInterval(LocalTime.MIN, interval.endTime())
-                            );
-                        } else {
-                            result.get(date).add(interval);
-                        }
-                    }
-                }
+        // 빈 리스트인 날짜도 보존한다.
+        dto.keySet().forEach(date ->
+                result.put(date, new ArrayList<>())
         );
+
+        dto.forEach((date, intervals) -> {
+            for (TimeInterval interval : convertIntervals(intervals)) {
+                result.get(date).add(
+                        interval.crossesDateBoundary()
+                                ? new TimeInterval(
+                                interval.startTime(),
+                                LocalTime.MAX
+                        )
+                                : interval
+                );
+
+                if (interval.crossesDateBoundary()) {
+                    result.computeIfAbsent(
+                            date.plusDays(1),
+                            ignored -> new ArrayList<>()
+                    ).add(new TimeInterval(
+                            LocalTime.MIN,
+                            interval.endTime()
+                    ));
+                }
+            }
+        });
 
         return result;
     }
 
-    private static List<TimeInterval> convertIntervals(List<BusinessScheduleDto.TimeIntervalDto> intervals) {
-        return intervals.stream().map(k -> new TimeInterval(k.openTime(), k.closeTime())).toList();
+    private static List<TimeInterval> convertIntervals(
+            List<BusinessScheduleDto.TimeIntervalDto> intervals
+    ) {
+        if (intervals == null) {
+            return List.of();
+        }
+
+        return intervals.stream()
+                .map(interval -> new TimeInterval(
+                        interval.openTime(),
+                        interval.closeTime()
+                ))
+                .toList();
     }
 }

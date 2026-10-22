@@ -6,6 +6,8 @@ import eightjbbm.keepgo.auth.refreshtokenhash.repository.RefreshTokenHashReposit
 import eightjbbm.keepgo.auth.refreshtokenhash.repository.RefreshTokenState;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -44,18 +46,23 @@ public class RefreshTokenManager {
                 sha256(refreshToken));
     }
 
-    public String rotate(String refreshToken) {
-        var refreshTokenHash = refreshTokenHashRepository
-                .findById(sha256(refreshToken))
-                .orElseThrow();
-        refreshTokenHashRepository.save(
-                new RefreshTokenHash(
-                        refreshTokenHash.memberId(),
-                        RefreshTokenState.USED,
-                        refreshTokenHash.hash(),
-                        refreshTokenHash.expiredAt()));
-        return issue(refreshTokenHash.memberId());
+    public RotationResult rotateWithMember(String refreshToken) {
+        RefreshTokenHash previous = refreshTokenHashRepository
+                .consumeActive(sha256(refreshToken))
+                .orElseThrow(() -> new OAuth2AuthenticationException(
+                        OAuth2ErrorCodes.INVALID_GRANT
+                ));
+
+        return new RotationResult(
+                previous.memberId(),
+                issue(previous.memberId())
+        );
     }
+
+    public record RotationResult(
+            Long memberId,
+            String refreshToken
+    ) {}
 
     public void revoke(String refreshToken) {
         refreshTokenHashRepository.findById(sha256(refreshToken))

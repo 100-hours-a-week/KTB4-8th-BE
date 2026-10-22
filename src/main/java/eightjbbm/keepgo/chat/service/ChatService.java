@@ -10,6 +10,7 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyJobStatus;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
+import eightjbbm.keepgo.util.exception.BadRequestException;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -74,17 +75,33 @@ public class ChatService {
     /// @param command {@link GetChatsCommand}
     /// @return {@link GetChatsResult}
     public GetChatsResult getChats(GetChatsCommand command) {
-        Slice<Chat> chatSlice = chatRepository.findByMemberIdAndIdLessThanOrderByCreatedAtDescIdDesc(
+        int size = command.size() == null ? 20 : command.size();
+
+        if (size < 1 || size > 100
+                || (command.cursor() != null && command.cursor() <= 0)) {
+            throw new BadRequestException();
+        }
+
+        List<Chat> fetched = chatRepository.findVisibleChats(
                 command.memberId(),
                 command.cursor(),
-                PageRequest.of(0, command.size() + 1)
+                PageRequest.of(0, size + 1)
         );
-        List<Chat> fetched = chatSlice.getContent();
-        List<Chat> chats = fetched.subList(0, Math.min(fetched.size(), command.size()));
-        boolean hasNext = fetched.size() > command.size();
-        Long nextCursor = hasNext ? fetched.getLast().getId() : -1L;
+
+        boolean hasNext = fetched.size() > size;
+
+        List<Chat> chats = List.copyOf(
+                fetched.subList(0, Math.min(fetched.size(), size))
+        );
+
+        // 실제 반환한 마지막 항목을 커서로 사용한다.
+        Long nextCursor = hasNext
+                ? chats.getLast().getId()
+                : -1L;
+
         return GetChatsResult.from(chats, hasNext, nextCursor);
     }
+
 
     /// 채팅 내역 초기화 API
     ///
