@@ -1,9 +1,12 @@
 package eightjbbm.keepgo.recommendation.service;
 
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.recommendation.entity.OutingCourse;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.repository.RecommendationJobStore;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.util.Coordinate;
@@ -35,6 +38,8 @@ public class RecommendationServiceV2 {
     private final AiServerRecommendApiService aiServerService;
     private final OutingCriteriaRepository criteriaRepository;
     private final OutingCollectionPrivateRepository collectionRepository;
+    private final OutingCourseRepository outingCourseRepository;
+    private final OutingStopRepository outingStopRepository;
     private final RecommendationResultMapper resultMapper;
     private final RecommendationJobStore jobs;
     private final Executor executor;
@@ -46,6 +51,8 @@ public class RecommendationServiceV2 {
     public RecommendationServiceV2(
             AiServerRecommendApiService aiServerService,
             OutingCriteriaRepository criteriaRepository,
+            OutingCourseRepository outingCourseRepository,
+            OutingStopRepository outingStopRepository,
             OutingCollectionPrivateRepository collectionRepository,
             RecommendationResultMapper resultMapper,
             RecommendationJobStore jobs,
@@ -59,6 +66,8 @@ public class RecommendationServiceV2 {
         this.aiServerService = aiServerService;
         this.criteriaRepository = criteriaRepository;
         this.collectionRepository = collectionRepository;
+        this.outingCourseRepository = outingCourseRepository;
+        this.outingStopRepository = outingStopRepository;
         this.resultMapper = resultMapper;
         this.jobs = jobs;
         this.executor = executor;
@@ -138,7 +147,8 @@ public class RecommendationServiceV2 {
 
             var data = requireSuccess(response);
             criteriaRepository.deleteById(criteria.getMemberId());
-            complete(connection, "success", Map.of("result", data));
+            var result = resultMapper.map(criteria, data);
+            complete(connection, "success", Map.of("result", result));
         } catch (RuntimeException error) {
             log.warn(
                     "추천 처리 실패: jobId={}",

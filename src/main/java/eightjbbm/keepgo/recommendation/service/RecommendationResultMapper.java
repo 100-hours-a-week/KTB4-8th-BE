@@ -1,86 +1,92 @@
 package eightjbbm.keepgo.recommendation.service;
 
-import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult;
-import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult.*;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.entity.OutingCourse;
+import eightjbbm.keepgo.recommendation.entity.OutingStop;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
+import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.recommendation.service.dto.RecommendOutingCourseResultV2;
+import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Component
+@RequiredArgsConstructor
 public class RecommendationResultMapper {
 
+    private final OutingCourseRepository outingCourseRepository;
+    private final OutingStopRepository outingStopRepository;
+    private final OutingGuideRepository outingGuideRepository;
     private static final DateTimeFormatter SCHEDULE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                     .withZone(ZoneId.of("Asia/Seoul"));
 
-    public RequestRecommendationResult map(
-            OutingCriteria criteria,
-            List<OutingGuide> candidates,
+    public RecommendOutingCourseResultV2 map(
+            OutingCriteria outingCriteria,
             RecommendCoursesResponseV2.SuccessData data
     ) {
-        var guidesById = candidates.stream()
-                .collect(Collectors.toMap(
-                        guide -> guide.getId().toString(),
-                        Function.identity()
-                ));
-
-        String score = data.matchScore() == null
-                ? null
-                : data.matchScore().toString();
-
-        var snippets = data.courses().stream()
-                .map(course -> new RecommendationSnippet(
-                        course.title(),
-                        score,
-                        course.places().size(),
-                        travelMinutes(course)
-                ))
+        Integer matchScore = data.matchScore();
+        List<OutingCourse> outingCourses = data.courses()
+                .stream()
+                .map(
+                        course -> {
+                            var outingCourse = new OutingCourse(
+                                course.title(),
+                                course.totalDurationMinutes(),
+                                matchScore,
+                                outingCriteria.getRequestedLocationName(),
+                                    null);
+                            List<OutingStop> stops = course.places().stream()
+                                    .map(place -> new OutingStop(
+                                            outingCourse,
+                                            place.travelMinutes(),
+                                            course.places().indexOf(place),
+                                            outingGuideRepository.getReferenceById(Long.valueOf(place.placeId()))))
+                                    .toList();
+                            outingStopRepository.saveAll(stops);
+                            outingCourse.setStops(stops);
+                            return outingCourseRepository.save(outingCourse);
+                        }
+                )
                 .toList();
 
-        var details = data.courses().stream()
-                .map(course -> new RecommendationDetail(
-                        course.title(),
-                        score,
-                        travelMinutes(course),
-                        IntStream.range(0, course.places().size())
-                                .mapToObj(index -> {
-                                    var place = course.places().get(index);
-                                    var guide = guidesById.get(place.placeId());
-
-                                    if (guide == null) {
-                                        throw new ServiceUnavailableException();
-                                    }
-
-                                    return new RecommendationDetailItem(
-                                            index + 1,
-                                            guide.getName(),
-                                            guide.getCategory(),
-                                            guide.getDescription(),
-                                            guide.getCoordinate().lat(),
-                                            guide.getCoordinate().lng()
-                                    );
-                                })
-                                .toList()
-                ))
-                .toList();
-
-        return new RequestRecommendationResult(
-                new RecommendationMetadata(
+        return new RecommendOutingCourseResultV2(
+                new RecommendOutingCourseResultV2.OutingCourseMetadata(
                         data.courses().size(),
-                        criteria.getRequestedLocationName(),
-                        SCHEDULE_FORMAT.format(criteria.getRequestedDatetime())
+                        outingCriteria.getRequestedLocationName(),
+                        outingCriteria.getRequestedDatetime().atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime().toString()
                 ),
-                snippets,
-                details
+                outingCourses.stream()
+                        .map(outingCourse -> new RecommendOutingCourseResultV2.OutingCourseSnippet(
+                                outingCourse.getName(),
+                                String.valueOf(outingCourse.getRecommendationScore()),
+                                outingCourse.getStops().size(),
+                                outingCourse.getDurationHours()
+                        ))
+                        .toList(),
+                outingCourses.stream()
+                        .map(outingCourse -> new RecommendOutingCourseResultV2.OutingCourseDetail(
+                                outingCourse.getId(),
+                                outingCourse.getName(),
+                                String.valueOf(outingCourse.getRecommendationScore()),
+                                outingCourse.getDurationHours(),
+                                outingCourse.getStops().stream().map(
+                                        outingStop -> new RecommendOutingCourseResultV2.OutingCourseStop(
+                                                outingStop.getId().sequence(),
+                                                outingStop.getOutingGuide().getName(),
+                                                outingStop.getOutingGuide().getCategory(),
+                                                outingStop.getOutingGuide().getCoordinate().lat(),
+                                                outingStop.getOutingGuide().getCoordinate().lng()
+                                        )
+                                ).toList()
+                        ))
+                        .toList()
         );
     }
 
