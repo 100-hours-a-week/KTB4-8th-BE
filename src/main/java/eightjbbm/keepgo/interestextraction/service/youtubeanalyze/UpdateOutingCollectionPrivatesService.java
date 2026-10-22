@@ -29,6 +29,7 @@ public class UpdateOutingCollectionPrivatesService {
     public void updateOutingCollectionPrivates(Long memberId, List<Video> unupdatedVideos) {
         // 아직 좋아요 이력에 반영되지 못한 영상들의 목록을 분석한다.
         // 블로킹 지점 (동기 논블로킹 필요?)
+        log.info("unupdatedVideos.size() = " + unupdatedVideos.size());
         List<OutingGuide> outingGuidesExtracted = analyzeVideosService.analyzeVideos(unupdatedVideos);
         log.info("updateOutingCollectionPrivates: outingGuidesExtracted.size()=" + outingGuidesExtracted.size());
         if (outingGuidesExtracted.isEmpty()) return;
