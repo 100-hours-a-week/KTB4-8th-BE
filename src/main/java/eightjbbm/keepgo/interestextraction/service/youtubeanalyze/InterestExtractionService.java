@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
+import com.google.api.services.youtube.model.Video;
+import com.google.api.services.youtube.model.VideoListResponse;
 import eightjbbm.keepgo.interestextraction.repository.youtubeanalyze.YoutubeApiServiceV2;
 import eightjbbm.keepgo.interestextraction.service.*;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
@@ -19,6 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -45,6 +49,7 @@ public class InterestExtractionService {
     public void syncWishlistFromYoutube(Long memberId) {
         log.info("syncWishlistFromYoutube");
         String pageToken = null;
+        List<Video> videoLists = new ArrayList<>();
         do {
             // pageToken = null인 경우 pageToken을 요청에 포함하지 않는다 => 첫 페이지 조회
             var response = youtubeApiService.getVideoLists(memberId, pageToken);
@@ -55,10 +60,11 @@ public class InterestExtractionService {
                     response.getItems());
 
              */
-            updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, response.getItems());
+            videoLists.addAll(response.getItems());
 
             pageToken = response.getNextPageToken();
         } while (pageToken != null);
+        updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, videoLists);
     }
 
     /// 유튜브 연동 API
