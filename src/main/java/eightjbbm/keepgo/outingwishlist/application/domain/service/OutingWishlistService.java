@@ -196,7 +196,7 @@ public class OutingWishlistService {
                 java.time.Instant.now());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AddOutingCourseResult addOutingCourse(
             AddOutingCourseCommand command
     ) {

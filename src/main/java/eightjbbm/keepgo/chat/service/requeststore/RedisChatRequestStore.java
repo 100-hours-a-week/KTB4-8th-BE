@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
+import java.time.Duration;
 import java.util.List;
 
 @Repository
@@ -25,11 +26,15 @@ public class RedisChatRequestStore implements ChatRequestStore {
                 """, Long.class);
 
     private final StringRedisTemplate redis;
+    private static final Duration REQUEST_TTL = Duration.ofMinutes(10);
 
     @Override
     public boolean acquire(Long memberId, String requestId) {
         return Boolean.TRUE.equals(
-                redis.opsForValue().setIfAbsent(key(memberId), requestId));
+                redis.opsForValue().setIfAbsent(
+                        key(memberId),
+                        requestId,
+                        REQUEST_TTL));
     }
 
     @Override

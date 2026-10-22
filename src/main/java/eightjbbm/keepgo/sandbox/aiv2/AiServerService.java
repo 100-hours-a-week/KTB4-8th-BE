@@ -42,6 +42,8 @@ public class AiServerService {
     public void embedPlaces(List<OutingGuide> newOutingGuides) {
         restClient.post()
                 .uri("/v1/embed-places")
-                .body(EmbedPlaceRequestV2.from(newOutingGuides));
+                .body(EmbedPlaceRequestV2.from(newOutingGuides))
+                .retrieve()
+                .toBodilessEntity();
     }
 }

@@ -1,11 +1,9 @@
 package eightjbbm.keepgo.auth.refreshtokenhash.repository;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import eightjbbm.keepgo.auth.accesstokenblacklist.repository.AccessTokenBlacklistedProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
