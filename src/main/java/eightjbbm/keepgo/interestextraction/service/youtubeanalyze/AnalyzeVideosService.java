@@ -7,6 +7,7 @@ import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.sandbox.aiv2.AiServerService;
 import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnalyzeVideosService {
@@ -28,6 +30,7 @@ public class AnalyzeVideosService {
     ///
     @Transactional
     public List<OutingGuide> analyzeVideos(List<Video> videos) {
+        log.info("analyzeVideos");
         // 분석할 영상들이 비즈니스상 유효한 영상들인지 검증한다.
         List<Video> videosValidated = validateVideos(videos);
         // 검증을 통과한 영상들을 분석하여 장소 및 행사 목록을 추출한다.
@@ -92,6 +95,7 @@ public class AnalyzeVideosService {
     }
 
     private List<OutingGuide> analyzeVideosInternal(List<Video> videos) {
+        log.info("analyzeVideosInternal");
         // 백엔드 측에서 분석할 수 있는 영상이라면 분석한다.
         Map<Video, OutingGuide> videosAnalyzedByBackend = youtubeAnalyzeService.analyzeVideosInternalByBackend(videos);
         // 백엔드 측에서 분석할 수 없는 영상들을 선별한다.
@@ -107,6 +111,7 @@ public class AnalyzeVideosService {
     }
 
     private List<OutingGuide> analyzeVideosInternalByAi(List<Video> videos) {
+        log.info("analyzeVideosInternalByAi");
         List<OutingGuide> result = new ArrayList<>();
         // 10개 단위로 분할
         for (int i = 0; i < videos.size(); i += 10) {
@@ -121,6 +126,7 @@ public class AnalyzeVideosService {
     private List<OutingGuide> requestAnalysis(List<Video> videos) {
         // AI 서버에게 요청을 전송하여, 요청의 결과를 토대로 추출된 장소 및 행사 정보를 반환한다.
         // AI 서버에게 분석 요청 전송
+        log.info("requestAnalysis");
         var response = aiServerService.analyzeVideoV2(
                 videos.stream()
                         .map(Video::getId)
@@ -134,6 +140,7 @@ public class AnalyzeVideosService {
 
     // 전략 패턴 적용 가능
     private List<OutingGuide> processResult(AnalyzeVideoResponseV2.Success success) {
+        log.info("processResult");
         List<OutingGuide> extractedOutingGuides = new ArrayList<>();
         for (var result: success.data().results()) {
             switch (result.status()) {

@@ -5,11 +5,13 @@ import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVide
 import eightjbbm.keepgo.interestextraction.repository.memberlike.MemberLikedVideoRepository;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UpdateMemberLikedVideoService {
@@ -21,6 +23,7 @@ public class UpdateMemberLikedVideoService {
     ///
     @Transactional
     public void updateMemberLikedVideos(Long memberId, List<Video> likedVideosYoutubeResponse) {
+        log.info("updateMemberLikedVideos");
         // 회원의 좋아요 이력을 불러온다.
         List<String> memberLikedVideoIds = memberLikedVideoRepository.findExistingVideos(
                 memberId,

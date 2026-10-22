@@ -8,6 +8,7 @@ import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
@@ -19,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.Serializable;
 import java.time.Instant;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InterestExtractionService {
@@ -40,6 +42,7 @@ public class InterestExtractionService {
     ///
     /// 응답으로 1개의 페이지를(최대 50개의 결과) 반환하므로 페이지 순회 필요
     public void syncWishlistFromYoutube(Long memberId) {
+        log.info("syncWishlistFromYoutube");
         String pageToken = null;
         do {
             // pageToken = null인 경우 pageToken을 요청에 포함하지 않는다 => 첫 페이지 조회

@@ -6,6 +6,7 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UpdateOutingCollectionPrivatesService {
@@ -25,6 +27,7 @@ public class UpdateOutingCollectionPrivatesService {
     ///
     @Transactional
     public void updateOutingCollectionPrivates(Long memberId, List<Video> unupdatedVideos) {
+        log.info("updateOutingCollectionPrivates");
         // 아직 좋아요 이력에 반영되지 못한 영상들의 목록을 분석한다.
         // 블로킹 지점 (동기 논블로킹 필요?)
         List<OutingGuide> outingGuidesExtracted = analyzeVideosService.analyzeVideos(unupdatedVideos);
