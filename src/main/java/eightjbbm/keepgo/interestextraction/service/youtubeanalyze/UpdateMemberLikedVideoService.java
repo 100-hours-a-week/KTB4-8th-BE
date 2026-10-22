@@ -36,7 +36,7 @@ public class UpdateMemberLikedVideoService {
         log.info("updateMemberLikedVideos: unupdatedVideos.size() = " + unupdatedVideos.size());
         if (unupdatedVideos.isEmpty()) return;
         // 좋아요 이력을 최신화한다.
-        updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, unupdatedVideos);
+        updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, likedVideosYoutubeResponse);
         /*
         memberLikedVideoRepository.saveAll(
                 unupdatedVideos.stream()
