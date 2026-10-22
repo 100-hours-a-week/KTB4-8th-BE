@@ -3,17 +3,16 @@ package eightjbbm.keepgo.outingwishlist.adapter.in.web;
 import eightjbbm.keepgo.outingwishlist.adapter.in.web.dto.*;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -123,5 +122,24 @@ public class OutingWishlistController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @PostMapping("/api/v2/member/outing-wishlist/outing-courses")
+    public ResponseEntity<Void> addOutingCourse(
+            @Valid @RequestBody AddOutingCourseRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.addOutingCourse(
+                AddOutingCourseCommand.from(
+                        memberId,
+                        request));
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .header(
+                        HttpHeaders.LOCATION,
+                        "/api/v2/member/outing-wishlist/outing-courses/" + result.addedOutingWishlistEntryId())
+                .build();
     }
 }

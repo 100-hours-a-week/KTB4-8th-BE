@@ -135,5 +135,16 @@ public class OutingWishlistService {
             GetOutingCourseDetailCommand command
     ) {
 
+    @Transactional
+    public AddOutingCourseResult addOutingCourse(
+            AddOutingCourseCommand command
+    ) {
+        var savedOutingWishlistEntry = outingWishlistRepository.save(
+                OutingCollectionPrivate.from(
+                        memberRepository.getReferenceById(command.memberId()),
+                        outingCourseRepository.getReferenceById(command.outingCourseId())));
+        return AddOutingCourseResult.from(
+                savedOutingWishlistEntry.getId()
+        );
     }
 }
