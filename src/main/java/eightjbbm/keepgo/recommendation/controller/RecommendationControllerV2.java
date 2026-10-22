@@ -25,13 +25,11 @@ public class RecommendationControllerV2 {
             @AuthenticationPrincipal Jwt jwt
     ) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        SseEmitter emitter = recommendationService.recommendOutingCourse(memberId);
-
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .cacheControl(CacheControl.noCache())
-                .body(emitter);
+                .body(recommendationService.recommendOutingCourse(memberId));
     }
 
     @PostMapping("/api/v2/member/recommendation/cancellation")

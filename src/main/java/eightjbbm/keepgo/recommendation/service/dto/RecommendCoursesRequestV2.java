@@ -47,7 +47,7 @@ public record RecommendCoursesRequestV2(
                         .toList(),
                 String.valueOf(outingCriteria.getUserAvailableTimeMinutes()),
                 outingCriteria.getCategories(),
-                outingCriteria.getRequestedDatetime().atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                outingCriteria.getRequestedDatetime().atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime(),
                 outingCriteria.getUserCoordinate()
         );
     }

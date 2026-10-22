@@ -6,7 +6,7 @@ import java.util.List;
 public interface RecommendCoursesResponseV2 {
     record Success(
             String message,
-            List<SuccessData> data
+            SuccessData data
     ) implements RecommendCoursesResponseV2 {}
 
     record SuccessData(
