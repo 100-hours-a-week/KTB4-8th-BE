@@ -134,6 +134,7 @@ public class AnalyzeVideosService {
                         .map(Video::getId)
                         .toList()
         );
+        log.info(response.toString());
         // 분석이 성공적으로 수행된 경우
         if (response instanceof AnalyzeVideoResponseV2.Success success) {
             return processResult(success);
