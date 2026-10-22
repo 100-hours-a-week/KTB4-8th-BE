@@ -47,6 +47,7 @@ public class InterestExtractionService {
         do {
             // pageToken = null인 경우 pageToken을 요청에 포함하지 않는다 => 첫 페이지 조회
             var response = youtubeApiService.getVideoLists(memberId, pageToken);
+            log.info("유튜브 API 호출 결과: " + response.getItems().size());
             // 비동기 논블로킹 필요
             updateMemberLikedVideoService.updateMemberLikedVideos(
                     memberId,

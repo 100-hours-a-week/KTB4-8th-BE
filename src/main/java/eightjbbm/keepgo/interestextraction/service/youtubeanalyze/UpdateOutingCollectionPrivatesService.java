@@ -27,10 +27,10 @@ public class UpdateOutingCollectionPrivatesService {
     ///
     @Transactional
     public void updateOutingCollectionPrivates(Long memberId, List<Video> unupdatedVideos) {
-        log.info("updateOutingCollectionPrivates");
         // 아직 좋아요 이력에 반영되지 못한 영상들의 목록을 분석한다.
         // 블로킹 지점 (동기 논블로킹 필요?)
         List<OutingGuide> outingGuidesExtracted = analyzeVideosService.analyzeVideos(unupdatedVideos);
+        log.info("updateOutingCollectionPrivates: outingGuidesExtracted.size()=" + outingGuidesExtracted.size());
         if (outingGuidesExtracted.isEmpty()) return;
         // 분석 결과 추출된 장소와 행사를 기존 여행 위시리스트와 대조하여 최신화가 필요한 부분을 파악한다.
         // 추출된 장소와 행사 중 이미 여행 위시리스트에 등록되어있는 것들

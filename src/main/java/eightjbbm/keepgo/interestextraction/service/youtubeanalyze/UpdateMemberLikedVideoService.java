@@ -23,7 +23,6 @@ public class UpdateMemberLikedVideoService {
     ///
     @Transactional
     public void updateMemberLikedVideos(Long memberId, List<Video> likedVideosYoutubeResponse) {
-        log.info("updateMemberLikedVideos");
         // 회원의 좋아요 이력을 불러온다.
         List<String> memberLikedVideoIds = memberLikedVideoRepository.findExistingVideos(
                 memberId,
@@ -34,6 +33,7 @@ public class UpdateMemberLikedVideoService {
         List<Video> unupdatedVideos = likedVideosYoutubeResponse.stream()
                 .filter(video -> !memberLikedVideoIds.contains(video.getId()))
                 .toList();
+        log.info("updateMemberLikedVideos: unupdatedVideos.size() = " + unupdatedVideos.size());
         if (unupdatedVideos.isEmpty()) return;
         // 좋아요 이력을 최신화한다.
         updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, unupdatedVideos);

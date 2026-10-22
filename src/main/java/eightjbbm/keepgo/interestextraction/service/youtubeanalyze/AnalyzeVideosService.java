@@ -30,9 +30,9 @@ public class AnalyzeVideosService {
     ///
     @Transactional
     public List<OutingGuide> analyzeVideos(List<Video> videos) {
-        log.info("analyzeVideos");
         // 분석할 영상들이 비즈니스상 유효한 영상들인지 검증한다.
         List<Video> videosValidated = validateVideos(videos);
+        log.info("analyzeVideos: videosValidated.size()=" + videosValidated.size());
         // 검증을 통과한 영상들을 분석하여 장소 및 행사 목록을 추출한다.
         // 블로킹 지점 (동기 논블로킹 필요?)
         // 결과는 Transient 객체들이므로, 이걸 실제 엔티티로 바꿔줘야 한다.
@@ -43,6 +43,7 @@ public class AnalyzeVideosService {
                         (first, _) -> first,
                         LinkedHashMap::new
                 )).values().stream().toList();
+        log.info("analyzeVideos: outingGuidesExtracted.size()=" + outingGuidesExtracted.size());
         // 분석 결과 추출된 장소와 행사를 기존 장소 및 행사 목록과 대조하여 최신화가 필요한 부분을 파악한다.
         // 분석 결과 추출된 장소와 행사 중 기존에 저장된 경우 파악
         // 중복 판단 기준: 주소와 이름이 모두 일치하는 경우
@@ -95,7 +96,7 @@ public class AnalyzeVideosService {
     }
 
     private List<OutingGuide> analyzeVideosInternal(List<Video> videos) {
-        log.info("analyzeVideosInternal");
+        log.info("analyzeVideosInternal: videos.size()=" + videos.size());
         // 백엔드 측에서 분석할 수 있는 영상이라면 분석한다.
         Map<Video, OutingGuide> videosAnalyzedByBackend = youtubeAnalyzeService.analyzeVideosInternalByBackend(videos);
         // 백엔드 측에서 분석할 수 없는 영상들을 선별한다.
@@ -111,7 +112,7 @@ public class AnalyzeVideosService {
     }
 
     private List<OutingGuide> analyzeVideosInternalByAi(List<Video> videos) {
-        log.info("analyzeVideosInternalByAi");
+        log.info("analyzeVideosInternalByAi: videos.size()=" + videos.size());
         List<OutingGuide> result = new ArrayList<>();
         // 10개 단위로 분할
         for (int i = 0; i < videos.size(); i += 10) {
@@ -126,7 +127,7 @@ public class AnalyzeVideosService {
     private List<OutingGuide> requestAnalysis(List<Video> videos) {
         // AI 서버에게 요청을 전송하여, 요청의 결과를 토대로 추출된 장소 및 행사 정보를 반환한다.
         // AI 서버에게 분석 요청 전송
-        log.info("requestAnalysis");
+        log.info("requestAnalysis: videos.size()=" + videos.size());
         var response = aiServerService.analyzeVideoV2(
                 videos.stream()
                         .map(Video::getId)
