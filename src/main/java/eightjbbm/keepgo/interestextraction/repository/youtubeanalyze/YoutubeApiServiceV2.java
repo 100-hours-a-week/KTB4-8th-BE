@@ -50,6 +50,7 @@ public class YoutubeApiServiceV2 {
             var builder = youtube
                     .videos()
                     .list(List.of("id", "status", "snippet", "contentDetails"))
+                    .setMaxResults(50L)
                     .setMyRating("like");
 
             if (pageToken != null) {
