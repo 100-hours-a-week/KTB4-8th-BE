@@ -220,6 +220,7 @@ public class OutingWishlistService {
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId)
                 .orElseThrow(PlaceNotFoundException::new);
         wishlistEntry.delete();
+        outingWishlistRepository.save(wishlistEntry);
     }
 
     @Transactional
@@ -231,6 +232,7 @@ public class OutingWishlistService {
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId)
                 .orElseThrow(EventNotFoundException::new);
         wishlistEntry.delete();
+        outingWishlistRepository.save(wishlistEntry);
     }
 
     @Transactional
@@ -242,5 +244,6 @@ public class OutingWishlistService {
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, outingCourseId)
                 .orElseThrow(OutingCourseNotFoundException::new);
         wishlistEntry.delete();
+        outingWishlistRepository.save(wishlistEntry);
     }
 }
