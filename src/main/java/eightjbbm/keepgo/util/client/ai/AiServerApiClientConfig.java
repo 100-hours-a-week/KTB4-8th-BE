@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.client.RestClient;
@@ -36,7 +37,7 @@ public class AiServerApiClientConfig {
         requestFactory.setReadTimeout(Duration.ofSeconds(130));
 
         return builder
-                .requestFactory(requestFactory)
+                .requestFactory(new BufferingClientHttpRequestFactory(requestFactory))
                 .baseUrl(properties.address())
                 .requestInterceptor((request, body, execution) -> {
                     String safeUri = request.getURI()
