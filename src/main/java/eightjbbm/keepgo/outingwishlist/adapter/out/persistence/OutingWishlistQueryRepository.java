@@ -37,7 +37,8 @@ public class OutingWishlistQueryRepository {
                         cursorCondition(
                                 ocp,
                                 pageToken.createDatetime(),
-                                pageToken.id())
+                                pageToken.id()),
+                        ocp.deleteDatetime.isNull()
                 )
                 .orderBy(
                         ocp.createDatetime.desc(),

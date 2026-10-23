@@ -35,22 +35,11 @@ public interface OutingCollectionPrivateRepository extends JpaRepository<OutingC
         from OutingCollectionPrivate o
         where o.member.id = :memberId
             and o.outingGuide in :outingGuides
+            and o.deleteDatetime is null
     """)
     List<OutingCollectionPrivate> findAllByMemberIdAndOutingGuides(
             @Param("memberId") Long memberId,
             @Param("outingGuides") Set<OutingGuide> outingGuides
-    );
-
-    @Query("""
-        select distinct og.address
-        from OutingCollectionPrivate ocp
-        join ocp.outingGuide og
-        where ocp.member.id = :memberId
-            and og in :outingGuides
-    """)
-    Set<Address> findWishlistAddresses(
-            @Param("memberId") Long memberId,
-            @Param("outingGuides") Collection<OutingGuide> outingGuides
     );
 
     @Query("""
@@ -59,6 +48,7 @@ public interface OutingCollectionPrivateRepository extends JpaRepository<OutingC
         join fetch ocp.outingGuide og
         where ocp.member.id = :memberId
            and ocp.id = :outingWishlistEntryId
+           and ocp.deleteDatetime is null
     """)
     Optional<OutingCollectionPrivate> findByMemberIdAndTypeAndOutingWishlistEntryId(
             @Param("memberId") Long memberId,
