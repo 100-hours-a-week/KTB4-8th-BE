@@ -56,6 +56,18 @@ public class OutingWishlistController {
                 .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
     }
 
+    @DeleteMapping("/api/v2/member/outing-wishlist/places/{placeId}")
+    public ResponseEntity<Void> removePlace(
+            @PathVariable @Positive Long placeId,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        outingWishlistService.removePlace(memberId, placeId);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .build();
+    }
+
     /// 여행 위시리스트에 추가한 행사 목록 조회 API
     ///
     @GetMapping("/api/v2/member/outing-wishlist/events")
@@ -92,6 +104,18 @@ public class OutingWishlistController {
                 .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
     }
 
+    @DeleteMapping("/api/v2/member/outing-wishlist/events/{eventId}")
+    public ResponseEntity<Void> removeEvent(
+            @PathVariable @Positive Long eventId,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        outingWishlistService.removeEvent(memberId, eventId);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .build();
+    }
+
     @GetMapping("/api/v2/member/outing-wishlist/outing-courses")
     public ResponseEntity<GetOutingCourseListResponse> getOutingCourseList(
             @RequestParam(required = false) String location,
@@ -122,6 +146,18 @@ public class OutingWishlistController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @DeleteMapping("/api/v2/member/outing-wishlist/outing-courses/{outingCourseId}")
+    public ResponseEntity<Void> removeOutingCourse(
+            @PathVariable @Positive Long outingCourseId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        outingWishlistService.removeOutingCourse(memberId, outingCourseId);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .build();
     }
 
     @PostMapping("/api/v2/member/outing-wishlist/outing-courses")

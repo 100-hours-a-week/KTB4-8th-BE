@@ -9,6 +9,7 @@ import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.InvalidPageTokenException;
+import eightjbbm.keepgo.outingwishlist.common.OutingCourseNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
 import eightjbbm.keepgo.recommendation.entity.OutingCourse;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
@@ -16,6 +17,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.util.exception.UnprocessableContentException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -207,5 +209,38 @@ public class OutingWishlistService {
         return AddOutingCourseResult.from(
                 savedOutingWishlistEntry.getId()
         );
+    }
+
+    @Transactional
+    public void removePlace(
+        Long memberId,
+        Long placeId
+    ) {
+        var wishlistEntry = outingWishlistRepository
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId)
+                .orElseThrow(PlaceNotFoundException::new);
+        wishlistEntry.delete();
+    }
+
+    @Transactional
+    public void removeEvent(
+        Long memberId,
+        Long eventId
+    ) {
+        var wishlistEntry = outingWishlistRepository
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId)
+                .orElseThrow(EventNotFoundException::new);
+        wishlistEntry.delete();
+    }
+
+    @Transactional
+    public void removeOutingCourse(
+        Long memberId,
+        Long outingCourseId
+    ) {
+        var wishlistEntry = outingWishlistRepository
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, outingCourseId)
+                .orElseThrow(OutingCourseNotFoundException::new);
+        wishlistEntry.delete();
     }
 }
