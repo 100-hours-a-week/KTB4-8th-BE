@@ -46,8 +46,8 @@ public record GetEventDetailResult(
                         : event.getEndDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
                 new Place(
                         null,
-                        event.getAddress().toSg(),
-                        event.getAddress().toRoad(),
+                        (event.getAddress() == null) ? null : event.getAddress().toSg(),
+                        (event.getAddress() == null) ? null : event.getAddress().toRoad(),
                         event.getCoordinate()
                 )
         );

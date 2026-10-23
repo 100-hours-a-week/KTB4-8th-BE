@@ -51,7 +51,7 @@ public record GetEventListResult(
                                             : event.getEndDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
                                     new Place(
                                             null,
-                                            event.getAddress().toSg()
+                                            (event.getAddress() == null) ? null : event.getAddress().toSg()
                                     ));
                         })
                         .toList()

@@ -26,6 +26,7 @@ public abstract class OutingGuide {
     private String category;
     private String description;
     private String locationDetail;
+    @Nullable
     private Address address;
     private Coordinate coordinate;
     @Nullable
@@ -57,7 +58,7 @@ public abstract class OutingGuide {
     public abstract boolean isAvailable(Instant instant);
 
     public boolean isSameAs(OutingGuide outingGuide) {
-        return this.address.equals(outingGuide.getAddress())
-                && this.name.equals(outingGuide.getName());
+        return this.name.equals(outingGuide.getName()) &&
+                (this.address == null || this.address.equals(outingGuide.getAddress()));
     }
 }
