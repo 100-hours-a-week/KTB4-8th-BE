@@ -44,6 +44,9 @@ spring:
               - openid
               - profile
               - email
+        provider:
+          google:
+            authorization-uri: "https://accounts.google.com/o/oauth2/v2/auth?prompt=select_account"
 
 keepgo:
   security:
