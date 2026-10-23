@@ -292,6 +292,7 @@ public class RecommendationServiceV2 {
         try {
             origin = kakaoPlaceSearch.getCoordinates(criteria.getRequestedLocationName());
         } catch (Exception e) {
+            log.info(e.getMessage());
             throw new IllegalStateException();
         }
         Instant requestedAt = criteria.getRequestedDatetime();
