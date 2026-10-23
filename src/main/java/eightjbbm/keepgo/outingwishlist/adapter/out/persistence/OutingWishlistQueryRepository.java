@@ -85,9 +85,8 @@ public class OutingWishlistQueryRepository {
 
         if (location != null && !location.isBlank()) {
             String normalizedLocation = location.strip();
-
-            locationCondition = course.address.address.eq(normalizedLocation)
-                    .or(course.address.address
+            locationCondition = course.location.eq(normalizedLocation)
+                    .or(course.location
                             .startsWith(normalizedLocation + " "));
         }
 

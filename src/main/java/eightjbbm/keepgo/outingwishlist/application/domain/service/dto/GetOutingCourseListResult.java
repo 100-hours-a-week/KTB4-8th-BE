@@ -79,7 +79,7 @@ public record GetOutingCourseListResult(
         return new Course(
                 entry.getId(),
                 course.getName(),
-                course.getAddress().toSg(),
+                course.getLocation(),
                 course.getDurationHours(),
                 entry.getCreateDatetime().atZone(zone).toLocalDate(),
                 List.of(new Stop(items.size(), items)));
