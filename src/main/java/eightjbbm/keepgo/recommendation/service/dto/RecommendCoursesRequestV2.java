@@ -4,6 +4,7 @@ import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
 import eightjbbm.keepgo.util.Coordinate;
+import jakarta.annotation.Nullable;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 public record RecommendCoursesRequestV2(
-        String query,
+        @Nullable String query,
         List<Candidate> candidates,
         String availableTime,
         Set<String> category,
