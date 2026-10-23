@@ -13,13 +13,9 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 import java.util.List;
 
-@EnableCaching
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(RtHashCacheProperties.class)
 public class CacheConfig {
-
-    private final RtHashCacheProperties rtHashCacheProperties;
 
     @Bean
     public CacheManager cacheManager() {
@@ -51,16 +47,6 @@ public class CacheConfig {
                         .build()
         );
 
-        // 슬롯과 같은 대화 단위라 TTL도 맞춘다.
-        var query = new CaffeineCache(
-                "query",
-                Caffeine.newBuilder()
-                        .maximumSize(1000)
-                        .expireAfterWrite(Duration.ofSeconds(600))
-                        .recordStats()
-                        .build()
-        );
-
         var atBlacklist = new CaffeineCache(
                 "atBlacklist",
                 Caffeine.newBuilder()
@@ -70,16 +56,7 @@ public class CacheConfig {
                         .build()
         );
 
-        var rtHash = new CaffeineCache(
-                "rtHash",
-                Caffeine.newBuilder()
-                        .maximumSize(rtHashCacheProperties.maximumSize())
-                        .expireAfterWrite(rtHashCacheProperties.expireAfterWrite())
-                        .recordStats()
-                        .build()
-        );
-
-        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, query, atBlacklist, rtHash));
+        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist));
         return cacheManager;
     }
 }

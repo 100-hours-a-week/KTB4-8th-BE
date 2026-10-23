@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.integration;
 
-import eightjbbm.keepgo.auth.AccessTokenManager;
+import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;

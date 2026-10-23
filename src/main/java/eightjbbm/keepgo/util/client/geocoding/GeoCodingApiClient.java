@@ -28,9 +28,9 @@ public class GeoCodingApiClient {
                                     .queryParam("request", "getAddress")
                                     .queryParam("version", 2.0)
                                     .queryParam("crs", "epsg:4326")
-                                    .queryParam("point", lat + "," + lng)
+                                    .queryParam("point", lng + "," + lat)
                                     .queryParam("format", "json")
-                                    .queryParam("type", "road")
+                                    .queryParam("type", "both")
                                     .queryParam("zipcode", false)
                                     .queryParam("simple", true)
                                     .queryParam("key", properties.key());

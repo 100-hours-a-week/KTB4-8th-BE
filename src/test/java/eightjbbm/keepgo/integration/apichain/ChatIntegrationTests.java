@@ -1,22 +1,16 @@
 package eightjbbm.keepgo.integration.apichain;
 
-import eightjbbm.keepgo.auth.AccessTokenManager;
+import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.auth.JwtProperties;
 import eightjbbm.keepgo.chat.dto.SendChatRequest;
 import eightjbbm.keepgo.chat.dto.UpdateSlotRequest;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.member.entity.Member;
-import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheRepository;
-import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
-import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
-import eightjbbm.keepgo.util.dto.AiSlot;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
-import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -34,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.anyOf;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,7 +120,7 @@ public class ChatIntegrationTests {
                 "test",
                 LocalDateTime.now(),
                 180,
-                List.of("카페")
+                Set.of("카페")
         );
 
         var result = webTestClient
@@ -179,9 +173,8 @@ public class ChatIntegrationTests {
                 .thenAnswer(invocation -> {
                     Thread.sleep(Duration.ofSeconds(5));
                     IO.println("Job Done!");
-                    return new ExtractSlotResponse("extract_success", new ExtractSlotResponse.ExtractData(
-                            new AiSlot(null, null, null, null, null), "", "어디로 가고 싶으세요?"
-                    ));
+                    getReplyCacheRepository.update(member.getId(), null);
+                    return null;
                 });
 
         var request = new SendChatRequest("hello");

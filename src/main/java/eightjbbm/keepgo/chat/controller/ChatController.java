@@ -30,7 +30,7 @@ public class ChatController {
     @PostMapping
     public ResponseEntity<SendChatResponse> sendChat(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestBody SendChatRequest request
+            @Valid @RequestBody SendChatRequest request
     ) {
         var command = ChatMapper.INSTANCE.toSendChatCommand(
                 Long.valueOf(jwt.getSubject()),

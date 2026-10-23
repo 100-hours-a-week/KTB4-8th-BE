@@ -1,5 +1,11 @@
 package eightjbbm.keepgo.util.client.google;
 
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.youtube.YouTube;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 import eightjbbm.keepgo.util.dto.RetrieveLikedVideosResponse;
 import eightjbbm.keepgo.util.dto.RetrieveLikesPlaylistIdResponse;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
 
+import java.io.IOException;
 import java.util.List;
 
 @Component

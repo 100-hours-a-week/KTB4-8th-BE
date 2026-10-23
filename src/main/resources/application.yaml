@@ -7,6 +7,11 @@ spring:
     name: keepgo
   jackson:
     property-naming-strategy: SNAKE_CASE
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
   datasource:
     url: jdbc:${DB_VENDOR:mysql}://${DB_HOST:172.25.96.1}:${DB_PORT:3306}/${DB_NAME:keepgo}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}
     username: ${DB_USERNAME:keepgo}
@@ -19,13 +24,29 @@ spring:
       client:
         registration:
           google:
+            provider: google
             client-id: ${GOOGLE_CLIENT_ID:451367164829-umjho06iuhcmapqlk7f0ebesllrbsukq.apps.googleusercontent.com}
             client-secret: ${GOOGLE_CLIENT_SECRET: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}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - openid
               - profile
               - email
               - https://www.googleapis.com/auth/youtube.readonly
+          google-login:
+            provider: google
+            client-id: ${GOOGLE_LOGIN_CLIENT_ID}
+            client-secret: ${GOOGLE_LOGIN_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+              - email
+        provider:
+          google:
+            authorization-uri: "https://accounts.google.com/o/oauth2/v2/auth?prompt=select_account"
 
 keepgo:
   security:
@@ -33,7 +54,7 @@ keepgo:
     jwt:
       access-token-ttl: 30m
       key-id: placeholder
-      issuer: https://auth.example.com
+      issuer: https://auth.keepgo.kr
       audience: placeholder
       client-id: placeholder
       public-key: classpath:keys/public_key.pem
@@ -50,11 +71,27 @@ keepgo:
     rt-hash:
       maximum-size: 1000
       expire-after-write: 1d
-  recommendation:
-    # 코스 추천 후보 출처 (임시, 2026-10)
-    # web: 사용자 저장 데이터 없이 대화 조건만 보내 AI가 웹검색으로 코스를 짠다
-    # saved: DB 장소를 후보로, 회원 저장 장소를 취향 이력으로 보낸다 (되돌릴 때 이 값)
-    candidate-source: ${KEEPGO_RECOMMENDATION_CANDIDATE_SOURCE:web}
+  ephemeral:
+    provider: ${EPHEMERAL_DATABASE:caffeine}
+    access-token-blacklist:
+      name: access-token-blacklist
+      ttl: 35m
+    refresh-token-hash:
+      name: refresh-token-hashes
+      ttl: 14d
+  storage:
+    provider: ${FILE_STORAGE_PROVIDER:local}
+    local:
+      root-path: ${FILE_STORAGE_LOCAL_PATH:uploads}
+    s3:
+      bucket: ${FILE_STORAGE_S3_BUCKET:}
+      region: ${FILE_STORAGE_S3_REGION:}
+
+recommendation:
+  candidate-radius-km: 5
+  jobs:
+    backend: ${EPHEMERAL_DATABASE:caffeine}
+    poll-interval-ms: 250
 
 management:
   server:

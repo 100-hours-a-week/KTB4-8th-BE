@@ -1,23 +1,33 @@
 package eightjbbm.keepgo.recommendation.entity;
 
+import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Entity
 @Getter
-@DiscriminatorValue("PLACE")
+@DiscriminatorValue("place")
 @NoArgsConstructor
 public class OutingPlace extends OutingGuide {
-    //private Float lat;
-    //private Float lng;
 
-    public OutingPlace(/*Float lat, Float lng, */String category, String name, String description) {
-        /*
-        this.lat = lat;
-        this.lng = lng;
-         */
-        super(category, name, description);
+    public OutingPlace(
+            String category,
+            String name,
+            String description,
+            String locationDetail,
+            String address,
+            Coordinate coordinate,
+            @Nullable BusinessSchedule businessSchedule) {
+        super(category, name, description, locationDetail, address, coordinate, businessSchedule);
+    }
+
+    @Override
+    public boolean isAvailable(Instant instant) {
+        return this.getBusinessSchedule() != null && this.getBusinessSchedule().isAvailable(instant);
     }
 }

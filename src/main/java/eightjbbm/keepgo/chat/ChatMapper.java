@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.chat;
 
 import eightjbbm.keepgo.chat.dto.*;
-import eightjbbm.keepgo.util.cache.slot.UpdateSlotCacheRequest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -27,7 +26,4 @@ public interface ChatMapper {
     GetChatsCommand toGetChatsCommand(Long memberId, Long cursor, Integer size);
 
     ResetChatroomCommand toResetChatroomCommand(Long memberId);
-
-    @Mapping(source = "userCoordinate", target = "coordinate")
-    UpdateSlotCacheRequest toUpdateSlotCacheRequest(UpdateSlotCommand command);
 }

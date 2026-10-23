@@ -1,15 +1,32 @@
 package eightjbbm.keepgo.util.dto;
 
-public record ExtractSlotResponse(
-        String message,
-        ExtractData data
-) {
-    /// @param slot AI가 이전 슬롯과 이번 발화를 합쳐 돌려준 슬롯 (AI 형식)
-    /// @param query 정성 조건
-    /// @param botMessage 사용자에게 보여줄 챗봇 답변
+import eightjbbm.keepgo.chat.dto.GetReplyResponse;
+import eightjbbm.keepgo.util.Coordinate;
+
+import java.time.LocalDate;
+
+public sealed interface ExtractSlotResponse {
+    public record Success(
+            String message,
+            ExtractData data
+    ) implements ExtractSlotResponse {}
+
     public record ExtractData(
-            AiSlot slot,
+            ExtractSlot slot,
             String query,
             String botMessage
     ) {}
+
+    public record ExtractSlot(
+            Coordinate origin,
+            String region,
+            LocalDate datetime,
+            Integer availableTime,
+            String category
+    ) {}
+
+    public record Error(
+            String message,
+            Object data
+    ) implements ExtractSlotResponse {}
 }

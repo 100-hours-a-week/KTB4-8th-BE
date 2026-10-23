@@ -3,19 +3,19 @@ name: Backend CI
 # ------------------------------------------------------------
 # CI 정책
 # ------------------------------------------------------------
-# main Push
+# main / develop Push
 # - Gradle Build와 Docker Image Build를 검증한다.
 # - 검증된 Docker Image를 Commit SHA Tag로 ECR에 저장한다.
 #
 # 이 Workflow는 Production EC2에는 배포하지 않는다.
 # 실제 Production 배포는 Cloud Repository의 CD Workflow에서 수행한다.
 #
-# ECR에는 main CI를 통과한 Image만 저장한다.
+# ECR에는 각 브랜치 CI를 통과한 Image를 저장한다. Cloud가 운영/V2 개발 대상을 구분한다.
 # latest Tag는 사용하지 않고 Commit SHA를 사용한다.
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, develop]
 
 # main에 새로운 Commit이 Push되면 이전 Commit의 CI를 취소하고
 # 최신 Commit만 검증 및 발행한다.
@@ -36,9 +36,9 @@ permissions:
 jobs:
 
   main-image:
-    name: Main - Build and Push Image
+    name: ${{ github.ref == 'refs/heads/develop' && 'Dev - Build and Push Image' || 'Main - Build and Push Image' }}
 
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
 
     runs-on: ubuntu-latest
 

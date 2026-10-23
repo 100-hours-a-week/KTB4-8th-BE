@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(AiServerApiClientProperties.class)
+@EnableConfigurationProperties(GeoCodingApiClientProperties.class)
 public class GeoCodingApiClientConfig {
 
     private final GeoCodingApiClientProperties properties;

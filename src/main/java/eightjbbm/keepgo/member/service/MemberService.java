@@ -3,34 +3,21 @@ package eightjbbm.keepgo.member.service;
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
-import eightjbbm.keepgo.member.entity.OutingCollectionPrivate;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.member.repository.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
-import eightjbbm.keepgo.recommendation.entity.OutingEvent;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
-import eightjbbm.keepgo.util.client.ai.AnalyzeVideoRequest;
 import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
-import eightjbbm.keepgo.util.file.File;
 import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
-import eightjbbm.keepgo.util.dto.AnalyzeVideoResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
+import eightjbbm.keepgo.util.file.FileUtil;
 
 @Slf4j
 @Service
@@ -56,7 +43,11 @@ public class MemberService {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
 
-        fileRepository.findByStoragePath(command.profileImagePath()).ifPresent(member::updateProfileImage);
+        String profileImagePath =
+                FileUtil.extractPathFromUrl(command.profileImagePath());
+
+        fileRepository.findByStoragePath(profileImagePath)
+                .ifPresent(member::updateProfileImage);
         return UpdateMemberInfoResult.from(member);
     }
 
@@ -97,28 +88,40 @@ public class MemberService {
                 .map(GetLikedVideosResponse.Item::id)
                 .forEach(
                         url -> {
+                            /*
                             AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
-                            OutingGuide guide;
-                            if (isPlaceOrEvent(response.getCategory())) {
-                                guide = outingPlaceRepository.findByName(response.getName()).orElseGet(
-                                        () -> outingPlaceRepository.save(new OutingPlace(
-                                                response.getCategory(),
-                                                response.getName(),
-                                                response.getSummary()
-                                        ))
-                                );
-                            } else {
-                                guide = outingEventRepository.findByName(response.getName()).orElseGet(
-                                        () -> outingEventRepository.save(new OutingEvent(
-                                                response.getCategory(),
-                                                response.getName(),
-                                                response.getSummary(),
-                                                response.data().eventStartDate(),
-                                                response.data().eventEndDate()
-                                        ))
-                                );
+                            if (response instanceof AnalyzeVideoResponseV2.Success successResponse) {
+                                OutingGuide guide;
+                                if (isPlaceOrEvent(successResponse.data())) {
+                                    guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
+                                            () -> outingPlaceRepository.save(new OutingPlace(
+                                                    successResponse.getCategory(),
+                                                    successResponse.getName(),
+                                                    successResponse.getSummary(),
+                                                    null,
+                                                    null,
+                                                    null
+                                            ))
+                                    );
+                                } else {
+                                    guide = outingEventRepository.findByName(successResponse.getName()).orElseGet(
+                                            () -> outingEventRepository.save(new OutingEvent(
+                                                    successResponse.getCategory(),
+                                                    successResponse.getName(),
+                                                    successResponse.getSummary(),
+                                                    null, //successResponse.data().eventStartDate(),
+                                                    null, //successResponse.data().eventEndDate(),
+                                                    null,
+                                                    null,
+                                                    null
+                                            ))
+                                    );
+                                }
+                                outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
                             }
-                            outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
+
+                             */
+
                         }
                 );
     }

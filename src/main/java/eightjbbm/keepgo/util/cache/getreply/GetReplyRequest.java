@@ -1,32 +1,27 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
 import eightjbbm.keepgo.chat.dto.SendChatCommand;
-import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 public record GetReplyRequest(
         Long memberId,
         String content,
         LocalDate createdDate,
-        SlotValue slot,
-        String query
+        OutingCriteria outingCriteria
 ) {
+
     public static GetReplyRequest from(
           SendChatCommand command,
           LocalDate date,
-          SlotValue slot,
-          String query
+          OutingCriteria outingCriteria
     ) {
         return new GetReplyRequest(
                 command.memberId(),
                 command.content(),
                 date,
-                slot,
-                query
+                outingCriteria
         );
     }
 }

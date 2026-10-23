@@ -1,0 +1,181 @@
+package eightjbbm.keepgo.outingwishlist.adapter.in.web;
+
+import eightjbbm.keepgo.outingwishlist.adapter.in.web.dto.*;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequiredArgsConstructor
+public class OutingWishlistController {
+
+    private final OutingWishlistService outingWishlistService;
+
+    /// 여행 위시리스트에 추가한 장소 목록 조회 API
+    ///
+    @GetMapping("/api/v2/member/outing-wishlist/places")
+    public ResponseEntity<GetPlaceListResponse> getPlaceList(
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String cursor,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getPlaceList(
+                new GetPlaceListCommand(
+                        memberId,
+                        location,
+                        cursor));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    /// 여행 위시리스트에 추가한 장소 상세 조회 API
+    ///
+    @GetMapping("/api/v2/member/outing-wishlist/places/{placeId}")
+    public ResponseEntity<GetPlaceDetailResponse> getPlaceDetail(
+            @PathVariable @Positive Long placeId,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getPlaceDetail(
+                new GetPlaceDetailCommand(
+                        memberId,
+                        placeId));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @DeleteMapping("/api/v2/member/outing-wishlist/places/{placeId}")
+    public ResponseEntity<Void> removePlace(
+            @PathVariable @Positive Long placeId,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        outingWishlistService.removePlace(memberId, placeId);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .build();
+    }
+
+    /// 여행 위시리스트에 추가한 행사 목록 조회 API
+    ///
+    @GetMapping("/api/v2/member/outing-wishlist/events")
+    public ResponseEntity<GetEventListResponse> getEventList(
+            @RequestParam(required = false) boolean ongoing,
+            @RequestParam(required = false) String cursor,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getEventList(
+                new GetEventListCommand(
+                        memberId,
+                        ongoing,
+                        cursor));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    /// 여행 위시리스트에 추가한 행사 상세 조회 API
+    ///
+    @GetMapping("/api/v2/member/outing-wishlist/events/{eventId}")
+    public ResponseEntity<GetEventDetailResponse> getEventDetail(
+            @PathVariable @Positive Long eventId,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getEventDetail(
+                new GetEventDetailCommand(
+                        memberId,
+                        eventId));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @DeleteMapping("/api/v2/member/outing-wishlist/events/{eventId}")
+    public ResponseEntity<Void> removeEvent(
+            @PathVariable @Positive Long eventId,
+            @AuthenticationPrincipal @NotNull Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        outingWishlistService.removeEvent(memberId, eventId);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .build();
+    }
+
+    @GetMapping("/api/v2/member/outing-wishlist/outing-courses")
+    public ResponseEntity<GetOutingCourseListResponse> getOutingCourseList(
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String cursor,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getOutingCourseList(
+                new GetOutingCourseListCommand(
+                        memberId,
+                        location,
+                        cursor));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @GetMapping("/api/v2/member/outing-wishlist/outing-courses/{outingCourseId}")
+    public ResponseEntity<GetOutingCourseDetailResponse> getOutingCourseDetail(
+            @PathVariable @Positive Long outingCourseId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.getOutingCourseDetail(
+                new GetOutingCourseDetailCommand(
+                        memberId,
+                        outingCourseId));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(OutingWishlistControllerMapper.INSTANCE.fromResult(result));
+    }
+
+    @DeleteMapping("/api/v2/member/outing-wishlist/outing-courses/{outingCourseId}")
+    public ResponseEntity<Void> removeOutingCourse(
+            @PathVariable @Positive Long outingCourseId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        outingWishlistService.removeOutingCourse(memberId, outingCourseId);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .build();
+    }
+
+    @PostMapping("/api/v2/member/outing-wishlist/outing-courses")
+    public ResponseEntity<Void> addOutingCourse(
+            @Valid @RequestBody AddOutingCourseRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        var result = outingWishlistService.addOutingCourse(
+                AddOutingCourseCommand.from(
+                        memberId,
+                        request));
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .header(
+                        HttpHeaders.LOCATION,
+                        "/api/v2/member/outing-wishlist/outing-courses/" + result.addedOutingWishlistEntryId())
+                .build();
+    }
+}

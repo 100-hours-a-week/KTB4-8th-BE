@@ -1,23 +1,41 @@
 package eightjbbm.keepgo.chat.dto;
 
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
-import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
+import eightjbbm.keepgo.util.Coordinate;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Set;
 
 public sealed interface GetReplyResult
         permits GetReplyResult.Completed, GetReplyResult.InProgress {
 
-    /// @param slot AI 응답을 기존 슬롯에 병합한 결과
     record Completed(
             String status,
             Chat chat,
-            GetReplyResponse.Slot slot
+            Slot slot
     ) implements GetReplyResult {
-        public static GetReplyResult from(String status, ExtractSlotResponse.ExtractData response, SlotValue mergedSlot) {
+        public static GetReplyResult from(String status, String content, OutingCriteria outingCriteria) {
             return new Completed(
-                    status, new Chat(response.botMessage(), true), GetReplyResponse.Slot.from(mergedSlot)
+                    status, new Chat(content, true),
+                    new Slot(
+                            outingCriteria.getUserCoordinate(),
+                            outingCriteria.getRequestedLocationName(),
+                            outingCriteria.getRequestedDatetime().atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                            outingCriteria.getUserAvailableTimeMinutes(),
+                            outingCriteria.getCategories()
+                    )
             );
         }
     }
+
+    public record Slot(
+            Coordinate origin,
+            String region,
+            LocalDateTime datetime,
+            Integer availableTime,
+            Set<String> category
+    ) {}
 
     record InProgress(
             String status,

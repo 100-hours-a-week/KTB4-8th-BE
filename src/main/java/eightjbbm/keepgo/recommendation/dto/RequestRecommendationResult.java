@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.recommendation.dto;
 
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 
@@ -26,14 +27,14 @@ public record RequestRecommendationResult(
             Integer totalPlaceCount,
             Integer totalTravelTime
     ) {
-        public static RecommendationSnippet from(RecommendCourseResponse.RecommendData.RecommendCourse course) {
+        public static RecommendationSnippet from(RecommendCourseResponse.Success.RecommendCourse course) {
             return new RecommendationSnippet(
                     course.title(),
                     String.valueOf(100),
                     course.places().size(),
                     course.places()
                             .stream()
-                            .mapToInt(RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace::travelMinutes)
+                            .mapToInt(RecommendCourseResponse.Success.RecommendPlace::travelMinutes)
                             .sum()
             );
         }
@@ -46,13 +47,13 @@ public record RequestRecommendationResult(
             List<RecommendationDetailItem> items
     ) {
         public static RecommendationDetail from(
-                RecommendCourseResponse.RecommendData.RecommendCourse course,
-                Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingGuide> extractor
+                RecommendCourseResponse.RecommendCourse course,
+                Function<RecommendCourseResponse.RecommendPlace, OutingPlace> extractor
         ) {
             return new RecommendationDetail(
                     course.title(),
                     String.valueOf(100),
-                    course.places().stream().mapToInt(RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace::travelMinutes).sum(),
+                    course.places().stream().mapToInt(RecommendCourseResponse.RecommendPlace::travelMinutes).sum(),
                     IntStream.range(0, course.places().size())
                             .mapToObj(k -> RecommendationDetailItem.from(
                                     k,
@@ -71,11 +72,11 @@ public record RequestRecommendationResult(
             Float lat,
             Float lng
     ) {
-        public static RecommendationDetailItem from(int sequence, RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace place, OutingGuide outingGuide) {
+        public static RecommendationDetailItem from(int sequence, RecommendCourseResponse.RecommendPlace place, OutingPlace outingPlace) {
             return new RecommendationDetailItem(
                     sequence,
                     place.placeName(),
-                    outingGuide == null ? null : outingGuide.getCategory(),
+                    outingPlace.getCategory(),
                     place.travelMinutes().toString(),
                     /*
                     outingPlace.getLat(),
@@ -89,14 +90,14 @@ public record RequestRecommendationResult(
     }
 
     public static RequestRecommendationResult from(
-            SlotValue slot,
-            RecommendCourseResponse response,
-            Function<RecommendCourseResponse.RecommendData.RecommendCourse.RecommendPlace, OutingGuide> extractor) {
+            OutingCriteria outingCriteria,
+            RecommendCourseResponse.Success response,
+            Function<RecommendCourseResponse.RecommendPlace, OutingPlace> extractor) {
         return new RequestRecommendationResult(
                 new RecommendationMetadata(
                         response.data().courses().size(),
-                        slot.getRegion(),
-                        slot.getDatetime() == null ? null : slot.getDatetime().toString()
+                        outingCriteria.getRequestedLocationName(),
+                        outingCriteria.getRequestedDatetime().toString()
                 ),
                 response.data().courses().stream().map(RecommendationSnippet::from).toList(),
                 response.data().courses().stream().map(k -> RecommendationDetail.from(k, extractor)).toList()
