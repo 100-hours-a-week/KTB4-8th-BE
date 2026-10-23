@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -26,6 +27,8 @@ public class OutingCourse {
 
     private String location;
 
+    private Instant createDatetime;
+
     @Setter
     @OneToMany(mappedBy = "outingCourse")
     private List<OutingStop> stops;
@@ -42,6 +45,7 @@ public class OutingCourse {
         this.recommendationScore = recommendationScore;
         this.location = location;
         this.stops = stops;
+        this.createDatetime = Instant.now();
     }
 
     public static OutingCourse from(
