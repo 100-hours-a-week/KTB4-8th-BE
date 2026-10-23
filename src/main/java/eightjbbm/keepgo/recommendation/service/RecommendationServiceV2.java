@@ -317,7 +317,6 @@ public class RecommendationServiceV2 {
 
         if (!hasCoordinate(criteria.getUserCoordinate())
                 || criteria.getRequestedDatetime() == null
-                || criteria.getUserPreferenceSummary() == null
                 || minutes == null
                 || !List.of(180, 360, 540).contains(minutes)) {
             throw new BadRequestException();

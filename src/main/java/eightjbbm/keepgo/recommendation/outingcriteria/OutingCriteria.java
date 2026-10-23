@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.recommendation.outingcriteria;
 
 import eightjbbm.keepgo.util.Coordinate;
+import jakarta.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -17,7 +18,7 @@ public class OutingCriteria {
     private Instant requestedDatetime;
     private Integer userAvailableTimeMinutes;
     private Set<String> categories;
-    private String userPreferenceSummary;
+    @Nullable private String userPreferenceSummary;
 
     public static OutingCriteria emptyOutingCriteriaWithMemberId(Long memberId) {
         return new OutingCriteria(
@@ -26,7 +27,7 @@ public class OutingCriteria {
                 null,
                 null,
                 null,
-                new HashSet<String>(),
+                new HashSet<>(),
                 null
         );
     }
