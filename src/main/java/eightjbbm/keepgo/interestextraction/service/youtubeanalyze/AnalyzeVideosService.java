@@ -2,8 +2,8 @@ package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.sandbox.OutingGuideFactory;
-import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.sandbox.aiv2.AiServerService;
 import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
 import lombok.RequiredArgsConstructor;
