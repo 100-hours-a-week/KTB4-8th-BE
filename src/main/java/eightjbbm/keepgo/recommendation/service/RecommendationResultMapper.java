@@ -31,7 +31,7 @@ public class RecommendationResultMapper {
             OutingCriteria outingCriteria,
             RecommendCoursesResponseV2.SuccessData data
     ) {
-        Integer matchScore = data.matchScore();
+        int matchScore = data.matchScore() == null ? 85 : data.matchScore();
         List<OutingCourse> outingCourses = data.courses()
                 .stream()
                 .map(

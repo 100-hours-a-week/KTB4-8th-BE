@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.recommendation.service.dto;
 
+import jakarta.annotation.Nullable;
+
 import java.time.LocalTime;
 import java.util.List;
 
@@ -11,7 +13,7 @@ public interface RecommendCoursesResponseV2 {
 
     record SuccessData(
             Object error,
-            Integer matchScore,
+            @Nullable Integer matchScore,
             List<Course> courses
     ) {}
 
