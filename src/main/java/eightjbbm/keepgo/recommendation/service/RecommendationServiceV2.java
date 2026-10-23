@@ -38,8 +38,7 @@ public class RecommendationServiceV2 {
     private final AiServerRecommendApiService aiServerService;
     private final OutingCriteriaRepository criteriaRepository;
     private final OutingCollectionPrivateRepository collectionRepository;
-    private final OutingCourseRepository outingCourseRepository;
-    private final OutingStopRepository outingStopRepository;
+    private final KakaoPlaceSearch kakaoPlaceSearch;
     private final RecommendationResultMapper resultMapper;
     private final RecommendationJobStore jobs;
     private final Executor executor;
@@ -51,8 +50,7 @@ public class RecommendationServiceV2 {
     public RecommendationServiceV2(
             AiServerRecommendApiService aiServerService,
             OutingCriteriaRepository criteriaRepository,
-            OutingCourseRepository outingCourseRepository,
-            OutingStopRepository outingStopRepository,
+            KakaoPlaceSearch kakaoPlaceSearch,
             OutingCollectionPrivateRepository collectionRepository,
             RecommendationResultMapper resultMapper,
             RecommendationJobStore jobs,
@@ -66,8 +64,7 @@ public class RecommendationServiceV2 {
         this.aiServerService = aiServerService;
         this.criteriaRepository = criteriaRepository;
         this.collectionRepository = collectionRepository;
-        this.outingCourseRepository = outingCourseRepository;
-        this.outingStopRepository = outingStopRepository;
+        this.kakaoPlaceSearch = kakaoPlaceSearch;
         this.resultMapper = resultMapper;
         this.jobs = jobs;
         this.executor = executor;
@@ -291,7 +288,12 @@ public class RecommendationServiceV2 {
             Long memberId,
             OutingCriteria criteria
     ) {
-        Coordinate origin = criteria.getUserCoordinate();
+        Coordinate origin;
+        try {
+            origin = kakaoPlaceSearch.getCoordinates(criteria.getRequestedLocationName());
+        } catch (Exception e) {
+            throw new IllegalStateException();
+        }
         Instant requestedAt = criteria.getRequestedDatetime();
 
         return collectionRepository.findRecommendationCandidates(memberId)
