@@ -44,9 +44,10 @@ public class RecommendationResultMapper {
                                 matchScore,
                                 outingCriteria.getRequestedLocationName(),
                                     null);
+                            var savedCourse = outingCourseRepository.save(outingCourse);
                             List<OutingStop> stops = course.places().stream()
                                     .map(place -> new OutingStop(
-                                            outingCourse,
+                                            savedCourse,
                                             place.travelMinutes(),
                                             course.places().indexOf(place),
                                             outingGuideRepository.getReferenceById(Long.valueOf(place.placeId()))))
