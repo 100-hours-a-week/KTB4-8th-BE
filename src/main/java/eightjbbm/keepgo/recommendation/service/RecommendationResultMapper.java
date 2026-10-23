@@ -11,6 +11,7 @@ import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -27,6 +28,7 @@ public class RecommendationResultMapper {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                     .withZone(ZoneId.of("Asia/Seoul"));
 
+    @Transactional
     public RecommendOutingCourseResultV2 map(
             OutingCriteria outingCriteria,
             RecommendCoursesResponseV2.SuccessData data
