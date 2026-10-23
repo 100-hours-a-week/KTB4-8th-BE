@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
@@ -62,7 +63,22 @@ public class AiServerApiClientConfig {
                         );
                     }
 
-                    return execution.execute(request, body);
+                    var response = execution.execute(request, body);
+
+
+                    String responseBody = StreamUtils.copyToString(
+                            response.getBody(), charset
+                    );
+
+                    log.info(
+                            "RestClient response: method={}, uri={}, status={}, body={}",
+                            request.getMethod(),
+                            request.getURI(),
+                            response.getStatusCode().value(),
+                            responseBody
+                    );
+
+                    return response;
                 })
                 .defaultHeader(
                         HttpHeaders.ACCEPT,
