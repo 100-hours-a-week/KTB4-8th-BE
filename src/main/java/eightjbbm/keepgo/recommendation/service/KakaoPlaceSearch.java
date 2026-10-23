@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.recommendation.service;
 
 import eightjbbm.keepgo.util.Coordinate;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -13,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
+@Component
 public class KakaoPlaceSearch {
 
     private static final String BASE_URL =
