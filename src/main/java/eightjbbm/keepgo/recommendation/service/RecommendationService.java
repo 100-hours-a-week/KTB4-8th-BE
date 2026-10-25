@@ -1,15 +1,14 @@
 package eightjbbm.keepgo.recommendation.service;
 
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationCommand;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult;
 import eightjbbm.keepgo.recommendation.dto.StopRecommendationCommand;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.cache.recommendationjob.RecommendationJobCacheService;
-import eightjbbm.keepgo.util.cache.slot.SlotValue;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
 import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
@@ -30,7 +29,7 @@ public class RecommendationService {
 
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         Long memberId = command.memberId();
-        List<OutingCollectionPrivate> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
+        List<OutingWishlistEntry> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
         OutingCriteria outingCriteria = outingCriteriaRepository.findById(memberId).orElseThrow();
         recommendationJobCacheService.createJob(memberId, 0L);
 

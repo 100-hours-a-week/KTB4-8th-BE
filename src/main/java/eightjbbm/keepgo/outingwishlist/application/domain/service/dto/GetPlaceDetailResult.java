@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.Coordinate;
 
@@ -21,7 +21,7 @@ public record GetPlaceDetailResult(
         String addressRoad,
         Coordinate coordinate
 ) {
-    public static GetPlaceDetailResult from(OutingCollectionPrivate wishlistEntry) {
+    public static GetPlaceDetailResult from(OutingWishlistEntry wishlistEntry) {
         OutingPlace place = (OutingPlace) wishlistEntry.getOutingGuide();
         return new GetPlaceDetailResult(
                 wishlistEntry.getId(),

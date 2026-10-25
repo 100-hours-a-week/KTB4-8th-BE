@@ -1,9 +1,8 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service;
 
-import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
@@ -11,13 +10,11 @@ import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.InvalidPageTokenException;
 import eightjbbm.keepgo.outingwishlist.common.OutingCourseNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
-import eightjbbm.keepgo.recommendation.entity.OutingCourse;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.util.exception.UnprocessableContentException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,7 +42,7 @@ public class OutingWishlistService {
                 ? new PageToken(null, null)
                 : pageTokenCodec.decode(command.cursor())
                 .orElseThrow(InvalidPageTokenException::new);
-        List<OutingCollectionPrivate> wishlistEntries = outingWishlistQueryRepository
+        List<OutingWishlistEntry> wishlistEntries = outingWishlistQueryRepository
                 .findAllByCursor(
                         command.memberId(),
                         "place",
@@ -72,7 +69,7 @@ public class OutingWishlistService {
     public GetPlaceDetailResult getPlaceDetail(
             GetPlaceDetailCommand command
     ) {
-        OutingCollectionPrivate wishlistEntry = outingWishlistRepository
+        OutingWishlistEntry wishlistEntry = outingWishlistRepository
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(
                         command.memberId(),
                         command.placeId())
@@ -93,7 +90,7 @@ public class OutingWishlistService {
                 ? new PageToken(null, null)
                 : pageTokenCodec.decode(command.cursor())
                 .orElseThrow(InvalidPageTokenException::new);
-        List<OutingCollectionPrivate> wishlistEntries = outingWishlistQueryRepository
+        List<OutingWishlistEntry> wishlistEntries = outingWishlistQueryRepository
                 .findAllByCursor(
                         command.memberId(),
                         "event",
@@ -120,7 +117,7 @@ public class OutingWishlistService {
     public GetEventDetailResult getEventDetail(
             GetEventDetailCommand command
     ) {
-        OutingCollectionPrivate wishlistEntry = outingWishlistRepository
+        OutingWishlistEntry wishlistEntry = outingWishlistRepository
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(
                         command.memberId(),
                         command.eventId())
@@ -203,7 +200,7 @@ public class OutingWishlistService {
             AddOutingCourseCommand command
     ) {
         var savedOutingWishlistEntry = outingWishlistRepository.save(
-                OutingCollectionPrivate.from(
+                OutingWishlistEntry.from(
                         memberRepository.getReferenceById(command.memberId()),
                         outingCourseRepository.getReferenceById(command.outingCourseId())));
         return AddOutingCourseResult.from(

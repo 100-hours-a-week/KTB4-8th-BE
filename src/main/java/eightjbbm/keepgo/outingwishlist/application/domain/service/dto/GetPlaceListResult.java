@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 
 import java.util.List;
 
@@ -20,7 +19,7 @@ public record GetPlaceListResult(
     ) {}
 
     public static GetPlaceListResult from(
-            List<OutingCollectionPrivate> wishlistEntries,
+            List<OutingWishlistEntry> wishlistEntries,
             String nextCursor
     ) {
         return new GetPlaceListResult(

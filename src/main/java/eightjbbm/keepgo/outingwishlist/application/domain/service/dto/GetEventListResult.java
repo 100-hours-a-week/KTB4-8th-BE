@@ -1,8 +1,7 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import jakarta.annotation.Nullable;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -30,7 +29,7 @@ public record GetEventListResult(
     ) {}
 
     public static GetEventListResult from(
-            List<OutingCollectionPrivate> wishlistEntries,
+            List<OutingWishlistEntry> wishlistEntries,
             String nextCursor
     ) {
         return new GetEventListResult(

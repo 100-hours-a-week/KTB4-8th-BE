@@ -11,10 +11,11 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+@Table(name = "outing_collection_private")
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OutingCollectionPrivate {
+public class OutingWishlistEntry {
     @Id @GeneratedValue
     private Long id;
 
@@ -42,7 +43,7 @@ public class OutingCollectionPrivate {
     @Column(name = "deleted_at")
     private Instant deleteDatetime;
 
-    protected OutingCollectionPrivate(
+    protected OutingWishlistEntry(
             Member member,
             OutingWishlistEntryType type,
             @Nullable OutingGuide outingGuide,
@@ -55,8 +56,8 @@ public class OutingCollectionPrivate {
         this.createDatetime = Instant.now();
     }
 
-    public static OutingCollectionPrivate from(Member member, OutingGuide outingGuide) {
-        return new OutingCollectionPrivate(
+    public static OutingWishlistEntry from(Member member, OutingGuide outingGuide) {
+        return new OutingWishlistEntry(
                 member,
                 OutingWishlistEntryType.getType(outingGuide),
                 outingGuide,
@@ -64,8 +65,8 @@ public class OutingCollectionPrivate {
         );
     }
 
-    public static OutingCollectionPrivate from(Member member, OutingCourse outingCourse) {
-        return new OutingCollectionPrivate(
+    public static OutingWishlistEntry from(Member member, OutingCourse outingCourse) {
+        return new OutingWishlistEntry(
                 member,
                 OutingWishlistEntryType.getType(outingCourse),
                 null,

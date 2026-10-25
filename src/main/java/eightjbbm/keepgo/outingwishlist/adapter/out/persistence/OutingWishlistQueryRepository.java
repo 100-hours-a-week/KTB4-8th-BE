@@ -2,7 +2,7 @@ package eightjbbm.keepgo.outingwishlist.adapter.out.persistence;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.QOutingCollectionPrivate;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
@@ -19,7 +19,7 @@ import java.util.Optional;
 public class OutingWishlistQueryRepository {
     private final JPAQueryFactory queryFactory;
 
-    public List<OutingCollectionPrivate> findAllByCursor(
+    public List<OutingWishlistEntry> findAllByCursor(
             Long memberId,
             String type,
             PageToken pageToken,
@@ -73,7 +73,7 @@ public class OutingWishlistQueryRepository {
 
 
 
-    public List<OutingCollectionPrivate> findCoursesByCursor(
+    public List<OutingWishlistEntry> findCoursesByCursor(
             Long memberId,
             String location,
             PageToken pageToken,
@@ -137,7 +137,7 @@ public class OutingWishlistQueryRepository {
                 .fetch();
     }
 
-    public Optional<OutingCollectionPrivate> findCourseDetail(
+    public Optional<OutingWishlistEntry> findCourseDetail(
             Long memberId,
             Long wishlistEntryId
     ) {

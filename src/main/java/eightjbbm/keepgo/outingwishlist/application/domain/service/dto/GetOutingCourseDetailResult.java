@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
 import eightjbbm.keepgo.recommendation.entity.OutingStop;
 import eightjbbm.keepgo.util.Coordinate;
@@ -33,7 +33,7 @@ public record GetOutingCourseDetailResult(
     ) {}
 
     public static GetOutingCourseDetailResult from(
-            OutingCollectionPrivate entry,
+            OutingWishlistEntry entry,
             Instant referenceTime
     ) {
         var course = entry.getOutingCourse();

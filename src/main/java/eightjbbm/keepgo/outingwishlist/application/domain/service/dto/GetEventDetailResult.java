@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
@@ -29,7 +29,7 @@ public record GetEventDetailResult(
             Coordinate coordinate
     ) {}
 
-    public static GetEventDetailResult from(OutingCollectionPrivate wishlistEntry) {
+    public static GetEventDetailResult from(OutingWishlistEntry wishlistEntry) {
         OutingEvent event = (OutingEvent) wishlistEntry.getOutingGuide();
         return new GetEventDetailResult(
                 wishlistEntry.getId(),

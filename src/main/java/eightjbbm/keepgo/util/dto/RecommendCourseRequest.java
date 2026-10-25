@@ -1,7 +1,7 @@
 package eightjbbm.keepgo.util.dto;
 
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.Coordinate;
 
@@ -51,7 +51,7 @@ public record RecommendCourseRequest(
             String placeId,
             LocalDate savedAt
     ) {
-        public static RecommendHistoryPlaceId from(OutingCollectionPrivate place) {
+        public static RecommendHistoryPlaceId from(OutingWishlistEntry place) {
             return new RecommendHistoryPlaceId(
                     place.getOutingGuide().getId().toString(),
                     place.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate()
@@ -61,7 +61,7 @@ public record RecommendCourseRequest(
 
     public static RecommendCourseRequest from(
             String query,
-            List<OutingCollectionPrivate> places,
+            List<OutingWishlistEntry> places,
             OutingCriteria outingCriteria
     ) {
 

@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingStop;
@@ -44,7 +44,7 @@ public record GetOutingCourseListResult(
     ) {}
 
     public static GetOutingCourseListResult from(
-            List<OutingCollectionPrivate> entries,
+            List<OutingWishlistEntry> entries,
             List<OutingStop> stops,
             String nextCursor
     ) {
@@ -62,7 +62,7 @@ public record GetOutingCourseListResult(
     }
 
     private static Course toCourse(
-            OutingCollectionPrivate entry,
+            OutingWishlistEntry entry,
             Map<Long, List<OutingStop>> stopsByCourseId,
             ZoneId zone
     ) {

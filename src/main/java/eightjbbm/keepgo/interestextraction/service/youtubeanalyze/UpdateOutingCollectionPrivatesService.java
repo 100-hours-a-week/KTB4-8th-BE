@@ -1,7 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
@@ -39,14 +39,14 @@ public class UpdateOutingCollectionPrivatesService {
                 .findAllByMemberIdAndOutingGuides(
                         memberId,
                         new HashSet<>(outingGuidesExtracted)).stream()
-                .map(OutingCollectionPrivate::getOutingGuide)
+                .map(OutingWishlistEntry::getOutingGuide)
                 .collect(Collectors.toSet());
         // 여행 위시리스트에 추가하여 미처 반영되지 못한 부분을 추가하여 최신화한다.
         outingCollectionPrivateRepository.saveAll(
                 outingGuidesExtracted.stream()
                         .filter(outingGuide -> !wishlistedOutingGuides.contains(outingGuide))
                         .map(outingGuide ->
-                                OutingCollectionPrivate.from(
+                                OutingWishlistEntry.from(
                                         memberRepository.getReferenceById(memberId),
                                         outingGuide))
                         .toList());
