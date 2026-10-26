@@ -19,17 +19,26 @@ public class AiServerService {
     }
 
     public AnalyzeVideoResponseV2 analyzeVideoV2(List<String> urls) {
-        return restClient.post()
+        var request = restClient.post()
                 .uri("/v1/analyze-video")
-                .body(convert(urls))
-                .exchange((_, res) -> {
-                    int status = res.getStatusCode().value();
-                    return switch (status) {
-                        case 200 -> res.bodyTo(AnalyzeVideoResponseV2.Success.class);
-                        case 400, 422, 429, 500, 502, 504 -> res.bodyTo(AnalyzeVideoResponseV2.Failure.class);
-                        default -> throw new RuntimeException(); // 예외 처리 구문 보완하기
-                    };
-                });
+                .body(convert(urls));
+
+        long startNanos = System.nanoTime();
+        try {
+            return request.exchange((_, res) -> {
+                int status = res.getStatusCode().value();
+                return switch (status) {
+                    case 200 -> res.bodyTo(AnalyzeVideoResponseV2.Success.class);
+                    case 400, 422, 429, 500, 502, 504 ->
+                            res.bodyTo(AnalyzeVideoResponseV2.Failure.class);
+                    default -> throw new RuntimeException();
+                };
+            });
+        } finally {
+            long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS
+                    .toMillis(System.nanoTime() - startNanos);
+            log.info("AI /v1/analyze-video 호출 소요 시간: {}ms", elapsedMillis);
+        }
     }
 
     private AnalyzeVideoRequestV2 convert(List<String> urls) {
@@ -42,10 +51,18 @@ public class AiServerService {
     }
 
     public void embedPlaces(List<OutingGuide> newOutingGuides) {
-        restClient.post()
+        var request = restClient.post()
                 .uri("/v1/embed-places")
-                .body(EmbedPlaceRequestV2.from(newOutingGuides))
-                .retrieve()
-                .toBodilessEntity();
+                .body(EmbedPlaceRequestV2.from(newOutingGuides));
+
+        long startNanos = System.nanoTime();
+        try {
+            request.retrieve()
+                    .toBodilessEntity();
+        } finally {
+            long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS
+                    .toMillis(System.nanoTime() - startNanos);
+            log.info("AI /v1/embed-places 호출 소요 시간: {}ms", elapsedMillis);
+        }
     }
 }

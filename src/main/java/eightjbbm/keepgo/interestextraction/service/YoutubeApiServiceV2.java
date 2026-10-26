@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.interestextraction.repository.youtubeanalyze;
+package eightjbbm.keepgo.interestextraction.service;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -7,7 +7,6 @@ import com.google.api.services.youtube.model.VideoListResponse;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
-import eightjbbm.keepgo.interestextraction.service.YoutubeAuthorizedClientService;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,9 +55,17 @@ public class YoutubeApiServiceV2 {
             if (pageToken != null) {
                 builder = builder.setPageToken(pageToken);
             }
-            return builder.execute();
+
+            long startNanos = System.nanoTime();
+            try {
+                return builder.execute();
+            } finally {
+                long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS
+                        .toMillis(System.nanoTime() - startNanos);
+                log.info("YouTube videos.list 호출 소요 시간: {}ms", elapsedMillis);
+            }
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("YouTube videos.list 호출 실패", e);
             throw new ServiceUnavailableException();
         }
     }
