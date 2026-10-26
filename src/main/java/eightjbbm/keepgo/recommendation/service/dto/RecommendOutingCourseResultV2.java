@@ -32,6 +32,7 @@ public record RecommendOutingCourseResultV2(
             Integer sequence,
             String name,
             String category,
+            Integer durationMinutes,
             Float lat,
             Float lng
     ) {}

@@ -84,6 +84,7 @@ public class RecommendationResultMapper {
                                                 outingStop.getId().sequence(),
                                                 outingStop.getOutingGuide().getName(),
                                                 outingStop.getOutingGuide().getCategory(),
+                                                outingStop.getTravelMinutes(),
                                                 outingStop.getOutingGuide().getCoordinate().lat(),
                                                 outingStop.getOutingGuide().getCoordinate().lng()
                                         )
