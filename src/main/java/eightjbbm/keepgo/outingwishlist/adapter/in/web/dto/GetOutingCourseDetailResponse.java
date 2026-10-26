@@ -10,7 +10,7 @@ public record GetOutingCourseDetailResponse(
         Long courseId,
         String name,
         Integer durationHours,
-        List<Stop> stops
+        Stop stops
 ) {
     public record Stop(
        Integer count,
@@ -23,6 +23,7 @@ public record GetOutingCourseDetailResponse(
        String name,
        String type,
        String category,
+       Integer durationMinutes,
        Coordinate coordinate,
        Boolean isAvailable
     ) {}
