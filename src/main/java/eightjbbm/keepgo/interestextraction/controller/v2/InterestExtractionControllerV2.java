@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class InterestExtractionControllerV2 {
-    private final InterestExtractionService interestExtractionService;
     private final InterestExtractionServiceV2 interestExtractionServiceV2;
 
     @PostMapping("/api/v2/member/youtube-sync")
@@ -28,7 +27,7 @@ public class InterestExtractionControllerV2 {
             @AuthenticationPrincipal Jwt jwt
     ) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        interestExtractionService.syncWishlistFromYoutube(memberId);
+        interestExtractionServiceV2.syncWishlistFromYoutube(memberId);
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
                 .build();

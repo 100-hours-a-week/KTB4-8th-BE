@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class InterestExtractionServiceV3 implements InterestExtractionService {
+public class InterestExtractionServiceV3 {
 
     private final YoutubeApiServiceV2 youtubeApiService;
     private final AiServerService aiServerApiService;
@@ -33,17 +33,11 @@ public class InterestExtractionServiceV3 implements InterestExtractionService {
     private final MemberRepository memberRepository;
     private final OutingWishlist outingWishlist;
 
-    @Override
     @Transactional
     public void syncWishlistFromYoutube(Long memberId) {
         List<Video> memberLikedVideos = retrieveMemberLikedVideosFromYoutube(memberId);
         List<OutingGuide> analyzedResults = analyzeYoutubeVideos(memberLikedVideos);
         addOutingGuidesToOutingWishlist(memberId, analyzedResults);
-    }
-
-    @Override
-    public SseEmitter syncWishlistFromYoutubeSSE(Long memberId) {
-        return null;
     }
 
     private List<Video> retrieveMemberLikedVideosFromYoutube(Long memberId) {
