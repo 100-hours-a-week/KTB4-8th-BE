@@ -24,7 +24,7 @@ public class HotPlaceServiceV2 {
                         .map(outingGuide ->
                                 new GetHotPlaceListResponse.Place(
                                         outingGuide.getName(),
-                                        outingGuide.getAddress().toSg()))
+                                        outingGuide.getAddress().toRoad()))
                         .toList());
     }
 
@@ -36,7 +36,7 @@ public class HotPlaceServiceV2 {
                         .map(outingGuide ->
                                 new GetOngoingEventListResponse.Event(
                                         outingGuide.getName(),
-                                        outingGuide.getAddress().toSg(),
+                                        outingGuide.getAddress().toRoad(),
                                         ((OutingEvent) outingGuide).getStartDatetime() == null
                                                 ? null
                                                 : ((OutingEvent) outingGuide).getStartDatetime().atZone(ZoneId.of("Asia/Seoul")).toLocalDate(),
