@@ -44,7 +44,7 @@ public class AiServerService {
     private AnalyzeVideoRequestV2 convert(List<String> urls) {
         var videoUrls = urls.stream()
                 .map(k -> {
-                    return "https://youtube.com/shorts/" + k;
+                    return "https://youtube.com/watch/" + k;
                 })
                 .toList();
         return new AnalyzeVideoRequestV2(videoUrls);
