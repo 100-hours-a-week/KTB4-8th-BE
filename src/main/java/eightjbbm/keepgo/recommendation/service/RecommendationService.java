@@ -3,7 +3,7 @@ package eightjbbm.keepgo.recommendation.service;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationCommand;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult;
 import eightjbbm.keepgo.recommendation.dto.StopRecommendationCommand;
@@ -23,13 +23,13 @@ import java.util.List;
 public class RecommendationService {
 
     private final AiServerApiClient aiServerApiClient;
-    private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
+    private final OutingWishlist outingWishlist;
     private final OutingCriteriaRepository outingCriteriaRepository;
     private final RecommendationJobCacheService recommendationJobCacheService;
 
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         Long memberId = command.memberId();
-        List<OutingWishlistEntry> collection = outingCollectionPrivateRepository.findAll(); //location으로 1차 필터링
+        List<OutingWishlistEntry> collection = outingWishlist.findAll(); //location으로 1차 필터링
         OutingCriteria outingCriteria = outingCriteriaRepository.findById(memberId).orElseThrow();
         recommendationJobCacheService.createJob(memberId, 0L);
 
@@ -45,7 +45,7 @@ public class RecommendationService {
             return RequestRecommendationResult.from(
                     outingCriteria,
                     successResponse,
-                    (k -> (OutingPlace) outingCollectionPrivateRepository
+                    (k -> (OutingPlace) outingWishlist
                             .findById(Long.valueOf(k.placeId()))
                             .orElseThrow()
                             .getOutingGuide())

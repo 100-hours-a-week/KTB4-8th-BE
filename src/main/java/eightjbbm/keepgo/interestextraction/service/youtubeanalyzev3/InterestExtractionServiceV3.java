@@ -1,11 +1,12 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3;
 
 import com.google.api.services.youtube.model.Video;
-import eightjbbm.keepgo.interestextraction.repository.youtubeanalyze.YoutubeApiServiceV2;
+import eightjbbm.keepgo.interestextraction.service.YoutubeApiServiceV2;
+import eightjbbm.keepgo.interestextraction.service.InterestExtractionService;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.sandbox.OutingGuideFactory;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,19 +25,25 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class InterestExtractionServiceV3 {
+public class InterestExtractionServiceV3 implements InterestExtractionService {
 
     private final YoutubeApiServiceV2 youtubeApiService;
     private final AiServerService aiServerApiService;
     private final OutingGuideRepository outingGuideRepository;
     private final MemberRepository memberRepository;
-    private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
+    private final OutingWishlist outingWishlist;
 
+    @Override
     @Transactional
     public void syncWishlistFromYoutube(Long memberId) {
         List<Video> memberLikedVideos = retrieveMemberLikedVideosFromYoutube(memberId);
         List<OutingGuide> analyzedResults = analyzeYoutubeVideos(memberLikedVideos);
         addOutingGuidesToOutingWishlist(memberId, analyzedResults);
+    }
+
+    @Override
+    public SseEmitter syncWishlistFromYoutubeSSE(Long memberId) {
+        return null;
     }
 
     private List<Video> retrieveMemberLikedVideosFromYoutube(Long memberId) {
@@ -53,18 +61,27 @@ public class InterestExtractionServiceV3 {
 
     /// 3분이 넘어가거나, 분석이 불가능한 영상을 분석 대상에서 제외한다.
     ///
-    private List<String> validateYoutubeVideos(List<Video> videos) {
-        return videos.stream().map(Video::getId).toList();
+    private List<Video> validateYoutubeVideos(List<Video> videos) {
+        return videos.stream()
+                .filter(video -> video.getStatus() != null)
+                .filter(video -> "uploaded".equals(video.getStatus().getUploadStatus()))
+                .filter(video -> "public".equals(video.getStatus().getPrivacyStatus()))
+                .filter(video -> video.getContentDetails() != null)
+                .filter(video -> video.getContentDetails().getDuration() != null)
+                .filter(video -> java.time.Duration.parse(video.getContentDetails().getDuration())
+                        .compareTo(java.time.Duration.ofMinutes(3)) <= 0)
+                .toList();
     }
 
     private List<OutingGuide> analyzeYoutubeVideos(List<Video> videos) {
         // 유효성 검사
-        List<String> validatedVideoIds = validateYoutubeVideos(videos);
+        List<String> validatedVideoIds = validateYoutubeVideos(videos).stream().map(Video::getId).toList();
 
         // AI 분석
         List<OutingGuide> analyzedResults = new ArrayList<>();
         for (int i = 0; i < validatedVideoIds.size(); i += 10) {
-            var response = aiServerApiService.analyzeVideoV2(validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size())));
+            var response = aiServerApiService.analyzeVideoV2(
+                    validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size())));
             if (response instanceof AnalyzeVideoResponseV2.Success success) {
                 for (var result: success.data().results()) {
                     switch (result.status()) {
@@ -117,13 +134,13 @@ public class InterestExtractionServiceV3 {
     }
 
     private void addOutingGuidesToOutingWishlist(Long memberId, List<OutingGuide> analyzedResults) {
-        List<OutingGuide> wishlistedOutingGuides = outingCollectionPrivateRepository
+        List<OutingGuide> wishlistedOutingGuides = outingWishlist
                 .findAllWishlistedOutingGuides(memberId, analyzedResults);
 
         Member member = memberRepository.getReferenceById(memberId);
         for (OutingGuide guide: analyzedResults) {
             if (!wishlistedOutingGuides.contains(guide)) {
-                outingCollectionPrivateRepository.save(OutingWishlistEntry.from(member, guide));
+                outingWishlist.save(OutingWishlistEntry.from(member, guide));
             }
         }
     }

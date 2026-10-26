@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 
 @Repository
-public interface OutingCollectionPrivateRepository extends JpaRepository<OutingWishlistEntry, Long>, QuerydslPredicateExecutor<OutingWishlistEntry> {
+public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>, QuerydslPredicateExecutor<OutingWishlistEntry> {
 
     @Query("""
     select distinct og

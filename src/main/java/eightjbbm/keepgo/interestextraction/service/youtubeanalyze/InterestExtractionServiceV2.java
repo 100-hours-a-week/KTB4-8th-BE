@@ -1,8 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
-import com.google.api.services.youtube.model.VideoListResponse;
-import eightjbbm.keepgo.interestextraction.repository.youtubeanalyze.YoutubeApiServiceV2;
+import eightjbbm.keepgo.interestextraction.service.YoutubeApiServiceV2;
 import eightjbbm.keepgo.interestextraction.service.*;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -27,10 +26,10 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class InterestExtractionService {
+public class InterestExtractionServiceV2 {
 
     private static final String PENDING_YOUTUBE_LINK =
-            InterestExtractionService.class.getName() + ".pendingYoutubeLink";
+            InterestExtractionServiceV2.class.getName() + ".pendingYoutubeLink";
 
     private final YoutubeApiServiceV2 youtubeApiService;
     private final UpdateMemberLikedVideoService updateMemberLikedVideoService;

@@ -19,7 +19,7 @@ public class OutingWishlistEntry {
     @Id @GeneratedValue
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
@@ -27,12 +27,12 @@ public class OutingWishlistEntry {
     @Column(name = "type", nullable = false)
     private OutingWishlistEntryType type;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guide_id")
     @Nullable
     private OutingGuide outingGuide;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
     @Nullable
     private OutingCourse outingCourse;

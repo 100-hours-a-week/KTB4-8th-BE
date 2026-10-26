@@ -1,12 +1,9 @@
 package eightjbbm.keepgo.recommendation.service;
 
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
-import eightjbbm.keepgo.recommendation.entity.OutingCourse;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
-import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
-import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.repository.RecommendationJobStore;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.util.Coordinate;
@@ -37,7 +34,7 @@ public class RecommendationServiceV2 {
 
     private final AiServerRecommendApiService aiServerService;
     private final OutingCriteriaRepository criteriaRepository;
-    private final OutingCollectionPrivateRepository collectionRepository;
+    private final OutingWishlist collectionRepository;
     private final KakaoPlaceSearch kakaoPlaceSearch;
     private final RecommendationResultMapper resultMapper;
     private final RecommendationJobStore jobs;
@@ -51,7 +48,7 @@ public class RecommendationServiceV2 {
             AiServerRecommendApiService aiServerService,
             OutingCriteriaRepository criteriaRepository,
             KakaoPlaceSearch kakaoPlaceSearch,
-            OutingCollectionPrivateRepository collectionRepository,
+            OutingWishlist collectionRepository,
             RecommendationResultMapper resultMapper,
             RecommendationJobStore jobs,
             @Qualifier("recommendationTaskExecutor") Executor executor,

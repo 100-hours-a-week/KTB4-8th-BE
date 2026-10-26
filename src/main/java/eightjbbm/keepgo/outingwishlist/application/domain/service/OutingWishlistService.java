@@ -3,7 +3,7 @@ package eightjbbm.keepgo.outingwishlist.application.domain.service;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
@@ -26,7 +26,7 @@ public class OutingWishlistService {
 
     private final MemberRepository memberRepository;
     private final OutingCourseRepository outingCourseRepository;
-    private final OutingCollectionPrivateRepository outingWishlistRepository;
+    private final OutingWishlist outingWishlist;
     private final OutingWishlistQueryRepository outingWishlistQueryRepository;
     private final PageTokenCodec pageTokenCodec;
 
@@ -69,7 +69,7 @@ public class OutingWishlistService {
     public GetPlaceDetailResult getPlaceDetail(
             GetPlaceDetailCommand command
     ) {
-        OutingWishlistEntry wishlistEntry = outingWishlistRepository
+        OutingWishlistEntry wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(
                         command.memberId(),
                         command.placeId())
@@ -117,7 +117,7 @@ public class OutingWishlistService {
     public GetEventDetailResult getEventDetail(
             GetEventDetailCommand command
     ) {
-        OutingWishlistEntry wishlistEntry = outingWishlistRepository
+        OutingWishlistEntry wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(
                         command.memberId(),
                         command.eventId())
@@ -199,7 +199,7 @@ public class OutingWishlistService {
     public AddOutingCourseResult addOutingCourse(
             AddOutingCourseCommand command
     ) {
-        var savedOutingWishlistEntry = outingWishlistRepository.save(
+        var savedOutingWishlistEntry = outingWishlist.save(
                 OutingWishlistEntry.from(
                         memberRepository.getReferenceById(command.memberId()),
                         outingCourseRepository.getReferenceById(command.outingCourseId())));
@@ -213,11 +213,11 @@ public class OutingWishlistService {
         Long memberId,
         Long placeId
     ) {
-        var wishlistEntry = outingWishlistRepository
+        var wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId)
                 .orElseThrow(PlaceNotFoundException::new);
         wishlistEntry.delete();
-        outingWishlistRepository.save(wishlistEntry);
+        outingWishlist.save(wishlistEntry);
     }
 
     @Transactional
@@ -225,11 +225,11 @@ public class OutingWishlistService {
         Long memberId,
         Long eventId
     ) {
-        var wishlistEntry = outingWishlistRepository
+        var wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId)
                 .orElseThrow(EventNotFoundException::new);
         wishlistEntry.delete();
-        outingWishlistRepository.save(wishlistEntry);
+        outingWishlist.save(wishlistEntry);
     }
 
     @Transactional
@@ -237,10 +237,10 @@ public class OutingWishlistService {
         Long memberId,
         Long outingCourseId
     ) {
-        var wishlistEntry = outingWishlistRepository
+        var wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, outingCourseId)
                 .orElseThrow(OutingCourseNotFoundException::new);
         wishlistEntry.delete();
-        outingWishlistRepository.save(wishlistEntry);
+        outingWishlist.save(wishlistEntry);
     }
 }

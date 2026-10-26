@@ -3,7 +3,7 @@ package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class UpdateOutingCollectionPrivatesService {
 
     private final MemberRepository memberRepository;
-    private final OutingCollectionPrivateRepository outingCollectionPrivateRepository;
+    private final OutingWishlist outingWishlist;
     private final AnalyzeVideosService analyzeVideosService;
     /// 회원의 여행 위시리스트 최신화
     ///
@@ -35,14 +35,14 @@ public class UpdateOutingCollectionPrivatesService {
         if (outingGuidesExtracted.isEmpty()) return;
         // 분석 결과 추출된 장소와 행사를 기존 여행 위시리스트와 대조하여 최신화가 필요한 부분을 파악한다.
         // 추출된 장소와 행사 중 이미 여행 위시리스트에 등록되어있는 것들
-        Set<OutingGuide> wishlistedOutingGuides = outingCollectionPrivateRepository
+        Set<OutingGuide> wishlistedOutingGuides = outingWishlist
                 .findAllByMemberIdAndOutingGuides(
                         memberId,
                         new HashSet<>(outingGuidesExtracted)).stream()
                 .map(OutingWishlistEntry::getOutingGuide)
                 .collect(Collectors.toSet());
         // 여행 위시리스트에 추가하여 미처 반영되지 못한 부분을 추가하여 최신화한다.
-        outingCollectionPrivateRepository.saveAll(
+        outingWishlist.saveAll(
                 outingGuidesExtracted.stream()
                         .filter(outingGuide -> !wishlistedOutingGuides.contains(outingGuide))
                         .map(outingGuide ->
