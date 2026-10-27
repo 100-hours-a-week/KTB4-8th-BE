@@ -1,8 +1,5 @@
 package eightjbbm.keepgo.recommendation.controller;
 
-import eightjbbm.keepgo.recommendation.GetHotPlaceListResponse;
-import eightjbbm.keepgo.recommendation.GetOngoingEventListResponse;
-import eightjbbm.keepgo.recommendation.service.HotPlaceServiceV2;
 import eightjbbm.keepgo.recommendation.service.RecommendationServiceV2;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -11,7 +8,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,7 +17,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class RecommendationControllerV2 {
 
     private final RecommendationServiceV2 recommendationService;
-    private final HotPlaceServiceV2 hotPlaceServiceV2;
 
     @PostMapping(
             value = "/api/v2/member/recommendation",
@@ -47,19 +42,5 @@ public class RecommendationControllerV2 {
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
                 .build();
-    }
-
-    @GetMapping("/api/v2/places/hot")
-    public ResponseEntity<GetHotPlaceListResponse> getHotPlaceList() {
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(hotPlaceServiceV2.getHotPlaceList());
-    }
-
-    @GetMapping("/api/v2/events/ongoing")
-    public ResponseEntity<GetOngoingEventListResponse> getOngoingEventList() {
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(hotPlaceServiceV2.getOngoingEventList());
     }
 }
