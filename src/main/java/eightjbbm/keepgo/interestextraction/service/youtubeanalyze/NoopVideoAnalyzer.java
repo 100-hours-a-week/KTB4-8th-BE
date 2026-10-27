@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public interface YoutubeAnalyzeService {
-
-    Map<Video, OutingGuide> analyzeVideosInternalByBackend(List<Video> videos);
+public class NoopVideoAnalyzer {
+    public Map<Video, OutingGuide> analyzeVideosInternalByBackend(List<Video> videos) {
+        return Map.of();
+    }
 }
-

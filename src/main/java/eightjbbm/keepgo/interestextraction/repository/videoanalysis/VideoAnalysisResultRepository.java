@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 @Repository
-public interface VideoAnalysisResultRepository extends JpaRepository<VideoAnalysisResult, Long> {
+public interface VideoAnalysisResultRepository extends JpaRepository<VideoAnalysisResult, VideoAnalysisResultId> {
 
     @Query("""
         select v.outingGuide

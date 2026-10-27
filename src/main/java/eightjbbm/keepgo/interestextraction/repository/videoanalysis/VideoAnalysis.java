@@ -1,6 +1,5 @@
 package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
-import eightjbbm.keepgo.sandbox.ds.VideoId;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,26 +12,38 @@ import java.time.Instant;
 public class VideoAnalysis {
     @Id @GeneratedValue
     private Long id;
-    @Embedded
-    private VideoId videoId;
+
+    private String videoId;
+
     @Enumerated(EnumType.STRING)
     private VideoAnalysisStatus status;
+
     private Instant createDatetime;
 
-    public VideoAnalysis(String videoId, VideoAnalysisStatus status) {
-        this.videoId = VideoId.fromVideoId(videoId);
-        this.status = status;
+    public VideoAnalysis(String videoId) {
+        this.videoId = videoId;
+        this.status = VideoAnalysisStatus.IN_PROGRESS;
         this.createDatetime = Instant.now();
     }
 
-    public VideoAnalysis(String videoId, String status) {
-        this.videoId = VideoId.fromVideoId(videoId);
-        switch (status) {
-            case "success" -> this.status = VideoAnalysisStatus.SUCCESS;
-            case "not_found" -> this.status = VideoAnalysisStatus.NOT_FOUND;
-            case "failed" -> this.status = VideoAnalysisStatus.FAILED;
-            default -> throw new IllegalStateException("invalid status: " + status);
+    public void setSuccess() {
+        if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
+            throw new IllegalStateException();
         }
-        this.createDatetime = Instant.now();
+        this.status = VideoAnalysisStatus.SUCCESS;
+    }
+
+    public void setNotFound() {
+        if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
+            throw new IllegalStateException();
+        }
+        this.status = VideoAnalysisStatus.NOT_FOUND;
+    }
+
+    public void setFailed() {
+        if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
+            throw new IllegalStateException();
+        }
+        this.status = VideoAnalysisStatus.FAILED;
     }
 }

@@ -25,7 +25,7 @@ public class AnalyzeVideosService {
 
     private final OutingGuideRepository outingGuideRepository;
     private final AiServerService aiServerService;
-    private final YoutubeAnalyzeService youtubeAnalyzeService;
+    private final NoopVideoAnalyzer youtubeVideoAnalyzer;
     /// 장소 및 행사 목록 최신화
     ///
     @Transactional
@@ -100,7 +100,7 @@ public class AnalyzeVideosService {
     private List<OutingGuide> analyzeVideosInternal(List<Video> videos) {
         log.info("analyzeVideosInternal: videos.size()=" + videos.size());
         // 백엔드 측에서 분석할 수 있는 영상이라면 분석한다.
-        Map<Video, OutingGuide> videosAnalyzedByBackend = youtubeAnalyzeService.analyzeVideosInternalByBackend(videos);
+        Map<Video, OutingGuide> videosAnalyzedByBackend = youtubeVideoAnalyzer.analyzeVideosInternalByBackend(videos);
         // 백엔드 측에서 분석할 수 없는 영상들을 선별한다.
         List<Video> videosNeedToBeAnalyzedByAi = videos.stream()
                 .filter(video -> !videosAnalyzedByBackend.containsKey(video))
