@@ -53,11 +53,11 @@ public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>
             @Param("outingWishlistEntryId") Long outingWishlistEntryId);
 
     @Query("""
-        select owe.outingGuide
+        select og
         from OutingWishlistEntry owe
-        join fetch owe.outingGuide og
+        join owe.outingGuide og
         where owe.member.id = :memberId
-            and owe.outingGuide in :outingGuides
+            and og in :outingGuides
             and owe.deleteDatetime is null
     """)
     List<OutingGuide> findAllWishlistedOutingGuides(
