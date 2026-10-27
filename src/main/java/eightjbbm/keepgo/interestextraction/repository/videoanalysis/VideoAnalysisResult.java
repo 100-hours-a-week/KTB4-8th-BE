@@ -2,6 +2,7 @@ package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -9,21 +10,27 @@ import java.time.Instant;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class VideoAnalysisResult {
-    @Id @GeneratedValue
-    private Long id;
-    @ManyToOne
-    @JoinColumn(name = "video_analysis_id")
+    @EmbeddedId
+    private VideoAnalysisResultId id;
+
+    @MapsId("videoAnalysisId")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "video_analysis_id", nullable = false)
     private VideoAnalysis videoAnalysis;
-    @ManyToOne
-    @JoinColumn(name = "outing_guide_id")
+
+    @MapsId("outingGuideId")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "outing_guide_id", nullable = false)
     private OutingGuide outingGuide;
-    private Instant createDatetime;
 
     public VideoAnalysisResult(VideoAnalysis videoAnalysis, OutingGuide outingGuide) {
         this.videoAnalysis = videoAnalysis;
         this.outingGuide = outingGuide;
-        this.createDatetime = Instant.now();
+        this.id = new VideoAnalysisResultId(
+                videoAnalysis.getId(),
+                outingGuide.getId()
+        );
     }
 }
