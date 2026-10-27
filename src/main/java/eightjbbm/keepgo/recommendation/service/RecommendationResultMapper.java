@@ -15,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -51,10 +53,10 @@ public class RecommendationResultMapper {
                                             place.travelMinutes(),
                                             course.places().indexOf(place),
                                             outingGuideRepository.getReferenceById(Long.valueOf(place.placeId()))))
-                                    .toList();
+                                    .collect(Collectors.toCollection(ArrayList::new));
                             outingStopRepository.saveAll(stops);
                             outingCourse.setStops(stops);
-                            return outingCourseRepository.save(outingCourse);
+                            return outingCourse;
                         }
                 )
                 .toList();
