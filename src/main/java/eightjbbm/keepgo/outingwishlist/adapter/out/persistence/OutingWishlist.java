@@ -17,7 +17,7 @@ public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>
 
     @Query("""
     select distinct og
-    from OutingCollectionPrivate ocp
+    from OutingWishlistEntry ocp
     join ocp.outingGuide og
     where ocp.member.id = :memberId
         and ocp.deleteDatetime is null
