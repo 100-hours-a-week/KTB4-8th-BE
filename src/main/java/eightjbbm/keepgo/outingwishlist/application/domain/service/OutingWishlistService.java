@@ -3,6 +3,7 @@ package eightjbbm.keepgo.outingwishlist.application.domain.service;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
@@ -238,7 +239,8 @@ public class OutingWishlistService {
         Long outingCourseId
     ) {
         var wishlistEntry = outingWishlist
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, outingCourseId)
+                .findByMemberIdAndIdAndTypeAndDeleteDatetimeIsNull(
+                        memberId, outingCourseId, OutingWishlistEntryType.OUTING_COURSE)
                 .orElseThrow(OutingCourseNotFoundException::new);
         wishlistEntry.delete();
         outingWishlist.save(wishlistEntry);

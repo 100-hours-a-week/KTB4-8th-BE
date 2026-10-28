@@ -156,7 +156,7 @@ public class OutingWishlistController {
         Long memberId = Long.valueOf(jwt.getSubject());
         outingWishlistService.removeOutingCourse(memberId, outingCourseId);
         return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
+                .status(HttpStatus.NO_CONTENT)
                 .build();
     }
 
