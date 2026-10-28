@@ -4,6 +4,8 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import tools.jackson.databind.ObjectMapper;
 import java.net.InetSocketAddress;
@@ -213,6 +215,32 @@ class VideoAnalysisJobClientTest {
         assertEquals(AiRequestException.Kind.HTTP_ERROR, exception.kind());
         assertEquals(503, exception.statusCode());
         assertEquals("12", exception.retryAfter());
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidDates")
+    void rejectsInvalidDateWireValues(String field, String value) throws Exception {
+        serve(200, "{\"message\":\"analyze_success\",\"data\":{\"results\":[{"
+                + "\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"success\","
+                + "\"error\":null,\"place_type\":\"이벤트\",\"" + field + "\":" + value + "}]}}", null, 0);
+        var exception = assertThrows(AiRequestException.class,
+                () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+        assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
+    }
+
+    static java.util.stream.Stream<Arguments> invalidDates() {
+        return java.util.stream.Stream.of("event_start_date", "event_end_date").flatMap(field ->
+                java.util.stream.Stream.of("[2026,10,28]", "\"2026-10-28T12:34:56\"", "\"\"")
+                        .map(value -> Arguments.of(field, value)));
+    }
+
+    @Test
+    void neverRetriesImmediatelyRetryableHttpFailure() throws Exception {
+        serve(503, "unavailable", "0", 0);
+        var exception = assertThrows(AiRequestException.class,
+                () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+        assertEquals(AiRequestException.Kind.HTTP_ERROR, exception.kind());
+        assertEquals(1, calls.get());
     }
 
 }

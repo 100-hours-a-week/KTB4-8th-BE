@@ -39,7 +39,7 @@
 
 ## 호출 시간과 수명
 
-연결 제한은 5초, 분석 호출의 전체 응답 수신 제한은 130초다. 실제 호출 한도는 진입 시 받은 남은 Job 시간과 130초 중 작은 값이며, 직렬화·요청 준비에 쓴 시간도 차감한다. 본문 수신이 지연되어도 한도를 적용하고, 기한이 없으면 호출하지 않는다. 클라이언트에서 애플리케이션 재시도·redirect·구계약 fallback을 수행하지 않는다. Spring 종료 시 전용 HTTP 클라이언트도 종료한다.
+연결 제한은 5초, 분석 호출의 전체 응답 수신 제한은 130초다. 실제 호출 한도는 진입 시 받은 남은 Job 시간과 130초 중 작은 값이며, 직렬화·요청 준비에 쓴 시간도 차감한다. 본문 수신이 지연되어도 한도를 적용하고, 기한이 없으면 호출하지 않는다. 전용 Apache HttpClient의 `disableAutomaticRetries()`로 자동 복구·재실행을 끄고 redirect·구계약 fallback도 수행하지 않는다. 전역 JDK 시스템 속성은 변경하지 않는다. Apache 의존성 추가로 전송 방식이 자동 변경되지 않도록 기존 Google·지오코딩 RestClient에는 JDK 요청 팩터리를 명시한다. Spring 종료 시 전용 HTTP 클라이언트도 종료한다.
 
 ## 재현과 실제 서버 호환성 확인
 
@@ -49,7 +49,7 @@
 bash gradlew test --tests '*VideoAnalysisJobClientTest'
 ```
 
-`spreadsheet-analysis-response.json`은 공유 명세의 응답 예시를 보존하되 JSON으로 실행할 수 있도록 스마트 따옴표와 줄 구분 문자를 정리한 fixture다. `mixed-analysis-response.json`은 후보 누락과 날짜 전달을 추가 검증한다. 로컬 HTTP 서버로 요청 형식·복수 행·오류·전송 실패·헤더/본문 지연·중단을 검증한다.
+`spreadsheet-analysis-response.json`은 공유 명세의 응답 예시를 보존하되 JSON으로 실행할 수 있도록 스마트 따옴표와 줄 구분 문자를 정리한 fixture다. `mixed-analysis-response.json`은 후보 누락과 날짜 전달을 추가 검증한다. 로컬 HTTP 서버로 요청 형식·복수 행·오류·전송 실패·헤더/본문 지연·중단을 검증한다. 날짜 배열의 거부와 `Retry-After: 0`인 503 응답에서도 요청을 한 번만 보내는 회귀 사례를 포함한다.
 
 실제 AI 서버 확인은 명시적으로 URL과 영상 ID를 지정한다. 서버 주소나 인증 정보를 저장소에 커밋하지 않는다.
 
