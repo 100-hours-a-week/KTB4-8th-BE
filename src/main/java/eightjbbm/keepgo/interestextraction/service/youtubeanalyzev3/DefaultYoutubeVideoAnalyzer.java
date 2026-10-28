@@ -71,7 +71,7 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
         Map<String, Long> analysisIdsByUrl = new HashMap<>();
         videoAnalysisManager.start(videoIds).forEach(
                 (videoId, analysisId) ->
-                        analysisIdsByUrl.put("https://youtube.com/watch/" + videoId, analysisId));
+                        analysisIdsByUrl.put("https://youtube.com/shorts/" + videoId, analysisId));
 
         Map<Long, VideoAnalysisStatus> unsuccessfulAnalyses = new HashMap<>();
         Set<Long> processedIds = new HashSet<>();
