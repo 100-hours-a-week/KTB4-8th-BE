@@ -1,5 +1,7 @@
 # 커밋 및 PR 작성 규칙
 
+브랜치의 역할·이름·릴리스·긴급 수정 절차는 [브랜치 전략](docs/branch-strategy.md)을 따른다.
+
 이 프로젝트는 [Conventional Commits 1.0.0-beta.4](https://www.conventionalcommits.org/en/v1.0.0-beta.4/#specification)를 기준으로 커밋을 작성한다. PR 제목에도 같은 형식을 사용한다. 한국어 사용, 타입 목록, PR 구성은 이 프로젝트가 추가한 규칙이다.
 
 ## 언어

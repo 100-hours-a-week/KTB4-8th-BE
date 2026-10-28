@@ -1,5 +1,11 @@
 # KTB4-8th-BE
 
+## 협업 규칙
+
+- [브랜치 전략](docs/branch-strategy.md)
+- [커밋 및 PR 작성 규칙](CONTRIBUTING.md)
+- [PR 전략](docs/pr-strategy.md)
+
 ## 환경 변수
 - 임의로 만들었습니다.
 - 기본적으로 MySQL, 제 로컬 환경 기준입니다.
