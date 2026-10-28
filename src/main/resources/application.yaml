@@ -1,4 +1,8 @@
 spring:
+  flyway:
+    enabled: false
+    baseline-on-migrate: false
+    clean-disabled: true
   sql:
     init:
       schema-locations:

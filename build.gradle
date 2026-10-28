@@ -98,6 +98,35 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
+sourceSets {
+	mysqlIntegrationTest {
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+	}
+}
+
+configurations {
+	mysqlIntegrationTestImplementation.extendsFrom testImplementation
+	mysqlIntegrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.register('mysqlIntegrationTest', Test) {
+	description = 'Verifies Flyway migrations against an explicitly configured, disposable MySQL server.'
+	group = 'verification'
+	testClassesDirs = sourceSets.mysqlIntegrationTest.output.classesDirs
+	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
+	environment 'MYSQL_TEST_SERVER_URL', providers.gradleProperty('mysqlTestServerUrl')
+			.orElse(providers.environmentVariable('MYSQL_TEST_SERVER_URL')).getOrElse('')
+	useJUnitPlatform()
+	shouldRunAfter tasks.named('test')
+	// An external database can change even when the compiled test inputs do not.
+	outputs.upToDateWhen { false }
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('mysqlIntegrationTest')
+}
+
 tasks.named('bootRun') {
 	jvmArgs "-javaagent:${configurations.sentryAgent.singleFile.absolutePath}"
 	environment 'SENTRY_AUTO_INIT', 'false'
