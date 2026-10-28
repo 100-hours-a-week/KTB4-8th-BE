@@ -2,6 +2,7 @@ package eightjbbm.keepgo.outingwishlist.adapter.out.persistence;
 
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
@@ -14,6 +15,9 @@ import java.util.Set;
 
 @Repository
 public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>, QuerydslPredicateExecutor<OutingWishlistEntry> {
+
+    Optional<OutingWishlistEntry> findByMemberIdAndIdAndTypeAndDeleteDatetimeIsNull(
+            Long memberId, Long wishlistEntryId, OutingWishlistEntryType type);
 
     @Query("""
     select distinct og
