@@ -22,6 +22,8 @@ PR 설명은 리뷰 당시의 대화뿐 아니라 나중에 변경 이유를 찾
 
 ## 브랜치와 의존성
 
+브랜치 이름·분기 기준·병합 대상은 [브랜치 전략](branch-strategy.md)을 따른다. 아래 `develop` 기준 절차는 일반 작업에 적용하며, 릴리스 안정화 수정은 해당 `release/*`, 운영 긴급 수정은 운영 태그를 기준으로 한다.
+
 - 독립 PR은 최신 `origin/develop`에서 새 작업 브랜치를 만든다. 브랜치 이름은 `docs/pr-conventions`, `tests/legacy-tests`, `tests/223-mysql-migrations`처럼 목적을 드러낸다.
 - 실제 선행 변경이 필요할 때만 부모 브랜치 위에 하위 브랜치를 만들고, 하위 PR의 base를 부모 브랜치로 둔다. 무관한 PR을 기다리도록 연결하지 않는다.
 - 본문에 기준 브랜치·선행 PR 링크·남은 조건·병합 순서를 적는다. 선행 PR이 병합되지 않은 하위 PR은 Draft로 유지한다.
@@ -44,7 +46,7 @@ PR 설명은 리뷰 당시의 대화뿐 아니라 나중에 변경 이유를 찾
 | 방식 | 프로젝트 사용 기준 | 이력상 결과 |
 |---|---|---|
 | Squash and merge | 짧은 작업 브랜치의 한 목적 PR에 기본 사용 | base에 최종 커밋 하나를 남김 |
-| Merge commit | develop→main 등 장기 브랜치의 통합·릴리스 경계와 전체 이력 보존이 필요한 경우 | 개별 커밋과 병합 지점을 남김 |
+| Merge commit | release/*·hotfix/*→main, release/*·hotfix/*→develop, hotfix/*→release/* 통합과 전체 이력 보존이 필요한 경우 | 개별 커밋과 병합 지점을 남김 |
 | Rebase and merge | 개별 커밋을 보존해야 하며 모두 독립적·검증 가능한 경우에 사유를 적고 사용 | 병합 커밋 없이 개별 커밋을 남기며 SHA가 바뀜 |
 
 GitHub의 병합 방식별 차이를 바탕으로 정한 정책이다. squash는 중간 커밋이 base에 따로 남지 않고, GitHub rebase는 새 SHA를 만든다. 근거: [GitHub PR 병합 방식](https://docs.github.com/en/pull-requests/reference/pull-request-merges).
