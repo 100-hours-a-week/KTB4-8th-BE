@@ -1,0 +1,15 @@
+# Opt in only after schema comparison and an explicit baseline of existing DBs.
+spring:
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    clean-disabled: true
+    validate-on-migrate: true
+  sql:
+    init:
+      mode: never
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}&characterEncoding=UTF-8&connectionCollation=utf8mb4_0900_bin
+  jpa:
+    hibernate:
+      ddl-auto: validate
