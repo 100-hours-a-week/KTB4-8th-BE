@@ -243,4 +243,16 @@ class VideoAnalysisJobClientTest {
         assertEquals(1, calls.get());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\"place_name\":42", "\"address\":true", "\"summary\":4.5",
+            "\"business_hours\":{\"timezone\":42}"})
+    void rejectsNumbersAndBooleansInTextFields(String candidateFields) throws Exception {
+        serve(200, "{\"message\":\"analyze_success\",\"data\":{\"results\":[{"
+                + "\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"success\","
+                + "\"error\":null,\"place_type\":\"장소\"," + candidateFields + "}]}}", null, 0);
+        var exception = assertThrows(AiRequestException.class,
+                () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+        assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
+    }
+
 }

@@ -5,6 +5,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.cfg.CoercionAction;
+import tools.jackson.databind.cfg.CoercionInputShape;
+import tools.jackson.databind.type.LogicalType;
 
 import java.nio.charset.StandardCharsets;
 import java.net.URI;
@@ -38,7 +41,12 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
     public VideoAnalysisJobClient(URI endpoint, ObjectMapper mapper) {
         this.endpoint = endpoint;
         this.mapper = mapper.rebuild().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-                .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS).build();
+                .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+                .withCoercionConfig(LogicalType.Textual, config -> config
+                        .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+                        .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
+                        .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))
+                .build();
         var connections = PoolingHttpClientConnectionManagerBuilder.create()
                 .setDefaultConnectionConfig(ConnectionConfig.custom()
                         .setConnectTimeout(Timeout.ofMilliseconds(CONNECT_TIMEOUT.toMillis())).build())
