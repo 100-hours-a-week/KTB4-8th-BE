@@ -16,6 +16,8 @@ name: Backend CI
 on:
   push:
     branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
 
 # main에 새로운 Commit이 Push되면 이전 Commit의 CI를 취소하고
 # 최신 Commit만 검증 및 발행한다.
@@ -35,10 +37,48 @@ permissions:
 
 jobs:
 
+  mysql-migrations:
+    name: MySQL migrations
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4.8
+        env:
+          MYSQL_ROOT_PASSWORD: integration-only
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      MYSQL_TEST_SERVER_URL: jdbc:mysql://127.0.0.1:3306/
+      MYSQL_TEST_USER: root
+      MYSQL_TEST_PASSWORD: integration-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify Flyway baseline and migrations on MySQL
+        run: bash gradlew --no-daemon mysqlIntegrationTest
+      - name: Upload MySQL test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-migration-test-reports
+          path: build/reports/tests/mysqlIntegrationTest
+
   main-image:
     name: ${{ github.ref == 'refs/heads/develop' && 'Dev - Build and Push Image' || 'Main - Build and Push Image' }}
 
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    needs: mysql-migrations
 
     runs-on: ubuntu-latest
 
@@ -64,13 +104,9 @@ jobs:
       - name: Grant execute permission to Gradle Wrapper
         run: chmod +x ./gradlew
 
-      # ECR에 저장되는 Image와 동일한 main Commit을 기준으로
-      # Test / Application Build 성공 여부를 보장한다.
-      #
-      # TODO(Test): CI 전용 Datasource 구성이 완료되면 외부 환경에 의존하지
-      # 않는 Context Test와 Repository Test를 추가한다.
-      - name: Application build (tests skipped)
-        run: ./gradlew --no-daemon bootjar
+      # MySQL migration 검사가 통과한 같은 Commit만 Image로 발행한다.
+      - name: Application build
+        run: ./gradlew --no-daemon bootJar
 
       # GitHub OIDC Token을 이용해
       # ECR Push 권한만 가진 AWS IAM Role을 Assume한다.
