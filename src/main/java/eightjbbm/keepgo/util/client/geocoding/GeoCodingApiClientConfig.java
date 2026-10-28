@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 import java.nio.charset.StandardCharsets;
 
@@ -23,6 +24,7 @@ public class GeoCodingApiClientConfig {
         RestClient.Builder builder
     ) {
         return builder
+                .requestFactory(new JdkClientHttpRequestFactory())
                 .baseUrl(properties.address())
                 .requestInterceptor((request, body, execution) -> {
                     String safeUri = request.getURI()

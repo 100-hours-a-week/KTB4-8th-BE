@@ -1,0 +1,195 @@
+{
+  "message": "analyze_success",
+  "data": {
+    "results": [
+      {
+        "video_url": "https://youtube.com/shorts/aaaa",
+        "status": "success",
+        "error": null,
+        "place_name": "메가커피 성수점",
+        "address": "서울특별시 성동구 아차산로 100",
+        "location_detail": "성수역 3번 출구 앞 OO빌딩 1층",
+        "category": "카페",
+        "business_hours": {
+          "timezone": "Asia/Seoul",
+          "weekly_hours": {
+            "MONDAY": [
+              {
+                "open_time": "08:00",
+                "close_time": "22:00"
+              }
+            ],
+            "TUESDAY": [
+              {
+                "open_time": "08:00",
+                "close_time": "22:00"
+              }
+            ],
+            "WEDNESDAY": [
+              {
+                "open_time": "08:00",
+                "close_time": "22:00"
+              }
+            ],
+            "THURSDAY": [
+              {
+                "open_time": "08:00",
+                "close_time": "22:00"
+              }
+            ],
+            "FRIDAY": [
+              {
+                "open_time": "08:00",
+                "close_time": "22:00"
+              }
+            ],
+            "SATURDAY": [
+              {
+                "open_time": "10:00",
+                "close_time": "15:00"
+              },
+              {
+                "open_time": "16:00",
+                "close_time": "22:00"
+              }
+            ],
+            "SUNDAY": []
+          },
+          "exceptions": {
+            "2026-10-20": [],
+            "2026-10-21": [
+              {
+                "open_time": "10:00",
+                "close_time": "15:00"
+              }
+            ]
+          },
+          "estimated": false
+        },
+        "event_start_date": null,
+        "event_end_date": null,
+        "event_period_unresolved": false,
+        "place_type": "장소",
+        "lat": 37.5441,
+        "lng": 127.056,
+        "confidence": 0.95,
+        "summary": "통유리에 좌석 간격이 넓고 대화 소음이 적음"
+      },
+      {
+        "video_url": "https://youtube.com/shorts/bbbb",
+        "status": "success",
+        "error": null,
+        "place_name": "성천막국수 답십리 본점",
+        "address": "서울특별시 동대문구 답십리로 100",
+        "location_detail": "답십리역 4번 출구 인근",
+        "category": "맛집",
+        "business_hours": {
+          "timezone": "Asia/Seoul",
+          "weekly_hours": {
+            "MONDAY": [
+              {
+                "open_time": "11:00",
+                "close_time": "21:00"
+              }
+            ],
+            "TUESDAY": [
+              {
+                "open_time": "11:00",
+                "close_time": "21:00"
+              }
+            ],
+            "WEDNESDAY": [
+              {
+                "open_time": "11:00",
+                "close_time": "21:00"
+              }
+            ],
+            "THURSDAY": [
+              {
+                "open_time": "11:00",
+                "close_time": "21:00"
+              }
+            ],
+            "FRIDAY": [
+              {
+                "open_time": "11:00",
+                "close_time": "21:00"
+              }
+            ],
+            "SATURDAY": [
+              {
+                "open_time": "11:00",
+                "close_time": "21:00"
+              }
+            ],
+            "SUNDAY": null
+          },
+          "exceptions": {},
+          "estimated": false
+        },
+        "event_start_date": null,
+        "event_end_date": null,
+        "event_period_unresolved": false,
+        "place_type": "장소",
+        "lat": 37.5665,
+        "lng": 127.056,
+        "confidence": 0.95,
+        "summary": "메밀 막국수가 대표 메뉴인 노포이고 점심시간에 웨이팅이 있음"
+      },
+      {
+        "video_url": "https://youtube.com/shorts/bbbb",
+        "status": "success",
+        "error": null,
+        "place_name": "답십리 고미술상가",
+        "address": "서울특별시 동대문구 고미술로 200",
+        "location_detail": null,
+        "category": "명소",
+        "business_hours": null,
+        "event_start_date": null,
+        "event_end_date": null,
+        "place_type": "이벤트",
+        "event_period_unresolved": false,
+        "lat": 37.5701,
+        "lng": 127.057,
+        "confidence": 0.9,
+        "summary": "골동품과 빈티지 소품 가게가 모여 있어 구경하며 걷기 좋음"
+      },
+      {
+        "video_url": "https://youtube.com/shorts/cccc",
+        "status": "not_found",
+        "error": null,
+        "place_name": null,
+        "address": null,
+        "location_detail": null,
+        "category": null,
+        "business_hours": null,
+        "event_start_date": null,
+        "event_end_date": null,
+        "event_period_unresolved": null,
+        "place_type": null,
+        "lat": null,
+        "lng": null,
+        "confidence": null,
+        "summary": null
+      },
+      {
+        "video_url": "https://youtube.com/shorts/dddd",
+        "status": "failed",
+        "error": "llm_timeout",
+        "place_name": null,
+        "address": null,
+        "location_detail": null,
+        "category": null,
+        "business_hours": null,
+        "event_start_date": null,
+        "event_end_date": null,
+        "event_period_unresolved": null,
+        "place_type": null,
+        "lat": null,
+        "lng": null,
+        "confidence": null,
+        "summary": null
+      }
+    ]
+  }
+}
