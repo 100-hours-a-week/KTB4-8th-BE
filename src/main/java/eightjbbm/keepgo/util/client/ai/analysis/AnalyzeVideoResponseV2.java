@@ -1,6 +1,6 @@
-package eightjbbm.keepgo.sandbox.aiv2;
+package eightjbbm.keepgo.util.client.ai.analysis;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
+import eightjbbm.keepgo.common.domain.BusinessScheduleDto;
 import jakarta.annotation.Nullable;
 import java.time.LocalDate;
 import java.util.List;

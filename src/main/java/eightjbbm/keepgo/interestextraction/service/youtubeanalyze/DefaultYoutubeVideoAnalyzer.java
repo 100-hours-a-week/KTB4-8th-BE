@@ -1,14 +1,12 @@
-package eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3;
+package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisStatus;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.sandbox.OutingGuideFactory;
-import eightjbbm.keepgo.sandbox.OutingGuideRepository;
-import eightjbbm.keepgo.sandbox.aiv2.AiServerService;
-import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
+import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,15 +48,17 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
             CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).join();
         }
 
-        if (!successfulAnalyses.isEmpty()) {
-            List<OutingGuide> persistedGuides =
-                    persistAnalyzedResults(analyzedResults.values().stream().toList());
+        List<OutingGuide> analyzedGuides = analyzedResults.values().stream().toList();
+        if (analyzedGuides.isEmpty()) {
+            return List.of();
+        }
 
+        List<OutingGuide> persistedGuides = persistAnalyzedResults(analyzedGuides);
+        if (!successfulAnalyses.isEmpty()) {
             videoAnalysisManager.completeSuccessful(successfulAnalyses, persistedGuides);
         }
 
-        // 기존 return 유지. 위에서 저장한 가이드는 기존 조회 로직에서 재사용된다.
-        return persistAnalyzedResults(analyzedResults.values().stream().toList());
+        return persistedGuides;
     }
 
     private void analyzeBatch(

@@ -1,15 +1,15 @@
-package eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3;
+package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.google.api.services.youtube.model.*;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.*;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.sandbox.OutingGuideRepository;
-import eightjbbm.keepgo.sandbox.aiv2.*;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
+import eightjbbm.keepgo.util.client.ai.analysis.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.IntStream;
@@ -38,7 +38,6 @@ class DefaultYoutubeVideoAnalyzerTest {
             ids.forEach(id -> result.put(id, analysisId(id)));
             return result;
         });
-        // Model read-after-write: analyze's unchanged return queries saved guides again.
         when(guides.findAllByAddresses(anyList())).thenAnswer(call -> {
             List<?> addresses = call.getArgument(0);
             return stored.values().stream()
@@ -112,6 +111,23 @@ class DefaultYoutubeVideoAnalyzerTest {
         verify(guides, never()).save(any(OutingGuide.class));
     }
 
+    @Test
+    @DisplayName("성공한 분석 결과는 한 번만 저장하고 분석 이력과 연결한다")
+    void persistsSuccessfulAnalysisOnce() {
+        when(ai.analyzeVideoV2(anyList())).thenReturn(response(List.of(result("v0", "success", "장소", "도로명주소"))));
+
+        List<OutingGuide> persisted = analyzer.analyze(videos(1));
+
+        assertThat(persisted).hasSize(1);
+        verify(guides, times(1)).findAllByAddresses(anyList());
+        verify(guides, times(1)).save(any(OutingGuide.class));
+        verify(ai, times(1)).embedPlaces(anyList());
+        verify(manager)
+                .completeSuccessful(
+                        argThat(analyses -> analyses.containsKey(1L)),
+                        argThat(persistedGuides -> persistedGuides.size() == 1));
+    }
+
     private List<String> ids(int from, int to) {
         return IntStream.range(from, to).mapToObj(i -> "v" + i).toList();
     }
@@ -141,7 +157,7 @@ class DefaultYoutubeVideoAnalyzerTest {
 
     private AnalyzeVideoResponseV2.Success.Result result(String id, String status, String name, String address) {
         return new AnalyzeVideoResponseV2.Success.Result(
-                "https://youtube.com/watch/" + id,
+                "https://youtube.com/shorts/" + id,
                 status,
                 null,
                 name,

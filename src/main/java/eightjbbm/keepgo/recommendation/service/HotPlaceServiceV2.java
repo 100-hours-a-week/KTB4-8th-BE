@@ -4,7 +4,7 @@ import eightjbbm.keepgo.recommendation.GetHotPlaceListResponse;
 import eightjbbm.keepgo.recommendation.GetOngoingEventListResponse;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
-import eightjbbm.keepgo.sandbox.OutingGuideRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import java.time.Instant;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;

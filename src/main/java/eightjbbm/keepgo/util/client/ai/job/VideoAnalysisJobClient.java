@@ -2,7 +2,7 @@ package eightjbbm.keepgo.util.client.ai.job;
 
 import static eightjbbm.keepgo.util.client.ai.job.AiRequestException.Kind.*;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
+import eightjbbm.keepgo.common.domain.BusinessScheduleDto;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
