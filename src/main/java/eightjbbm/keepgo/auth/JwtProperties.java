@@ -1,8 +1,7 @@
 package eightjbbm.keepgo.auth;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import java.time.Duration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "keepgo.security.jwt")
 public record JwtProperties(
@@ -12,6 +11,4 @@ public record JwtProperties(
         String audience,
         String clientId,
         String publicKey,
-        String privateKey
-) {
-}
+        String privateKey) {}

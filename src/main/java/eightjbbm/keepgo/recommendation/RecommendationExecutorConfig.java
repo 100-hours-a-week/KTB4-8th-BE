@@ -1,10 +1,9 @@
 package eightjbbm.keepgo.recommendation;
 
+import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-
-import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
 public class RecommendationExecutorConfig {
@@ -18,9 +17,7 @@ public class RecommendationExecutorConfig {
         executor.setQueueCapacity(8);
         executor.setThreadNamePrefix("recommendation-");
 
-        executor.setRejectedExecutionHandler(
-                new ThreadPoolExecutor.AbortPolicy()
-        );
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
         return executor;
     }

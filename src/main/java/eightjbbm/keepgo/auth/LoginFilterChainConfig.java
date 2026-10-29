@@ -24,31 +24,23 @@ public class LoginFilterChainConfig {
     @Order(1)
     @Bean
     public SecurityFilterChain loginFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .securityMatchers(
-                        matchers -> matchers.requestMatchers(
+        return http.securityMatchers(matchers -> matchers.requestMatchers(
+                        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session"),
+                        PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth2/**"),
+                        PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/login/oauth2/code/**")))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session"),
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth2/**"),
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/login/oauth2/code/**")
-                        )
-                )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/user/auth-session"),
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/oauth2/**"),
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/login/oauth2/code/**")
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/login/oauth2/code/**"))
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .oauth2Login(auth -> auth
-                        .successHandler(oidcLoginSuccessHandler)
-                )
+                .oauth2Login(auth -> auth.successHandler(oidcLoginSuccessHandler))
                 .build();
     }
 }

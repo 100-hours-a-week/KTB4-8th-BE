@@ -1,11 +1,5 @@
 package eightjbbm.keepgo.util.client.google;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.services.youtube.YouTube;
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.AccessToken;
-import com.google.auth.oauth2.GoogleCredentials;
 import eightjbbm.keepgo.util.dto.RetrieveLikedVideosResponse;
 import eightjbbm.keepgo.util.dto.RetrieveLikesPlaylistIdResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +7,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
-
-import java.io.IOException;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -25,16 +16,16 @@ public class GoogleApiClient {
     private final RestClient googleRestClient;
 
     public RetrieveLikesPlaylistIdResponse retrieveLikesPlaylistId(String googleAccessToken) {
-        return googleRestClient.get()
-                .uri(
-                    uriBuilder -> {
-                        UriBuilder builder = uriBuilder
+        return googleRestClient
+                .get()
+                .uri(uriBuilder -> {
+                    UriBuilder builder = uriBuilder
                             .path("/youtube/v3/channels")
                             .queryParam("part", "contentDetails")
                             .queryParam("mine", "true");
 
-                        return builder.build();
-                    })
+                    return builder.build();
+                })
                 .headers(headers -> {
                     headers.setBearerAuth(googleAccessToken);
                 })
@@ -44,35 +35,33 @@ public class GoogleApiClient {
 
     /// 첫 50개만 조회할 수 있음. 리팩토링 필요
     public RetrieveLikedVideosResponse retrieveLikedVideos(String likesPlaylistId, String googleAccessToken) {
-        return googleRestClient.get()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path("/youtube/v3/playlistItems")
-                                    .queryParam("part", "contentDetails")
-                                    .queryParam("id", likesPlaylistId)
-                                    .queryParam("maxResults", 50);
+        return googleRestClient
+                .get()
+                .uri(uriBuilder -> {
+                    UriBuilder builder = uriBuilder
+                            .path("/youtube/v3/playlistItems")
+                            .queryParam("part", "contentDetails")
+                            .queryParam("id", likesPlaylistId)
+                            .queryParam("maxResults", 50);
 
-                            return builder.build();
-                        }
-                )
+                    return builder.build();
+                })
                 .headers(headers -> headers.setBearerAuth(googleAccessToken))
                 .retrieve()
                 .body(RetrieveLikedVideosResponse.class);
     }
 
     public GetLikedVideosResponse getLikedVideos(String oAuth2AccessToken) {
-        return googleRestClient.get()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path("/youtube/v3/videos")
-                                    .queryParam("part", "id")
-                                    .queryParam("myRating", "like");
+        return googleRestClient
+                .get()
+                .uri(uriBuilder -> {
+                    UriBuilder builder = uriBuilder
+                            .path("/youtube/v3/videos")
+                            .queryParam("part", "id")
+                            .queryParam("myRating", "like");
 
-                            return builder.build();
-                        }
-                )
+                    return builder.build();
+                })
                 .headers(headers -> headers.setBearerAuth(oAuth2AccessToken))
                 .retrieve()
                 .body(GetLikedVideosResponse.class);

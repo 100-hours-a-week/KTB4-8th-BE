@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.adapter.in.web.dto;
 
 import eightjbbm.keepgo.util.Coordinate;
-
 import java.time.LocalDate;
 import java.util.List;
 
@@ -16,6 +15,4 @@ public record GetPlaceDetailResponse(
         LocalDate saveDate,
         String addressSg,
         String addressRoad,
-        Coordinate coordinate
-) {
-}
+        Coordinate coordinate) {}

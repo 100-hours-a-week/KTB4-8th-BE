@@ -1,18 +1,18 @@
 package eightjbbm.keepgo.sandbox.ds;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
 
 @Entity
 @Table(name = "business_schedule_exception")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BusinessScheduleExceptionJpaEntity {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -25,10 +25,7 @@ public class BusinessScheduleExceptionJpaEntity {
     private TimeInterval timeInterval;
 
     public BusinessScheduleExceptionJpaEntity(
-            BusinessScheduleJpaEntity businessHours,
-            LocalDate date,
-            TimeInterval timeInterval
-    ) {
+            BusinessScheduleJpaEntity businessHours, LocalDate date, TimeInterval timeInterval) {
         this.businessSchedule = businessHours;
         this.date = date;
         this.timeInterval = timeInterval;

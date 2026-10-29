@@ -24,27 +24,14 @@ public class OutingStop {
     @JoinColumn(name = "outing_guide_id", nullable = false)
     private OutingGuide outingGuide;
 
-    public OutingStop(
-            OutingCourse outingCourse,
-            int travelMinutes,
-            int sequence,
-            OutingGuide outingGuide
-    ) {
+    public OutingStop(OutingCourse outingCourse, int travelMinutes, int sequence, OutingGuide outingGuide) {
         this.id = new OutingStopId(outingCourse.getId(), sequence);
         this.travelMinutes = travelMinutes;
         this.outingCourse = outingCourse;
         this.outingGuide = outingGuide;
     }
 
-    public static OutingStop from(
-            OutingCourse outingCourse,
-            int travelMinutes,
-            int sequence,
-            OutingGuide outingGuide) {
-        return new OutingStop(
-                outingCourse,
-                travelMinutes,
-                sequence,
-                outingGuide);
+    public static OutingStop from(OutingCourse outingCourse, int travelMinutes, int sequence, OutingGuide outingGuide) {
+        return new OutingStop(outingCourse, travelMinutes, sequence, outingGuide);
     }
 }

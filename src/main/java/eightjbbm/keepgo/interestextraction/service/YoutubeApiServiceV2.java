@@ -8,13 +8,12 @@ import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
+import java.util.Date;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.stereotype.Service;
-
-import java.util.Date;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -25,29 +24,17 @@ public class YoutubeApiServiceV2 {
     private final HttpTransport httpTransport;
     private final JsonFactory jsonFactory;
 
-    public VideoListResponse getVideoLists(
-            Long memberId,
-            String pageToken
-    ) {
+    public VideoListResponse getVideoLists(Long memberId, String pageToken) {
         OAuth2AccessToken accessToken = authorizedClientService.getAccessToken(memberId);
         var credentials = GoogleCredentials.create(
-                new AccessToken(
-                        accessToken.getTokenValue(),
-                        Date.from(accessToken.getExpiresAt())
-                )
-        );
+                new AccessToken(accessToken.getTokenValue(), Date.from(accessToken.getExpiresAt())));
 
-        var youtube = new YouTube.Builder(
-                httpTransport,
-                jsonFactory,
-                new HttpCredentialsAdapter(credentials)
-        )
+        var youtube = new YouTube.Builder(httpTransport, jsonFactory, new HttpCredentialsAdapter(credentials))
                 .setApplicationName("keepgo")
                 .build();
 
         try {
-            var builder = youtube
-                    .videos()
+            var builder = youtube.videos()
                     .list(List.of("id", "status", "snippet", "contentDetails"))
                     .setMaxResults(50L)
                     .setMyRating("like");
@@ -60,8 +47,7 @@ public class YoutubeApiServiceV2 {
             try {
                 return builder.execute();
             } finally {
-                long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS
-                        .toMillis(System.nanoTime() - startNanos);
+                long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
                 log.info("YouTube videos.list 호출 소요 시간: {}ms", elapsedMillis);
             }
         } catch (Exception e) {

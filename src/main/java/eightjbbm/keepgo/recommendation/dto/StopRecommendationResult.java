@@ -1,4 +1,3 @@
 package eightjbbm.keepgo.recommendation.dto;
 
-public record StopRecommendationResult() {
-}
+public record StopRecommendationResult() {}

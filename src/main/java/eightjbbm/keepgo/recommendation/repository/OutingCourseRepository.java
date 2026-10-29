@@ -5,5 +5,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface OutingCourseRepository extends JpaRepository<OutingCourse, Long> {
-}
+public interface OutingCourseRepository extends JpaRepository<OutingCourse, Long> {}

@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class UnprocessableContentException extends ErrorResponseException {
     public UnprocessableContentException() {
-        super(
-                HttpStatus.UNPROCESSABLE_CONTENT,
-                ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_CONTENT),
-                null
-        );
+        super(HttpStatus.UNPROCESSABLE_CONTENT, ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_CONTENT), null);
     }
 }

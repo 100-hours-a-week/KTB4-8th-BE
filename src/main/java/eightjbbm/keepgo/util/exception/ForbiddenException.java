@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class ForbiddenException extends ErrorResponseException {
     public ForbiddenException() {
-        super(
-                HttpStatus.FORBIDDEN,
-                ProblemDetail.forStatus(HttpStatus.FORBIDDEN),
-                null
-        );
+        super(HttpStatus.FORBIDDEN, ProblemDetail.forStatus(HttpStatus.FORBIDDEN), null);
     }
 }

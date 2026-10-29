@@ -1,12 +1,10 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
-import eightjbbm.keepgo.util.dto.ExtractSlotResponse;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -27,7 +25,8 @@ public class GetReplyCacheRepository {
     }
 
     public Optional<String> getReply(Long memberId) {
-        return Optional.ofNullable(getReplyCache().get(memberId, GetReplyValue.class).getReply());
+        return Optional.ofNullable(
+                getReplyCache().get(memberId, GetReplyValue.class).getReply());
     }
 
     public void setStatusAsFail(Long memberId) {

@@ -11,16 +11,10 @@ public record BusinessScheduleDto(
         String timezone,
         Boolean estimated,
         Map<DayOfWeek, List<TimeIntervalDto>> weeklyHours,
-        Map<LocalDate, List<TimeIntervalDto>> exceptions
-) {
-    public record TimeIntervalDto(
-            LocalTime openTime,
-            LocalTime closeTime
-    ) {}
+        Map<LocalDate, List<TimeIntervalDto>> exceptions) {
+    public record TimeIntervalDto(LocalTime openTime, LocalTime closeTime) {}
 
-    public static BusinessScheduleDto from(
-            BusinessSchedule businessSchedule
-    ) {
+    public static BusinessScheduleDto from(BusinessSchedule businessSchedule) {
         return new BusinessScheduleDto(
                 businessSchedule.getTimezone().toString(),
                 businessSchedule.isEstimated(),
@@ -29,21 +23,14 @@ public record BusinessScheduleDto(
                                 Map.Entry::getKey,
                                 entry -> entry.getValue().stream()
                                         .map(timeInterval ->
-                                                new TimeIntervalDto(
-                                                        timeInterval.startTime(),
-                                                        timeInterval.endTime()))
-                                        .toList()
-                        )),
+                                                new TimeIntervalDto(timeInterval.startTime(), timeInterval.endTime()))
+                                        .toList())),
                 businessSchedule.getExceptions().entrySet().stream()
                         .collect(Collectors.toMap(
                                 Map.Entry::getKey,
                                 entry -> entry.getValue().stream()
                                         .map(timeInterval ->
-                                                new TimeIntervalDto(
-                                                        timeInterval.startTime(),
-                                                        timeInterval.endTime()))
-                                        .toList()
-                        ))
-        );
+                                                new TimeIntervalDto(timeInterval.startTime(), timeInterval.endTime()))
+                                        .toList())));
     }
 }

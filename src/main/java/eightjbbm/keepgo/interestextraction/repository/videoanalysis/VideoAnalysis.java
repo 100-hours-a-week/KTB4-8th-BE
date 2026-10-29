@@ -1,16 +1,16 @@
 package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 @Entity
 @Getter
 @NoArgsConstructor
 public class VideoAnalysis {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
 
     private String videoId;

@@ -1,24 +1,19 @@
 package eightjbbm.keepgo.chat.service.requeststore;
 
+import java.time.Duration;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
-import java.time.Duration;
-import java.util.List;
-
 @Repository
 @RequiredArgsConstructor
-@ConditionalOnProperty(
-        name = "keepgo.ephemeral.provider",
-        havingValue = "redis"
-)
+@ConditionalOnProperty(name = "keepgo.ephemeral.provider", havingValue = "redis")
 public class RedisChatRequestStore implements ChatRequestStore {
 
-    private static final DefaultRedisScript<Long> RELEASE =
-            new DefaultRedisScript<>("""
+    private static final DefaultRedisScript<Long> RELEASE = new DefaultRedisScript<>("""
                 if redis.call('GET', KEYS[1]) == ARGV[1] then
                     return redis.call('DEL', KEYS[1])
                 end
@@ -30,11 +25,7 @@ public class RedisChatRequestStore implements ChatRequestStore {
 
     @Override
     public boolean acquire(Long memberId, String requestId) {
-        return Boolean.TRUE.equals(
-                redis.opsForValue().setIfAbsent(
-                        key(memberId),
-                        requestId,
-                        REQUEST_TTL));
+        return Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key(memberId), requestId, REQUEST_TTL));
     }
 
     @Override

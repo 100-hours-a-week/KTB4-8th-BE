@@ -1,10 +1,9 @@
 package eightjbbm.keepgo.sandbox.ds;
 
 import com.google.api.services.youtube.model.Video;
-import lombok.Getter;
-
 import java.util.List;
 import java.util.stream.Stream;
+import lombok.Getter;
 
 @Getter
 public class VideoIds {
@@ -24,12 +23,7 @@ public class VideoIds {
     }
 
     public static VideoIds fromVideos(List<Video> videos) {
-        return new VideoIds(
-                videos.stream()
-                        .map(Video::getId)
-                        .map(VideoId::new)
-                        .toList()
-        );
+        return new VideoIds(videos.stream().map(Video::getId).map(VideoId::new).toList());
     }
 
     public static VideoIds fromVideoIds(List<VideoId> videoIds) {

@@ -2,24 +2,16 @@ package eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3;
 
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.service.YoutubeApiServiceV2;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.sandbox.OutingGuideFactory;
-import eightjbbm.keepgo.sandbox.OutingGuideRepository;
-import eightjbbm.keepgo.sandbox.aiv2.AiServerService;
-import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -52,11 +44,11 @@ public class InterestExtractionServiceV3 {
     }
 
     private void addOutingGuidesToOutingWishlist(Long memberId, List<OutingGuide> analyzedResults) {
-        List<OutingGuide> wishlistedOutingGuides = outingWishlist
-                .findAllWishlistedOutingGuides(memberId, analyzedResults);
+        List<OutingGuide> wishlistedOutingGuides =
+                outingWishlist.findAllWishlistedOutingGuides(memberId, analyzedResults);
 
         Member member = memberRepository.getReferenceById(memberId);
-        for (OutingGuide guide: analyzedResults) {
+        for (OutingGuide guide : analyzedResults) {
             if (!wishlistedOutingGuides.contains(guide)) {
                 outingWishlist.save(OutingWishlistEntry.from(member, guide));
             }

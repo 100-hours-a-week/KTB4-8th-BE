@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.outingwishlist;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -15,6 +17,10 @@ import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.util.exception.NotFoundException;
 import jakarta.persistence.Entity;
+import java.sql.DriverManager;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Supplier;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
@@ -23,13 +29,6 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
-
-import java.sql.DriverManager;
-import java.util.List;
-import java.util.UUID;
-import java.util.function.Supplier;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named = "MYSQL_TEST_SERVER_URL", matches = "jdbc:mysql://[^/]+/")
 class OutingCourseDeletionIntegrationTest {
@@ -54,7 +53,7 @@ class OutingCourseDeletionIntegrationTest {
         password = System.getenv().getOrDefault("MYSQL_TEST_PASSWORD", "");
         schema = "keepgo_wishlist_it_" + UUID.randomUUID().toString().replace("-", "");
         try (var connection = DriverManager.getConnection(serverUrl, username, password);
-             var statement = connection.createStatement()) {
+                var statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE " + schema);
         }
         var configuration = new Configuration()
@@ -62,7 +61,8 @@ class OutingCourseDeletionIntegrationTest {
                 .setProperty("hibernate.connection.username", username)
                 .setProperty("hibernate.connection.password", password)
                 .setProperty("hibernate.hbm2ddl.auto", "create-drop")
-                .setProperty("hibernate.physical_naming_strategy",
+                .setProperty(
+                        "hibernate.physical_naming_strategy",
                         "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
@@ -76,7 +76,8 @@ class OutingCourseDeletionIntegrationTest {
                 repositories.getRepository(MemberRepository.class),
                 repositories.getRepository(OutingCourseRepository.class),
                 repositories.getRepository(OutingWishlist.class),
-                new OutingWishlistQueryRepository(new JPAQueryFactory(session)), new PageTokenCodec());
+                new OutingWishlistQueryRepository(new JPAQueryFactory(session)),
+                new PageTokenCodec());
         transaction(() -> {
             var member = Member.create("소유자");
             var other = Member.create("다른 회원");
@@ -97,7 +98,7 @@ class OutingCourseDeletionIntegrationTest {
         if (factory != null) factory.close();
         if (schema != null) {
             try (var connection = DriverManager.getConnection(serverUrl, username, password);
-                 var statement = connection.createStatement()) {
+                    var statement = connection.createStatement()) {
                 statement.execute("DROP DATABASE " + schema);
             }
         }
@@ -105,31 +106,49 @@ class OutingCourseDeletionIntegrationTest {
 
     @Test
     void deletedCourseDisappearsFromListAndDetailAndCannotBeDeletedAgain() {
-        var entryId = transaction(() -> service.addOutingCourse(
-                new AddOutingCourseCommand(memberId, courseId)).addedOutingWishlistEntryId());
-        assertEquals(entryId, transaction(() -> service.getOutingCourseList(
-                new GetOutingCourseListCommand(memberId, null, null))).courses().getFirst().courseId());
-        transaction(() -> { service.removeOutingCourse(memberId, entryId); return null; });
-        assertTrue(transaction(() -> service.getOutingCourseList(
-                new GetOutingCourseListCommand(memberId, null, null))).courses().isEmpty());
-        assertThrows(NotFoundException.class, () -> transaction(() -> service.getOutingCourseDetail(
-                new GetOutingCourseDetailCommand(memberId, entryId))));
-        assertThrows(OutingCourseNotFoundException.class, () -> transaction(() -> {
-            service.removeOutingCourse(memberId, entryId); return null;
-        }));
+        var entryId = transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))
+                .addedOutingWishlistEntryId());
+        assertEquals(
+                entryId,
+                transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
+                        .courses()
+                        .getFirst()
+                        .courseId());
+        transaction(() -> {
+            service.removeOutingCourse(memberId, entryId);
+            return null;
+        });
+        assertTrue(transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
+                .courses()
+                .isEmpty());
+        assertThrows(
+                NotFoundException.class,
+                () -> transaction(
+                        () -> service.getOutingCourseDetail(new GetOutingCourseDetailCommand(memberId, entryId))));
+        assertThrows(
+                OutingCourseNotFoundException.class,
+                () -> transaction(() -> {
+                    service.removeOutingCourse(memberId, entryId);
+                    return null;
+                }));
         // 코스 자체는 보존되므로 다시 위시리스트에 추가할 수 있다.
         assertNotNull(transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))));
     }
 
     @Test
     void anotherMemberCannotDeleteOwnersCourse() {
-        var entryId = transaction(() -> service.addOutingCourse(
-                new AddOutingCourseCommand(memberId, courseId)).addedOutingWishlistEntryId());
-        assertThrows(OutingCourseNotFoundException.class, () -> transaction(() -> {
-            service.removeOutingCourse(otherMemberId, entryId); return null;
-        }));
-        assertEquals(entryId, transaction(() -> service.getOutingCourseDetail(
-                new GetOutingCourseDetailCommand(memberId, entryId))).courseId());
+        var entryId = transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))
+                .addedOutingWishlistEntryId());
+        assertThrows(
+                OutingCourseNotFoundException.class,
+                () -> transaction(() -> {
+                    service.removeOutingCourse(otherMemberId, entryId);
+                    return null;
+                }));
+        assertEquals(
+                entryId,
+                transaction(() -> service.getOutingCourseDetail(new GetOutingCourseDetailCommand(memberId, entryId)))
+                        .courseId());
     }
 
     @Test
@@ -141,11 +160,16 @@ class OutingCourseDeletionIntegrationTest {
             session.persist(entry);
             return entry.getId();
         });
-        assertThrows(OutingCourseNotFoundException.class, () -> transaction(() -> {
-            service.removeOutingCourse(memberId, entryId); return null;
-        }));
-        assertEquals(entryId, transaction(() -> service.getPlaceDetail(
-                new GetPlaceDetailCommand(memberId, entryId))).placeId());
+        assertThrows(
+                OutingCourseNotFoundException.class,
+                () -> transaction(() -> {
+                    service.removeOutingCourse(memberId, entryId);
+                    return null;
+                }));
+        assertEquals(
+                entryId,
+                transaction(() -> service.getPlaceDetail(new GetPlaceDetailCommand(memberId, entryId)))
+                        .placeId());
     }
 
     private <T> T transaction(Supplier<T> action) {

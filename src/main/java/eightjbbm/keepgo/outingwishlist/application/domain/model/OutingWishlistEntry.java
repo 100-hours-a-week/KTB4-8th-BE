@@ -5,18 +5,18 @@ import eightjbbm.keepgo.recommendation.entity.OutingCourse;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 @Table(name = "outing_collection_private")
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OutingWishlistEntry {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -47,8 +47,7 @@ public class OutingWishlistEntry {
             Member member,
             OutingWishlistEntryType type,
             @Nullable OutingGuide outingGuide,
-            @Nullable OutingCourse outingCourse
-    ) {
+            @Nullable OutingCourse outingCourse) {
         this.member = member;
         this.type = type;
         this.outingGuide = outingGuide;
@@ -57,21 +56,11 @@ public class OutingWishlistEntry {
     }
 
     public static OutingWishlistEntry from(Member member, OutingGuide outingGuide) {
-        return new OutingWishlistEntry(
-                member,
-                OutingWishlistEntryType.getType(outingGuide),
-                outingGuide,
-                null
-        );
+        return new OutingWishlistEntry(member, OutingWishlistEntryType.getType(outingGuide), outingGuide, null);
     }
 
     public static OutingWishlistEntry from(Member member, OutingCourse outingCourse) {
-        return new OutingWishlistEntry(
-                member,
-                OutingWishlistEntryType.getType(outingCourse),
-                null,
-                outingCourse
-        );
+        return new OutingWishlistEntry(member, OutingWishlistEntryType.getType(outingCourse), null, outingCourse);
     }
 
     public void delete() {

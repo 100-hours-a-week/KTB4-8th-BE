@@ -4,10 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
 @Embeddable
-public record VideoId(
-        @Column(name = "video_id")
-        String videoId
-) {
+public record VideoId(@Column(name = "video_id") String videoId) {
     public String toLink() {
         return "https://youtube.com/watch/" + videoId();
     }

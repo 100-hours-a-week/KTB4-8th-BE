@@ -1,10 +1,10 @@
 package eightjbbm.keepgo.auth.accesstokenblacklist.repository;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
@@ -12,8 +12,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-
-import java.util.List;
 
 @Configuration
 @EnableConfigurationProperties(AccessTokenBlacklistedProperties.class)
@@ -25,22 +23,15 @@ public class AccessTokenBlacklistedConfig {
     private static final String PROVIDER_NAME_REDIS = "redis";
 
     @Bean(CACHE_MANAGER_NAME)
-    @ConditionalOnProperty(
-            name = PROVIDER_NAME_PATH,
-            havingValue = PROVIDER_NAME_CAFFEINE,
-            matchIfMissing = true
-    )
-    public CacheManager caffeineCacheManager(
-            AccessTokenBlacklistedProperties properties
-    ) {
+    @ConditionalOnProperty(name = PROVIDER_NAME_PATH, havingValue = PROVIDER_NAME_CAFFEINE, matchIfMissing = true)
+    public CacheManager caffeineCacheManager(AccessTokenBlacklistedProperties properties) {
         var blacklist = new CaffeineCache(
                 properties.name(),
                 Caffeine.newBuilder()
                         .expireAfterWrite(properties.ttl())
                         .recordStats()
                         .build(),
-                false
-        );
+                false);
 
         var manager = new SimpleCacheManager();
         manager.setCaches(List.of(blacklist));
@@ -48,14 +39,9 @@ public class AccessTokenBlacklistedConfig {
     }
 
     @Bean(CACHE_MANAGER_NAME)
-    @ConditionalOnProperty(
-            name = PROVIDER_NAME_PATH,
-            havingValue = PROVIDER_NAME_REDIS
-    )
+    @ConditionalOnProperty(name = PROVIDER_NAME_PATH, havingValue = PROVIDER_NAME_REDIS)
     public CacheManager redisCacheManager(
-            RedisConnectionFactory connectionFactory,
-            AccessTokenBlacklistedProperties properties
-    ) {
+            RedisConnectionFactory connectionFactory, AccessTokenBlacklistedProperties properties) {
         var blacklist = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(properties.ttl())
                 .disableCachingNullValues();

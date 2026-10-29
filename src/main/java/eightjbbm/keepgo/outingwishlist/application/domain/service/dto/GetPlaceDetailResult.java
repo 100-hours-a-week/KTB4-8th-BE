@@ -3,7 +3,6 @@ package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.Coordinate;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -19,8 +18,7 @@ public record GetPlaceDetailResult(
         LocalDate saveDate,
         String addressSg,
         String addressRoad,
-        Coordinate coordinate
-) {
+        Coordinate coordinate) {
     public static GetPlaceDetailResult from(OutingWishlistEntry wishlistEntry) {
         OutingPlace place = (OutingPlace) wishlistEntry.getOutingGuide();
         return new GetPlaceDetailResult(
@@ -32,7 +30,6 @@ public record GetPlaceDetailResult(
                 wishlistEntry.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
                 place.getAddress().toSg(),
                 place.getAddress().toRoad(),
-                place.getCoordinate()
-        );
+                place.getCoordinate());
     }
 }

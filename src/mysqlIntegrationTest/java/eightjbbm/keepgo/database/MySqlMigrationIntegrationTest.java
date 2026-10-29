@@ -1,6 +1,16 @@
 package eightjbbm.keepgo.database;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import jakarta.persistence.Entity;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.hibernate.cfg.Configuration;
@@ -14,20 +24,9 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
-import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MySqlMigrationIntegrationTest {
     private static String serverUrl;
@@ -51,7 +50,7 @@ class MySqlMigrationIntegrationTest {
     void createIsolatedSchema() throws Exception {
         schema = "keepgo_it_" + UUID.randomUUID().toString().replace("-", "");
         try (var connection = DriverManager.getConnection(serverUrl, username, password);
-             var statement = connection.createStatement()) {
+                var statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE " + schema + " CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin");
         }
         jdbcUrl = serverUrl + schema + "?characterEncoding=UTF-8&connectionCollation=utf8mb4_0900_bin";
@@ -61,7 +60,7 @@ class MySqlMigrationIntegrationTest {
     void dropOnlyTestSchema() throws Exception {
         if (schema != null) {
             try (var connection = DriverManager.getConnection(serverUrl, username, password);
-                 var statement = connection.createStatement()) {
+                    var statement = connection.createStatement()) {
                 statement.execute("DROP DATABASE " + schema);
             }
         }
@@ -71,7 +70,8 @@ class MySqlMigrationIntegrationTest {
     void migratesEmptyDatabaseAndValidatesCurrentEntityMappings() throws Exception {
         flyway().migrate();
 
-        try (var connection = connection(); var statement = connection.createStatement()) {
+        try (var connection = connection();
+                var statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO member (id, nickname) VALUES (700, '기존 회원 🌸')");
             try (var result = statement.executeQuery("SELECT nickname FROM member WHERE id = 700")) {
                 result.next();
@@ -84,7 +84,8 @@ class MySqlMigrationIntegrationTest {
                 .setProperty("hibernate.connection.username", username)
                 .setProperty("hibernate.connection.password", password)
                 .setProperty("hibernate.hbm2ddl.auto", "validate")
-                .setProperty("hibernate.physical_naming_strategy",
+                .setProperty(
+                        "hibernate.physical_naming_strategy",
                         "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
@@ -102,17 +103,22 @@ class MySqlMigrationIntegrationTest {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V1__current_schema.sql"));
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("fixtures/legacy-data.sql"));
         }
-        var migration = Flyway.configure().dataSource(jdbcUrl, username, password)
+        var migration = Flyway.configure()
+                .dataSource(jdbcUrl, username, password)
                 .locations("classpath:db/test-expansion")
                 .callbacks(new MySqlMigrationPreflight())
-                .baselineOnMigrate(false).baselineVersion("1").cleanDisabled(true).load();
+                .baselineOnMigrate(false)
+                .baselineVersion("1")
+                .cleanDisabled(true)
+                .load();
 
         assertThrows(FlywayException.class, migration::migrate);
         migration.baseline();
         migration.migrate();
         migration.validate();
 
-        try (var connection = connection(); var statement = connection.createStatement()) {
+        try (var connection = connection();
+                var statement = connection.createStatement()) {
             try (var result = statement.executeQuery("""
                     SELECT m.nickname, g.name, g.address, a.status, w.deleted_at,
                            a.test_note, s.next_val
@@ -137,19 +143,25 @@ class MySqlMigrationIntegrationTest {
     }
 
     private Flyway flyway() {
-        return Flyway.configure().dataSource(jdbcUrl, username, password)
+        return Flyway.configure()
+                .dataSource(jdbcUrl, username, password)
                 .locations("classpath:db/migration")
                 .callbacks(new MySqlMigrationPreflight())
-                .baselineOnMigrate(false).cleanDisabled(true).load();
+                .baselineOnMigrate(false)
+                .cleanDisabled(true)
+                .load();
     }
 
     @Test
     void refusesUnsupportedConnectionBeforeApplyingMigrations() {
-        var migration = Flyway.configure().dataSource(jdbcUrl, username, password)
+        var migration = Flyway.configure()
+                .dataSource(jdbcUrl, username, password)
                 .locations("classpath:db/migration")
                 .initSql("SET NAMES latin1")
                 .callbacks(new MySqlMigrationPreflight())
-                .baselineOnMigrate(false).cleanDisabled(true).load();
+                .baselineOnMigrate(false)
+                .cleanDisabled(true)
+                .load();
 
         assertThrows(FlywayException.class, migration::migrate);
     }
@@ -158,18 +170,21 @@ class MySqlMigrationIntegrationTest {
     void onlyExplicitMigrationProfileAppliesMigrations() throws Exception {
         var runner = new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
-                .withConfiguration(AutoConfigurations.of(
-                        DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class))
+                .withConfiguration(
+                        AutoConfigurations.of(DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class))
                 .withUserConfiguration(MySqlMigrationPreflight.class)
-                .withPropertyValues("spring.datasource.url=" + jdbcUrl,
-                        "spring.datasource.username=" + username, "spring.datasource.password=" + password);
+                .withPropertyValues(
+                        "spring.datasource.url=" + jdbcUrl,
+                        "spring.datasource.username=" + username,
+                        "spring.datasource.password=" + password);
 
         runner.run(context -> {
             assertNull(context.getStartupFailure());
             assertFalse(context.containsBean("flyway"));
         });
-        try (var connection = connection(); var statement = connection.createStatement();
-             var result = statement.executeQuery("""
+        try (var connection = connection();
+                var statement = connection.createStatement();
+                var result = statement.executeQuery("""
                      SELECT COUNT(*) FROM information_schema.TABLES
                      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'member'
                      """)) {

@@ -17,24 +17,16 @@ public class InterestExtractionControllerV3 {
 
     private final InterestExtractionServiceV3 interestExtractionService;
 
-    @PostMapping(
-            value = "/api/v3/member/youtube-sync",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter syncWishlistFromYoutube(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+    @PostMapping(value = "/api/v3/member/youtube-sync", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter syncWishlistFromYoutube(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
         return null;
     }
 
     @PostMapping("/api/v3/member/youtube-sync-plain")
-    public ResponseEntity<Void> syncWishlistFromYoutubePlain(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+    public ResponseEntity<Void> syncWishlistFromYoutubePlain(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
         interestExtractionService.syncWishlistFromYoutubePlain(memberId);
-        return ResponseEntity
-                .status(HttpStatus.NO_CONTENT)
-                .build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

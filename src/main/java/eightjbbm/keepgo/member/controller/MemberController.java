@@ -23,17 +23,11 @@ public class MemberController {
     /// @return {@link GetMemberInfoResponse}
     @GetMapping
     public ResponseEntity<GetMemberInfoResponse> getMemberInfo(@AuthenticationPrincipal Jwt jwt) {
-        var command = MemberMapper.INSTANCE.toGetMemberInfoCommand(
-                Long.valueOf(jwt.getSubject())
-        );
+        var command = MemberMapper.INSTANCE.toGetMemberInfoCommand(Long.valueOf(jwt.getSubject()));
 
         GetMemberInfoResult result = memberService.getMemberInfo(command);
 
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(
-                        GetMemberInfoResponse.from(result)
-                );
+        return ResponseEntity.status(HttpStatus.OK).body(GetMemberInfoResponse.from(result));
     }
 
     /// 회원 정보 수정 API
@@ -42,37 +36,22 @@ public class MemberController {
     /// @return {@link UpdateMemberInfoResponse}
     @PatchMapping
     public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestBody UpdateMemberInfoRequest request) {
-        var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(
-                Long.valueOf(jwt.getSubject()),
-                request
-        );
+            @AuthenticationPrincipal Jwt jwt, @RequestBody UpdateMemberInfoRequest request) {
+        var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(Long.valueOf(jwt.getSubject()), request);
 
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(
-                        UpdateMemberInfoResponse.from(
-                                memberService.updateMemberInfo(command)
-                        )
-                );
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(UpdateMemberInfoResponse.from(memberService.updateMemberInfo(command)));
     }
 
     /// 유튜브 동기화 API
     /// @param jwt
     @PostMapping("/youtube-analyze")
     public ResponseEntity<Void> synchronizeYoutubeLikeVideos(
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication
-    ) {
-        var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(
-                Long.valueOf(jwt.getSubject())
-        );
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(Long.valueOf(jwt.getSubject()));
 
         memberService.synchronizeYoutubeLikeVideos(command);
 
-        return ResponseEntity
-                .status(HttpStatus.NO_CONTENT)
-                .build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.recommendation.service;
 
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
+import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
@@ -8,9 +9,14 @@ import eightjbbm.keepgo.recommendation.repository.RecommendationJobStore;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.exception.*;
-import eightjbbm.keepgo.recommendation.entity.OutingEvent;
-
+import java.io.IOException;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,14 +25,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.io.IOException;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -41,8 +39,7 @@ public class RecommendationServiceV2 {
     private final Executor executor;
     private final double radiusKm;
 
-    private final ConcurrentMap<String, RecommendationConnection> localSseConnections =
-            new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, RecommendationConnection> localSseConnections = new ConcurrentHashMap<>();
 
     public RecommendationServiceV2(
             AiServerRecommendApiService aiServerService,
@@ -52,8 +49,7 @@ public class RecommendationServiceV2 {
             RecommendationResultMapper resultMapper,
             RecommendationJobStore jobs,
             @Qualifier("recommendationTaskExecutor") Executor executor,
-            @Value("${recommendation.candidate-radius-km:5}") double radiusKm
-    ) {
+            @Value("${recommendation.candidate-radius-km:5}") double radiusKm) {
         if (!Double.isFinite(radiusKm) || radiusKm <= 0) {
             throw new IllegalArgumentException("추천 반경은 양수여야 합니다.");
         }
@@ -69,8 +65,7 @@ public class RecommendationServiceV2 {
     }
 
     public SseEmitter recommendOutingCourse(Long memberId) {
-        OutingCriteria criteria = criteriaRepository.findById(memberId)
-                .orElseThrow(NotFoundException::new);
+        OutingCriteria criteria = criteriaRepository.findById(memberId).orElseThrow(NotFoundException::new);
         validate(criteria);
         var connection = new RecommendationConnection(memberId);
         if (!jobs.start(memberId, connection.jobId)) {
@@ -100,8 +95,7 @@ public class RecommendationServiceV2 {
     public boolean cancelOutingCourseRecommendation(Long memberId) {
         var job = jobs.find(memberId).orElse(null);
 
-        if (job == null
-                || !jobs.finish(memberId, job.id(), RecommendationJobStore.State.CANCELLED)) {
+        if (job == null || !jobs.finish(memberId, job.id(), RecommendationJobStore.State.CANCELLED)) {
             return false;
         }
 
@@ -114,26 +108,19 @@ public class RecommendationServiceV2 {
         return true;
     }
 
-    private void recommend(
-            RecommendationConnection connection,
-            OutingCriteria criteria
-    ) {
+    private void recommend(RecommendationConnection connection, OutingCriteria criteria) {
         try {
             if (!checkRunning(connection)) {
                 return;
             }
 
-            List<OutingGuide> candidates =
-                    findCandidates(connection.memberId, criteria);
+            List<OutingGuide> candidates = findCandidates(connection.memberId, criteria);
 
             if (!checkRunning(connection)) {
                 return;
             }
 
-            var response = aiServerService.recommendCourses(
-                    criteria,
-                    candidates
-            );
+            var response = aiServerService.recommendCourses(criteria, candidates);
 
             if (!checkRunning(connection)) {
                 return;
@@ -144,11 +131,7 @@ public class RecommendationServiceV2 {
             var result = resultMapper.map(criteria, data);
             complete(connection, "success", Map.of("result", result));
         } catch (RuntimeException error) {
-            log.warn(
-                    "추천 처리 실패: jobId={}",
-                    connection.jobId,
-                    error
-            );
+            log.warn("추천 처리 실패: jobId={}", connection.jobId, error);
 
             fail(connection);
         } finally {
@@ -156,21 +139,14 @@ public class RecommendationServiceV2 {
             releaseJob(connection);
         }
     }
-    private void complete(
-            RecommendationConnection connection,
-            String event,
-            Object data
-    ) {
+
+    private void complete(RecommendationConnection connection, String event, Object data) {
         synchronized (connection) {
             if (connection.isClosed()) {
                 return;
             }
 
-            if (jobs.finish(
-                    connection.memberId,
-                    connection.jobId,
-                    RecommendationJobStore.State.FINISHED
-            )) {
+            if (jobs.finish(connection.memberId, connection.jobId, RecommendationJobStore.State.FINISHED)) {
                 terminate(connection, event, data);
             } else {
                 // 취소가 먼저 확정됐다면 stopped로 종료한다.
@@ -184,8 +160,7 @@ public class RecommendationServiceV2 {
             complete(connection, "service-unavailable", unavailable());
         } catch (RuntimeException error) {
             // 저장소 장애 시에도 로컬 SSE 연결은 종료한다.
-            log.warn("추천 작업 상태 변경 실패: jobId={}",
-                    connection.jobId, error);
+            log.warn("추천 작업 상태 변경 실패: jobId={}", connection.jobId, error);
 
             terminate(connection, "service-unavailable", unavailable());
         }
@@ -213,27 +188,20 @@ public class RecommendationServiceV2 {
         }
     }
 
-    @Scheduled(
-            fixedDelayString = "${recommendation.jobs.poll-interval-ms:250}"
-    )
+    @Scheduled(fixedDelayString = "${recommendation.jobs.poll-interval-ms:250}")
     public void checkConnections() {
         for (var connection : localSseConnections.values()) {
             try {
                 checkRunning(connection);
             } catch (RuntimeException error) {
-                log.warn("추천 작업 상태 조회 실패: jobId={}",
-                        connection.jobId, error);
+                log.warn("추천 작업 상태 조회 실패: jobId={}", connection.jobId, error);
 
                 terminate(connection, "service-unavailable", unavailable());
             }
         }
     }
 
-    private void terminate(
-            RecommendationConnection connection,
-            String event,
-            Object data
-    ) {
+    private void terminate(RecommendationConnection connection, String event, Object data) {
         synchronized (connection) {
             try {
                 connection.finish(event, data);
@@ -254,37 +222,25 @@ public class RecommendationServiceV2 {
         try {
             jobs.remove(connection.memberId, connection.jobId);
         } catch (RuntimeException error) {
-            log.warn(
-                    "추천 작업 정리 실패: jobId={}",
-                    connection.jobId,
-                    error
-            );
+            log.warn("추천 작업 정리 실패: jobId={}", connection.jobId, error);
         }
     }
 
-    private RecommendCoursesResponseV2.SuccessData requireSuccess(
-            RecommendCoursesResponseV2 response
-    ) {
-        if (response instanceof RecommendCoursesResponseV2.Success(
-                String message, RecommendCoursesResponseV2.SuccessData data
-        )
+    private RecommendCoursesResponseV2.SuccessData requireSuccess(RecommendCoursesResponseV2 response) {
+        if (response
+                        instanceof
+                        RecommendCoursesResponseV2.Success(String message, RecommendCoursesResponseV2.SuccessData data)
                 && data != null
                 && data.error() == null
                 && data.courses() != null
-                && (
-                "recommend_success".equals(message)
-                        || "recommend_not_found".equals(message)
-        )) {
+                && ("recommend_success".equals(message) || "recommend_not_found".equals(message))) {
             return data;
         }
 
         throw new ServiceUnavailableException();
     }
 
-    private List<OutingGuide> findCandidates(
-            Long memberId,
-            OutingCriteria criteria
-    ) {
+    private List<OutingGuide> findCandidates(Long memberId, OutingCriteria criteria) {
         Coordinate origin;
         try {
             origin = kakaoPlaceSearch.getCoordinates(criteria.getRequestedLocationName());
@@ -294,18 +250,12 @@ public class RecommendationServiceV2 {
         }
         Instant requestedAt = criteria.getRequestedDatetime();
 
-        return collectionRepository.findRecommendationCandidates(memberId)
-                .stream()
+        return collectionRepository.findRecommendationCandidates(memberId).stream()
                 .filter(guide -> hasCoordinate(guide.getCoordinate()))
                 .filter(guide -> isWithinEventPeriod(guide, requestedAt))
-                .filter(guide ->
-                        distanceKm(origin, guide.getCoordinate()) <= radiusKm
-                )
-                .sorted(
-                        Comparator.comparingDouble((OutingGuide guide) ->
-                                distanceKm(origin, guide.getCoordinate())
-                        ).thenComparing(OutingGuide::getId)
-                )
+                .filter(guide -> distanceKm(origin, guide.getCoordinate()) <= radiusKm)
+                .sorted(Comparator.comparingDouble((OutingGuide guide) -> distanceKm(origin, guide.getCoordinate()))
+                        .thenComparing(OutingGuide::getId))
                 .limit(50)
                 .toList();
     }
@@ -338,22 +288,15 @@ public class RecommendationServiceV2 {
         double toLat = Math.toRadians(to.lat());
 
         double deltaLat = toLat - fromLat;
-        double deltaLng = Math.toRadians(
-                (double) to.lng() - from.lng()
-        );
+        double deltaLng = Math.toRadians((double) to.lng() - from.lng());
 
         double a = Math.pow(Math.sin(deltaLat / 2), 2)
-                + Math.cos(fromLat) * Math.cos(toLat)
-                * Math.pow(Math.sin(deltaLng / 2), 2);
+                + Math.cos(fromLat) * Math.cos(toLat) * Math.pow(Math.sin(deltaLng / 2), 2);
 
-        return 6371.0088 * 2
-                * Math.asin(Math.sqrt(Math.max(0, Math.min(1, a))));
+        return 6371.0088 * 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, a))));
     }
 
-    private boolean isWithinEventPeriod(
-            OutingGuide guide,
-            Instant requestedAt
-    ) {
+    private boolean isWithinEventPeriod(OutingGuide guide, Instant requestedAt) {
         if (!(guide instanceof OutingEvent event)) {
             return true;
         }
@@ -361,11 +304,9 @@ public class RecommendationServiceV2 {
         Instant start = event.getStartDatetime();
         Instant end = event.getEndDatetime();
 
-        boolean hasStarted =
-                start == null || !requestedAt.isBefore(start);
+        boolean hasStarted = start == null || !requestedAt.isBefore(start);
 
-        boolean hasNotEnded =
-                end == null || requestedAt.isBefore(end);
+        boolean hasNotEnded = end == null || requestedAt.isBefore(end);
 
         return hasStarted && hasNotEnded;
     }

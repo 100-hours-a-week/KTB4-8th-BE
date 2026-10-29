@@ -9,15 +9,14 @@ import eightjbbm.keepgo.sandbox.OutingGuideFactory;
 import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.sandbox.aiv2.AiServerService;
 import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -31,7 +30,9 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
     @Override
     public List<OutingGuide> analyze(List<Video> videos) {
         // 유효성 검사
-        List<String> validatedVideoIds = YoutubeVideoValidator.validate(videos).stream().map(Video::getId).toList();
+        List<String> validatedVideoIds = YoutubeVideoValidator.validate(videos).stream()
+                .map(Video::getId)
+                .toList();
 
         Map<GuideKey, OutingGuide> analyzedResults = new ConcurrentHashMap<>();
         Map<Long, GuideKey> successfulAnalyses = new ConcurrentHashMap<>();
@@ -40,12 +41,10 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
             List<CompletableFuture<Void>> tasks = new ArrayList<>();
 
             for (int i = 0; i < validatedVideoIds.size(); i += 10) {
-                List<String> batch = validatedVideoIds.subList(
-                        i, Math.min(i + 10, validatedVideoIds.size()));
+                List<String> batch = validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size()));
 
                 tasks.add(CompletableFuture.runAsync(
-                        () -> analyzeBatch(batch, analyzedResults, successfulAnalyses),
-                        executor));
+                        () -> analyzeBatch(batch, analyzedResults, successfulAnalyses), executor));
             }
 
             CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).join();
@@ -62,23 +61,21 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
         return persistAnalyzedResults(analyzedResults.values().stream().toList());
     }
 
-
     private void analyzeBatch(
-            List<String> videoIds,
-            Map<GuideKey, OutingGuide> analyzedResults,
-            Map<Long, GuideKey> successfulAnalyses
-    ) {
+            List<String> videoIds, Map<GuideKey, OutingGuide> analyzedResults, Map<Long, GuideKey> successfulAnalyses) {
         Map<String, Long> analysisIdsByUrl = new HashMap<>();
-        videoAnalysisManager.start(videoIds).forEach(
-                (videoId, analysisId) ->
+        videoAnalysisManager
+                .start(videoIds)
+                .forEach((videoId, analysisId) ->
                         analysisIdsByUrl.put("https://youtube.com/shorts/" + videoId, analysisId));
 
         Map<Long, VideoAnalysisStatus> unsuccessfulAnalyses = new HashMap<>();
         Set<Long> processedIds = new HashSet<>();
 
         // 실패 응답이나 응답 누락 시 FAILED로 처리한다.
-        analysisIdsByUrl.values().forEach(
-                analysisId -> unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.FAILED));
+        analysisIdsByUrl
+                .values()
+                .forEach(analysisId -> unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.FAILED));
 
         try {
             var response = aiServerApiService.analyzeVideoV2(videoIds);
@@ -87,50 +84,48 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                 for (var result : success.data().results()) {
                     Long analysisId = analysisIdsByUrl.get(result.videoUrl());
 
-                        if (analysisId == null || !processedIds.add(analysisId)) {
-                            continue;
-                        }
+                    if (analysisId == null || !processedIds.add(analysisId)) {
+                        continue;
+                    }
 
-                        switch (result.status()) {
-                            case "success" -> {
-                                OutingGuide guide = OutingGuideFactory.createOutingGuide(result);
-                                GuideKey key = new GuideKey(guide.getName(), guide.getAddress());
+                    switch (result.status()) {
+                        case "success" -> {
+                            OutingGuide guide = OutingGuideFactory.createOutingGuide(result);
+                            GuideKey key = new GuideKey(guide.getName(), guide.getAddress());
 
-                                analyzedResults.putIfAbsent(key, guide);
-                                successfulAnalyses.put(analysisId, key);
-                                unsuccessfulAnalyses.remove(analysisId);
-                            }
-                            case "not_found" ->
-                                unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.NOT_FOUND);
-                            case "failed" ->
-                                unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.FAILED);
-                            default -> throw new IllegalStateException(
-                                "Unknown analysis status: " + result.status());
+                            analyzedResults.putIfAbsent(key, guide);
+                            successfulAnalyses.put(analysisId, key);
+                            unsuccessfulAnalyses.remove(analysisId);
                         }
+                        case "not_found" -> unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.NOT_FOUND);
+                        case "failed" -> unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.FAILED);
+                        default -> throw new IllegalStateException("Unknown analysis status: " + result.status());
                     }
                 }
+            }
         } finally {
-                videoAnalysisManager.completeUnsuccessful(unsuccessfulAnalyses);
+            videoAnalysisManager.completeUnsuccessful(unsuccessfulAnalyses);
         }
     }
 
     private List<OutingGuide> persistAnalyzedResults(List<OutingGuide> analyzedResults) {
-        Map<GuideKey, OutingGuide> allByAddresses = outingGuideRepository
-                .findAllByAddresses(
-                        analyzedResults.stream()
+        Map<GuideKey, OutingGuide> allByAddresses =
+                outingGuideRepository
+                        .findAllByAddresses(analyzedResults.stream()
                                 .map(OutingGuide::getAddress)
                                 .distinct()
-                                .toList()).stream()
-                .collect(Collectors.toMap(
-                        outingGuide -> new GuideKey(outingGuide.getName(), outingGuide.getAddress()),
-                        outingGuide -> outingGuide,
-                        (existing, duplicate) -> existing));
+                                .toList())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                outingGuide -> new GuideKey(outingGuide.getName(), outingGuide.getAddress()),
+                                outingGuide -> outingGuide,
+                                (existing, duplicate) -> existing));
 
         Map<GuideKey, OutingGuide> uniqueGuides = new LinkedHashMap<>();
 
         List<OutingGuide> persistedGuides = new ArrayList<>();
         List<OutingGuide> unembeddedGuides = new ArrayList<>();
-        for (OutingGuide guide: analyzedResults) {
+        for (OutingGuide guide : analyzedResults) {
             GuideKey key = new GuideKey(guide.getName(), guide.getAddress());
             if (!uniqueGuides.containsKey(key)) {
                 uniqueGuides.put(key, guide);

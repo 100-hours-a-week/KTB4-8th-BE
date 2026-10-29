@@ -1,20 +1,17 @@
 package eightjbbm.keepgo.util.file;
 
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import org.springframework.web.multipart.MultipartFile;
 
 public class LocalFileStorage implements FileStorage {
 
     private final Path rootPath;
 
     public LocalFileStorage(String rootPath) {
-        this.rootPath = Paths.get(rootPath)
-                .toAbsolutePath()
-                .normalize();
+        this.rootPath = Paths.get(rootPath).toAbsolutePath().normalize();
     }
 
     @Override
@@ -33,8 +30,7 @@ public class LocalFileStorage implements FileStorage {
     private Path resolvePath(String key) {
         Path destination = rootPath.resolve(key).normalize();
 
-        if (!destination.startsWith(rootPath)
-                || destination.equals(rootPath)) {
+        if (!destination.startsWith(rootPath) || destination.equals(rootPath)) {
             throw new IllegalArgumentException("INVALID_FILE_STORAGE_KEY");
         }
 
