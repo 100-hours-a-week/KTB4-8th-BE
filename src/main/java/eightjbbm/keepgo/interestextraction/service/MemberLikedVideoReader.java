@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service;
 
 import com.google.api.services.youtube.model.Video;
+import com.google.api.services.youtube.model.VideoListResponse;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -12,13 +13,13 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MemberLikedVideoReader {
 
-    private final YoutubeApiServiceV2 youtubeApiService;
+    private final YoutubeVideoProvider youtubeVideoProvider;
 
     public List<Video> readAll(Long memberId) {
         String pageToken = null;
         List<Video> videos = new ArrayList<>();
         do {
-            var response = youtubeApiService.getVideoLists(memberId, pageToken);
+            VideoListResponse response = youtubeVideoProvider.getVideoLists(memberId, pageToken);
             videos.addAll(response.getItems());
             pageToken = response.getNextPageToken();
         } while (pageToken != null);

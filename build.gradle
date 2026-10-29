@@ -116,6 +116,9 @@ sourceSets {
 	mysqlIntegrationTest {
 		compileClasspath += sourceSets.main.output
 		runtimeClasspath += sourceSets.main.output
+		// 스텁과 SSE 테스트 클라이언트는 MySQL 없이도 검증하므로 test 소스셋에 두고 재사용한다.
+		compileClasspath += sourceSets.test.output
+		runtimeClasspath += sourceSets.test.output
 	}
 }
 
@@ -131,6 +134,8 @@ tasks.register('mysqlIntegrationTest', Test) {
 	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
 	environment 'MYSQL_TEST_SERVER_URL', providers.gradleProperty('mysqlTestServerUrl')
 			.orElse(providers.environmentVariable('MYSQL_TEST_SERVER_URL')).getOrElse('')
+	// 통합 테스트의 Spring 컨텍스트는 실제 카카오 호출을 하지 않지만, 빈 생성 시 키를 요구한다.
+	environment 'KAKAO_REST_API_KEY', providers.environmentVariable('KAKAO_REST_API_KEY').orElse('integration-test')
 	useJUnitPlatform()
 	shouldRunAfter tasks.named('test')
 	// An external database can change even when the compiled test inputs do not.
@@ -139,6 +144,17 @@ tasks.register('mysqlIntegrationTest', Test) {
 
 tasks.named('check') {
 	dependsOn tasks.named('mysqlIntegrationTest')
+}
+
+// k6 성능 측정에서도 같은 AI 스텁을 고정 지연과 함께 띄울 수 있게 한다.
+tasks.register('aiStub', JavaExec) {
+	description = 'Runs the reusable AI server HTTP stub for k6 and manual integration tests.'
+	group = 'verification'
+	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
+	mainClass = 'eightjbbm.keepgo.integration.stub.AiServerStub'
+	environment 'AI_STUB_PORT', providers.gradleProperty('aiStubPort').orElse('18080').get()
+	environment 'AI_STUB_DELAY_MS', providers.gradleProperty('aiStubDelayMs').orElse('0').get()
+	dependsOn tasks.named('mysqlIntegrationTestClasses')
 }
 
 tasks.named('bootRun') {
