@@ -89,12 +89,32 @@ jobs:
       - name: Verify Palantir Java Format
         run: bash gradlew --no-daemon spotlessCheck
 
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      # test에는 ArchUnit 아키텍처 규칙이 포함된다. 이 Job이 없으면 규칙이 로컬에서만 강제된다.
+      - name: Run unit tests
+        run: bash gradlew --no-daemon test
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: build/reports/tests/test
+
   main-image:
     name: ${{ github.ref == 'refs/heads/develop' && 'Dev - Build and Push Image' || 'Main - Build and Push Image' }}
 
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
 
-    needs: [mysql-migrations, format]
+    needs: [mysql-migrations, format, unit-tests]
 
     runs-on: ubuntu-latest
 
