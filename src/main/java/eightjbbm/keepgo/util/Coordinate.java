@@ -13,4 +13,15 @@ public record Coordinate(
         }
         return (lat.equals(other.lat()) && lng.equals(other.lng()));
     }
+
+    public boolean isValid() {
+        return lat != null
+                && lng != null
+                && Float.isFinite(lat)
+                && Float.isFinite(lng)
+                && lat >= -90
+                && lat <= 90
+                && lng >= -180
+                && lng <= 180;
+    }
 }

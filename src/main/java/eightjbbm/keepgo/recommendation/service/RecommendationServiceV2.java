@@ -1,18 +1,12 @@
 package eightjbbm.keepgo.recommendation.service;
 
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
-import eightjbbm.keepgo.recommendation.RecommendationProperties;
-import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.recommendation.repository.RecommendationJobStore;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
-import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.exception.*;
 import java.io.IOException;
-import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +14,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,45 +22,33 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Slf4j
 @Service
-@EnableConfigurationProperties(RecommendationProperties.class)
 public class RecommendationServiceV2 {
 
     private final AiServerRecommendApiService aiServerService;
     private final OutingCriteriaRepository criteriaRepository;
-    private final OutingWishlist collectionRepository;
-    private final KakaoPlaceSearch kakaoPlaceSearch;
+    private final RecommendationCandidateSelector candidateSelector;
     private final RecommendationResultMapper resultMapper;
     private final RecommendationCourseService recommendationCourseService;
     private final RecommendationJobStore jobs;
     private final Executor executor;
-    private final double radiusKm;
 
     private final ConcurrentMap<String, RecommendationConnection> localSseConnections = new ConcurrentHashMap<>();
 
     public RecommendationServiceV2(
             AiServerRecommendApiService aiServerService,
             OutingCriteriaRepository criteriaRepository,
-            KakaoPlaceSearch kakaoPlaceSearch,
-            OutingWishlist collectionRepository,
+            RecommendationCandidateSelector candidateSelector,
             RecommendationResultMapper resultMapper,
             RecommendationCourseService recommendationCourseService,
             RecommendationJobStore jobs,
-            @Qualifier("recommendationTaskExecutor") Executor executor,
-            RecommendationProperties recommendationProperties) {
-        double radiusKm = recommendationProperties.candidateRadiusKm();
-        if (!Double.isFinite(radiusKm) || radiusKm <= 0) {
-            throw new IllegalArgumentException("추천 반경은 양수여야 합니다.");
-        }
-
+            @Qualifier("recommendationTaskExecutor") Executor executor) {
         this.aiServerService = aiServerService;
         this.criteriaRepository = criteriaRepository;
-        this.collectionRepository = collectionRepository;
-        this.kakaoPlaceSearch = kakaoPlaceSearch;
+        this.candidateSelector = candidateSelector;
         this.resultMapper = resultMapper;
         this.recommendationCourseService = recommendationCourseService;
         this.jobs = jobs;
         this.executor = executor;
-        this.radiusKm = radiusKm;
     }
 
     public SseEmitter recommendOutingCourse(Long memberId) {
@@ -120,7 +101,7 @@ public class RecommendationServiceV2 {
                 return;
             }
 
-            List<OutingGuide> candidates = findCandidates(connection.memberId, criteria);
+            List<OutingGuide> candidates = candidateSelector.select(connection.memberId, criteria);
 
             if (!checkRunning(connection)) {
                 return;
@@ -247,75 +228,16 @@ public class RecommendationServiceV2 {
         throw new ServiceUnavailableException();
     }
 
-    private List<OutingGuide> findCandidates(Long memberId, OutingCriteria criteria) {
-        Coordinate origin;
-        try {
-            origin = kakaoPlaceSearch.getCoordinates(criteria.getRequestedLocationName());
-        } catch (Exception e) {
-            log.info(e.getMessage());
-            throw new IllegalStateException();
-        }
-        Instant requestedAt = criteria.getRequestedDatetime();
-
-        return collectionRepository.findRecommendationCandidates(memberId).stream()
-                .filter(guide -> hasCoordinate(guide.getCoordinate()))
-                .filter(guide -> isWithinEventPeriod(guide, requestedAt))
-                .filter(guide -> distanceKm(origin, guide.getCoordinate()) <= radiusKm)
-                .sorted(Comparator.comparingDouble((OutingGuide guide) -> distanceKm(origin, guide.getCoordinate()))
-                        .thenComparing(OutingGuide::getId))
-                .limit(50)
-                .toList();
-    }
-
     private void validate(OutingCriteria criteria) {
         Integer minutes = criteria.getUserAvailableTimeMinutes();
 
-        if (!hasCoordinate(criteria.getUserCoordinate())
+        if (criteria.getUserCoordinate() == null
+                || !criteria.getUserCoordinate().isValid()
                 || criteria.getRequestedDatetime() == null
                 || minutes == null
                 || !List.of(180, 360, 540).contains(minutes)) {
             throw new BadRequestException();
         }
-    }
-
-    private boolean hasCoordinate(Coordinate coordinate) {
-        return coordinate != null
-                && coordinate.lat() != null
-                && coordinate.lng() != null
-                && Float.isFinite(coordinate.lat())
-                && Float.isFinite(coordinate.lng())
-                && coordinate.lat() >= -90
-                && coordinate.lat() <= 90
-                && coordinate.lng() >= -180
-                && coordinate.lng() <= 180;
-    }
-
-    private double distanceKm(Coordinate from, Coordinate to) {
-        double fromLat = Math.toRadians(from.lat());
-        double toLat = Math.toRadians(to.lat());
-
-        double deltaLat = toLat - fromLat;
-        double deltaLng = Math.toRadians((double) to.lng() - from.lng());
-
-        double a = Math.pow(Math.sin(deltaLat / 2), 2)
-                + Math.cos(fromLat) * Math.cos(toLat) * Math.pow(Math.sin(deltaLng / 2), 2);
-
-        return 6371.0088 * 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, a))));
-    }
-
-    private boolean isWithinEventPeriod(OutingGuide guide, Instant requestedAt) {
-        if (!(guide instanceof OutingEvent event)) {
-            return true;
-        }
-
-        Instant start = event.getStartDatetime();
-        Instant end = event.getEndDatetime();
-
-        boolean hasStarted = start == null || !requestedAt.isBefore(start);
-
-        boolean hasNotEnded = end == null || requestedAt.isBefore(end);
-
-        return hasStarted && hasNotEnded;
     }
 
     private ProblemDetail unavailable() {
