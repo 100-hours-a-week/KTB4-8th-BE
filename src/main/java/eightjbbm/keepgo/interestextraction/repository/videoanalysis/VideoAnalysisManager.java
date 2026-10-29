@@ -20,8 +20,16 @@ public class VideoAnalysisManager {
 
     @Transactional
     public Map<String, Long> start(List<String> videoIds) {
+        return start(null, videoIds);
+    }
+
+    @Transactional
+    public Map<String, Long> start(Long youtubeSyncId, List<String> videoIds) {
         return videoAnalysisRepository
-                .saveAll(videoIds.stream().distinct().map(VideoAnalysis::new).toList())
+                .saveAll(videoIds.stream()
+                        .distinct()
+                        .map(videoId -> new VideoAnalysis(videoId, youtubeSyncId))
+                        .toList())
                 .stream()
                 .collect(Collectors.toMap(VideoAnalysis::getVideoId, VideoAnalysis::getId));
     }

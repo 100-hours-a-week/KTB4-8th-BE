@@ -15,13 +15,20 @@ public class VideoAnalysis {
 
     private String videoId;
 
+    private Long youtubeSyncId;
+
     @Enumerated(EnumType.STRING)
     private VideoAnalysisStatus status;
 
     private Instant createDatetime;
 
     public VideoAnalysis(String videoId) {
+        this(videoId, null);
+    }
+
+    public VideoAnalysis(String videoId, Long youtubeSyncId) {
         this.videoId = videoId;
+        this.youtubeSyncId = youtubeSyncId;
         this.status = VideoAnalysisStatus.IN_PROGRESS;
         this.createDatetime = Instant.now();
     }

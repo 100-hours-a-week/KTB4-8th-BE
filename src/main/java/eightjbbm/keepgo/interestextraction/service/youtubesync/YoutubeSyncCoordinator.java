@@ -105,6 +105,29 @@ public class YoutubeSyncCoordinator {
         }
     }
 
+    /// 실행 중인 동기화의 heartbeat를 주기적으로 남겨 인스턴스 장애를 다른 인스턴스가 감지하게 한다.
+    @Scheduled(fixedDelayString = "${keepgo.youtube-sync.heartbeat-interval-ms:10000}")
+    public void heartbeat() {
+        try {
+            syncService.heartbeat(instanceId);
+        } catch (RuntimeException error) {
+            log.error("YouTube 동기화 heartbeat 기록 실패: instanceId={}", instanceId, error);
+        }
+    }
+
+    /// heartbeat가 끊긴 동기화를 어느 인스턴스에서든 회수해 FAILED로 마감한다.
+    @Scheduled(fixedDelayString = "${keepgo.youtube-sync.sweep-interval-ms:30000}")
+    public void sweepExpiredSyncs() {
+        try {
+            int failed = syncService.failExpired(properties.heartbeatTimeout());
+            if (failed > 0) {
+                log.warn("heartbeat가 끊긴 YouTube 동기화를 실패 처리했습니다: count={}", failed);
+            }
+        } catch (RuntimeException error) {
+            log.error("YouTube 동기화 만료 처리 실패", error);
+        }
+    }
+
     /// 모든 연결은 실행 인스턴스와 무관하게 같은 행을 폴링한다.
     @Scheduled(fixedDelayString = "${keepgo.youtube-sync.poll-interval-ms:1000}")
     public void pollConnections() {
@@ -191,7 +214,7 @@ public class YoutubeSyncCoordinator {
 
         AtomicInteger completedBatches = new AtomicInteger();
         try {
-            List<OutingGuide> guides = youtubeVideoAnalyzer.analyze(targets, (processedCount, failedCount) -> {
+            List<OutingGuide> guides = youtubeVideoAnalyzer.analyze(syncId, targets, (processedCount, failedCount) -> {
                 int completed = completedBatches.incrementAndGet();
                 recordBatch(syncId, processedCount, failedCount, batchProgress(completed, batchCount));
             });

@@ -32,6 +32,11 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
 
     @Override
     public List<OutingGuide> analyze(List<Video> videos, BatchCompletedListener listener) {
+        return analyze(null, videos, listener);
+    }
+
+    @Override
+    public List<OutingGuide> analyze(Long syncId, List<Video> videos, BatchCompletedListener listener) {
         // 유효성 검사
         List<String> validatedVideoIds = YoutubeVideoValidator.validate(videos).stream()
                 .map(Video::getId)
@@ -47,7 +52,7 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                 List<String> batch = validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size()));
 
                 tasks.add(CompletableFuture.runAsync(
-                        () -> analyzeBatch(batch, analyzedResults, successfulAnalyses, listener), executor));
+                        () -> analyzeBatch(syncId, batch, analyzedResults, successfulAnalyses, listener), executor));
             }
 
             CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).join();
@@ -67,15 +72,16 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
     }
 
     private void analyzeBatch(
+            Long syncId,
             List<String> videoIds,
             Map<GuideKey, OutingGuide> analyzedResults,
             Map<Long, GuideKey> successfulAnalyses,
             BatchCompletedListener listener) {
         Map<String, Long> analysisIdsByUrl = new HashMap<>();
-        videoAnalysisManager
-                .start(videoIds)
-                .forEach((videoId, analysisId) ->
-                        analysisIdsByUrl.put("https://youtube.com/shorts/" + videoId, analysisId));
+        Map<String, Long> analysisIds =
+                syncId == null ? videoAnalysisManager.start(videoIds) : videoAnalysisManager.start(syncId, videoIds);
+        analysisIds.forEach(
+                (videoId, analysisId) -> analysisIdsByUrl.put("https://youtube.com/shorts/" + videoId, analysisId));
 
         Map<Long, VideoAnalysisStatus> unsuccessfulAnalyses = new HashMap<>();
         Set<Long> processedIds = new HashSet<>();
