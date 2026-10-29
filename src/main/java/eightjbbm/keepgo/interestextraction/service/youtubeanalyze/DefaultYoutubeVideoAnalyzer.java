@@ -27,6 +27,11 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
 
     @Override
     public List<OutingGuide> analyze(List<Video> videos) {
+        return analyze(videos, (processedCount, failedCount) -> {});
+    }
+
+    @Override
+    public List<OutingGuide> analyze(List<Video> videos, BatchCompletedListener listener) {
         // 유효성 검사
         List<String> validatedVideoIds = YoutubeVideoValidator.validate(videos).stream()
                 .map(Video::getId)
@@ -42,7 +47,7 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                 List<String> batch = validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size()));
 
                 tasks.add(CompletableFuture.runAsync(
-                        () -> analyzeBatch(batch, analyzedResults, successfulAnalyses), executor));
+                        () -> analyzeBatch(batch, analyzedResults, successfulAnalyses, listener), executor));
             }
 
             CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).join();
@@ -62,7 +67,10 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
     }
 
     private void analyzeBatch(
-            List<String> videoIds, Map<GuideKey, OutingGuide> analyzedResults, Map<Long, GuideKey> successfulAnalyses) {
+            List<String> videoIds,
+            Map<GuideKey, OutingGuide> analyzedResults,
+            Map<Long, GuideKey> successfulAnalyses,
+            BatchCompletedListener listener) {
         Map<String, Long> analysisIdsByUrl = new HashMap<>();
         videoAnalysisManager
                 .start(videoIds)
@@ -105,6 +113,7 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
             }
         } finally {
             videoAnalysisManager.completeUnsuccessful(unsuccessfulAnalyses);
+            listener.batchCompleted(videoIds.size(), unsuccessfulAnalyses.size());
         }
     }
 

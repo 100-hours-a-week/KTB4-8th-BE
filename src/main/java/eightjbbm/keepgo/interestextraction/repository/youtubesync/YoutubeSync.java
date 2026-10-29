@@ -1,0 +1,95 @@
+package eightjbbm.keepgo.interestextraction.repository.youtubesync;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+/// 회원의 YouTube 동기화 하나. SSE 연결과 실행 인스턴스가 같은 행을 공유한다.
+///
+/// `active_member_id` 생성 컬럼과 유일 제약은 DB가 관리하므로 엔티티에 매핑하지 않는다.
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class YoutubeSync {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private Long memberId;
+
+    private String instanceId;
+
+    private String traceId;
+
+    @Enumerated(EnumType.STRING)
+    private YoutubeSyncStatus status;
+
+    private long eventSeq;
+
+    private Integer videoFetchedCount;
+
+    private Integer videoTargetCount;
+
+    private Integer videoAnalyzedCount;
+
+    private Integer videoFailedCount;
+
+    private int progress;
+
+    private String errorCode;
+
+    private Instant createDatetime;
+
+    private Instant updateDatetime;
+
+    private Instant finishDatetime;
+
+    public static YoutubeSync queued(Long memberId, String instanceId, String traceId) {
+        YoutubeSync sync = new YoutubeSync();
+        sync.memberId = memberId;
+        sync.instanceId = instanceId;
+        sync.traceId = traceId;
+        sync.status = YoutubeSyncStatus.QUEUED;
+        sync.eventSeq = 1;
+        sync.progress = 0;
+        sync.createDatetime = Instant.now();
+        sync.updateDatetime = sync.createDatetime;
+        return sync;
+    }
+
+    public void start(int fetchedCount, int targetCount, int nextProgress) {
+        this.status = YoutubeSyncStatus.RUNNING;
+        this.videoFetchedCount = fetchedCount;
+        this.videoTargetCount = targetCount;
+        this.videoAnalyzedCount = 0;
+        this.videoFailedCount = 0;
+        this.progress = Math.max(this.progress, nextProgress);
+        touch();
+    }
+
+    public void succeed(int nextProgress) {
+        this.status = YoutubeSyncStatus.SUCCEEDED;
+        this.progress = Math.max(this.progress, nextProgress);
+        this.finishDatetime = Instant.now();
+        touch();
+    }
+
+    public void fail(String failureCode) {
+        this.status = YoutubeSyncStatus.FAILED;
+        this.errorCode = failureCode;
+        this.finishDatetime = Instant.now();
+        touch();
+    }
+
+    private void touch() {
+        this.eventSeq += 1;
+        this.updateDatetime = Instant.now();
+    }
+}
