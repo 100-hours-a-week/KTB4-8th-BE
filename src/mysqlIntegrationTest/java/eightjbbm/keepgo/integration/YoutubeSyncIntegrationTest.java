@@ -13,9 +13,11 @@ import eightjbbm.keepgo.integration.sse.SseOpenException;
 import eightjbbm.keepgo.integration.sse.SseTestClient;
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
+import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeConnectionChecker;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
+import eightjbbm.keepgo.util.exception.YoutubeNotConnectedException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -201,7 +203,7 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
         runToSuccess(token);
         assertThat(syncCount(member)).isEqualTo(1);
 
-        SetHolder recent = reconnect(token);
+        ReconnectResult recent = reconnect(token);
         assertThat(recent.events())
                 .extracting(SseEvent::event)
                 .containsExactly("youtube-sync.accepted", "youtube-sync.success");
@@ -209,7 +211,7 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
 
         Thread.sleep(2_200);
 
-        SetHolder renewed = reconnect(token);
+        ReconnectResult renewed = reconnect(token);
         assertThat(renewed.events().get(0).event()).isEqualTo("youtube-sync.accepted");
         assertThat(data(renewed.events().get(0)).get("video_target_count").isNull())
                 .isTrue();
@@ -312,7 +314,7 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
     @DisplayName("일반 YouTube 조회 오류는 bad-gateway 오류 이벤트를 보낸다")
     void emitsBadGatewayWhenYoutubeFetchFails() throws Exception {
         YOUTUBE.addPage(videos("video-a"));
-        YOUTUBE.failAfter(1, new ServiceUnavailableException());
+        YOUTUBE.failWith(new ServiceUnavailableException());
         Member member = newMember();
 
         List<SseEvent> events = new ArrayList<>();
@@ -360,7 +362,7 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
         return events;
     }
 
-    private SetHolder reconnect(String token) throws Exception {
+    private ReconnectResult reconnect(String token) throws Exception {
         List<SseEvent> events = new ArrayList<>();
         try (SseTestClient client = open(token)) {
             SseEvent first = client.next(Duration.ofSeconds(5));
@@ -368,7 +370,7 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
             events.addAll(client.collectUntilClosed(Duration.ofSeconds(20)));
             client.awaitClosed(Duration.ofSeconds(5));
         }
-        return new SetHolder(events);
+        return new ReconnectResult(events);
     }
 
     private Member newMember() {
@@ -437,7 +439,7 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
         return video;
     }
 
-    private record SetHolder(List<SseEvent> events) {}
+    private record ReconnectResult(List<SseEvent> events) {}
 
     @TestConfiguration(proxyBeanMethods = false)
     static class StubConfig {
@@ -446,6 +448,16 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
         @Primary
         YoutubeVideoProvider stubYoutubeVideoProvider() {
             return YOUTUBE;
+        }
+
+        @Bean
+        @Primary
+        YoutubeConnectionChecker stubYoutubeConnectionChecker() {
+            return memberId -> {
+                if (YOUTUBE.isTokenExpired()) {
+                    throw new YoutubeNotConnectedException();
+                }
+            };
         }
     }
 }

@@ -11,8 +11,9 @@ import eightjbbm.keepgo.interestextraction.YoutubeSyncProperties;
 import eightjbbm.keepgo.interestextraction.service.MemberLikedVideoReader;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoAnalyzer;
+import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeConnectionChecker;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncCoordinator;
-import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncStore;
+import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncService;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
@@ -52,7 +53,7 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
     private final MemberRepository memberRepository;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
-    private final YoutubeSyncStore store;
+    private final YoutubeSyncService store;
     private final MemberLikedVideoReader memberLikedVideoReader;
     private final YoutubeVideoAnalyzer youtubeVideoAnalyzer;
     private final OutingWishlistSyncService outingWishlistSyncService;
@@ -63,7 +64,7 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
             MemberRepository memberRepository,
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
-            YoutubeSyncStore store,
+            YoutubeSyncService store,
             MemberLikedVideoReader memberLikedVideoReader,
             YoutubeVideoAnalyzer youtubeVideoAnalyzer,
             OutingWishlistSyncService outingWishlistSyncService) {
@@ -103,11 +104,11 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
             YoutubeSyncCoordinator otherInstance = new YoutubeSyncCoordinator(
                     store,
                     memberLikedVideoReader,
-                    YOUTUBE,
                     youtubeVideoAnalyzer,
+                    memberId -> {},
                     outingWishlistSyncService,
                     executor,
-                    new YoutubeSyncProperties("instance-b", 3, 50L, 15_000L, 1_800_000L, 10, Duration.ofMinutes(5)));
+                    new YoutubeSyncProperties("instance-b", 3, 15_000L, 1_800_000L, 10, Duration.ofMinutes(5)));
 
             otherInstance.connect(member.getId());
 
@@ -185,6 +186,12 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
         @Primary
         YoutubeVideoProvider stubYoutubeVideoProvider() {
             return YOUTUBE;
+        }
+
+        @Bean
+        @Primary
+        YoutubeConnectionChecker stubYoutubeConnectionChecker() {
+            return memberId -> {};
         }
     }
 }

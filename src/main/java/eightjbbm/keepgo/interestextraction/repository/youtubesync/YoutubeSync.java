@@ -45,11 +45,11 @@ public class YoutubeSync {
 
     private String errorCode;
 
-    private Instant createDatetime;
+    private Instant createdAt;
 
-    private Instant updateDatetime;
+    private Instant updatedAt;
 
-    private Instant finishDatetime;
+    private Instant finishedAt;
 
     public static YoutubeSync queued(Long memberId, String instanceId, String traceId) {
         YoutubeSync sync = new YoutubeSync();
@@ -59,8 +59,8 @@ public class YoutubeSync {
         sync.status = YoutubeSyncStatus.QUEUED;
         sync.eventSeq = 1;
         sync.progress = 0;
-        sync.createDatetime = Instant.now();
-        sync.updateDatetime = sync.createDatetime;
+        sync.createdAt = Instant.now();
+        sync.updatedAt = sync.createdAt;
         return sync;
     }
 
@@ -77,19 +77,19 @@ public class YoutubeSync {
     public void succeed(int nextProgress) {
         this.status = YoutubeSyncStatus.SUCCEEDED;
         this.progress = Math.max(this.progress, nextProgress);
-        this.finishDatetime = Instant.now();
+        this.finishedAt = Instant.now();
         touch();
     }
 
     public void fail(String failureCode) {
         this.status = YoutubeSyncStatus.FAILED;
         this.errorCode = failureCode;
-        this.finishDatetime = Instant.now();
+        this.finishedAt = Instant.now();
         touch();
     }
 
     private void touch() {
         this.eventSeq += 1;
-        this.updateDatetime = Instant.now();
+        this.updatedAt = Instant.now();
     }
 }

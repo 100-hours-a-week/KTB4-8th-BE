@@ -3,13 +3,11 @@ package eightjbbm.keepgo.interestextraction.service.youtubesync;
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.YoutubeSyncProperties;
 import eightjbbm.keepgo.interestextraction.service.MemberLikedVideoReader;
-import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoAnalyzer;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoValidator;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.exception.ConflictException;
-import eightjbbm.keepgo.util.exception.YoutubeNotConnectedException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,29 +35,30 @@ public class YoutubeSyncCoordinator {
 
     private static final int BATCH_SIZE = 10;
 
-    private final YoutubeSyncStore store;
+    private final YoutubeSyncService syncService;
     private final MemberLikedVideoReader memberLikedVideoReader;
-    private final YoutubeVideoProvider youtubeVideoProvider;
     private final YoutubeVideoAnalyzer youtubeVideoAnalyzer;
+    private final YoutubeConnectionChecker connectionChecker;
     private final OutingWishlistSyncService outingWishlistSyncService;
     private final Executor executor;
     private final YoutubeSyncProperties properties;
     private final String instanceId;
 
     private final Set<YoutubeSyncConnection> connections = ConcurrentHashMap.newKeySet();
+    private final Object creationLock = new Object();
 
     public YoutubeSyncCoordinator(
-            YoutubeSyncStore store,
+            YoutubeSyncService syncService,
             MemberLikedVideoReader memberLikedVideoReader,
-            YoutubeVideoProvider youtubeVideoProvider,
             YoutubeVideoAnalyzer youtubeVideoAnalyzer,
+            YoutubeConnectionChecker connectionChecker,
             OutingWishlistSyncService outingWishlistSyncService,
             @Qualifier("youtubeSyncTaskExecutor") Executor executor,
             YoutubeSyncProperties properties) {
-        this.store = store;
+        this.syncService = syncService;
         this.memberLikedVideoReader = memberLikedVideoReader;
-        this.youtubeVideoProvider = youtubeVideoProvider;
         this.youtubeVideoAnalyzer = youtubeVideoAnalyzer;
+        this.connectionChecker = connectionChecker;
         this.outingWishlistSyncService = outingWishlistSyncService;
         this.executor = executor;
         this.properties = properties;
@@ -67,38 +66,43 @@ public class YoutubeSyncCoordinator {
     }
 
     public SseEmitter connect(Long memberId) {
-        var active = store.findActive(memberId);
+        var active = syncService.findActive(memberId);
         if (active.isPresent()) {
             return attach(active.get());
         }
 
-        var recent = store.findRecentFinished(memberId, Instant.now().minus(properties.recentResultWindow()));
+        var recent = syncService.findRecentFinished(memberId, Instant.now().minus(properties.recentResultWindow()));
         if (recent.isPresent()) {
             return attach(recent.get());
         }
 
-        // 스트림을 열기 전에 연동 여부를 확인해야 409를 HTTP 상태로 돌려줄 수 있다.
-        checkYoutubeConnection(memberId);
+        // 스트림을 열기 전에 연동 여부만 확인해야 409를 HTTP 상태로 돌려줄 수 있다.
+        // 영상 목록 조회는 스트림이 열린 뒤 실행 인스턴스가 한다.
+        connectionChecker.requireConnected(memberId);
 
-        if (store.countRunningByInstance(instanceId) >= properties.maxConcurrentSyncs()) {
-            return reject(YoutubeSyncError.SYNC_BUSY);
-        }
+        // 같은 인스턴스의 상한 검사와 행 생성을 한 임계 구역에서 처리해 동시에 상한을 넘지 않게 한다.
+        synchronized (creationLock) {
+            if (syncService.countRunningByInstance(instanceId) >= properties.maxConcurrentSyncs()) {
+                return reject(YoutubeSyncError.SYNC_BUSY);
+            }
 
-        boolean created = true;
-        YoutubeSyncSnapshot snapshot;
-        try {
-            snapshot = store.create(memberId, instanceId, UUID.randomUUID().toString());
-        } catch (DataIntegrityViolationException duplicate) {
-            // 다른 요청(다른 인스턴스 포함)이 먼저 만들었다면 그 동기화에 붙는다.
-            created = false;
-            snapshot = store.findActive(memberId).orElseThrow(ConflictException::new);
-        }
+            boolean created = true;
+            YoutubeSyncSnapshot snapshot;
+            try {
+                snapshot = syncService.create(
+                        memberId, instanceId, UUID.randomUUID().toString());
+            } catch (DataIntegrityViolationException duplicate) {
+                // 다른 요청(다른 인스턴스 포함)이 먼저 만들었다면 그 동기화에 붙는다.
+                created = false;
+                snapshot = syncService.findActive(memberId).orElseThrow(ConflictException::new);
+            }
 
-        SseEmitter emitter = attach(snapshot);
-        if (created) {
-            submit(snapshot.id(), snapshot.memberId());
+            SseEmitter emitter = attach(snapshot);
+            if (created) {
+                submit(snapshot.id(), snapshot.memberId());
+            }
+            return emitter;
         }
-        return emitter;
     }
 
     /// 모든 연결은 실행 인스턴스와 무관하게 같은 행을 폴링한다.
@@ -111,7 +115,7 @@ public class YoutubeSyncCoordinator {
 
     private void poll(YoutubeSyncConnection connection) {
         try {
-            var snapshot = store.find(connection.syncId());
+            var snapshot = syncService.find(connection.syncId());
             if (snapshot.isEmpty()) {
                 remove(connection);
                 return;
@@ -161,23 +165,12 @@ public class YoutubeSyncCoordinator {
         connections.remove(connection);
     }
 
-    private void checkYoutubeConnection(Long memberId) {
-        try {
-            youtubeVideoProvider.getVideoLists(memberId, null);
-        } catch (ResponseStatusException error) {
-            if (error.getStatusCode().value() == HttpStatus.CONFLICT.value()) {
-                throw new YoutubeNotConnectedException();
-            }
-            throw error;
-        }
-    }
-
     private void submit(Long syncId, Long memberId) {
         try {
             executor.execute(() -> execute(syncId, memberId));
         } catch (RuntimeException error) {
-            log.warn("YouTube 동기화 실행을 시작하지 못했습니다: syncId={}", syncId, error);
-            store.fail(syncId, YoutubeSyncError.INTERNAL_ERROR);
+            log.error("YouTube 동기화 실행을 시작하지 못했습니다: syncId={}", syncId, error);
+            syncService.fail(syncId, YoutubeSyncError.INTERNAL_ERROR);
         }
     }
 
@@ -186,14 +179,15 @@ public class YoutubeSyncCoordinator {
         try {
             videos = memberLikedVideoReader.readAll(memberId);
         } catch (RuntimeException error) {
-            log.warn("YouTube 동기화 조회 실패: syncId={}", syncId, error);
-            store.fail(syncId, fetchError(error));
+            YoutubeSyncError failure = fetchError(error);
+            logFetchFailure(syncId, failure, error);
+            syncService.fail(syncId, failure);
             return;
         }
 
         List<Video> targets = distinctById(YoutubeVideoValidator.validate(videos));
         int batchCount = (targets.size() + BATCH_SIZE - 1) / BATCH_SIZE;
-        store.start(syncId, videos.size(), targets.size(), fetchProgress(targets.size()));
+        syncService.start(syncId, videos.size(), targets.size(), fetchProgress(targets.size()));
 
         AtomicInteger completedBatches = new AtomicInteger();
         try {
@@ -202,16 +196,24 @@ public class YoutubeSyncCoordinator {
                 recordBatch(syncId, processedCount, failedCount, batchProgress(completed, batchCount));
             });
             outingWishlistSyncService.sync(memberId, guides);
-            store.succeed(syncId, 100);
+            syncService.succeed(syncId, 100);
         } catch (RuntimeException error) {
-            log.warn("YouTube 동기화 실행 실패: syncId={}", syncId, error);
-            store.fail(syncId, YoutubeSyncError.INTERNAL_ERROR);
+            log.error("YouTube 동기화 실행 실패: syncId={}", syncId, error);
+            syncService.fail(syncId, YoutubeSyncError.INTERNAL_ERROR);
+        }
+    }
+
+    private void logFetchFailure(Long syncId, YoutubeSyncError failure, RuntimeException error) {
+        if (failure == YoutubeSyncError.YOUTUBE_REAUTHORIZATION_REQUIRED) {
+            log.warn("YouTube 동기화 재연동 필요: syncId={}", syncId);
+        } else {
+            log.error("YouTube 동기화 조회 실패: syncId={}", syncId, error);
         }
     }
 
     private void recordBatch(Long syncId, int processedCount, int failedCount, int progress) {
         try {
-            store.recordBatch(syncId, processedCount, failedCount, progress);
+            syncService.recordBatch(syncId, processedCount, failedCount, progress);
         } catch (RuntimeException error) {
             // 진척도 기록 실패가 분석 결과를 버리지 않게 한다.
             log.warn("YouTube 동기화 진척도 기록 실패: syncId={}", syncId, error);

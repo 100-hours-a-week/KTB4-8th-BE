@@ -9,7 +9,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record YoutubeSyncProperties(
         String instanceId,
         @DefaultValue("3") int maxConcurrentSyncs,
-        @DefaultValue("1000") long pollIntervalMs,
         @DefaultValue("15000") long keepAliveMs,
         @DefaultValue("1800000") long emitterTimeoutMs,
         @DefaultValue("10") int fetchWeight,

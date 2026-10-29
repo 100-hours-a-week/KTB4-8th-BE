@@ -10,10 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/// 동기화 행의 트랜잭션 경계. 조정기는 이 클래스 밖에서 실행·SSE를 다룬다.
+/// 동기화 행의 트랜잭션 경계. 조정기는 이 서비스 밖에서 실행·SSE를 다룬다.
 @Service
 @RequiredArgsConstructor
-public class YoutubeSyncStore {
+public class YoutubeSyncService {
 
     private static final List<YoutubeSyncStatus> ACTIVE = List.of(YoutubeSyncStatus.QUEUED, YoutubeSyncStatus.RUNNING);
     private static final List<YoutubeSyncStatus> TERMINAL =
@@ -31,7 +31,7 @@ public class YoutubeSyncStore {
     @Transactional(readOnly = true)
     public Optional<YoutubeSyncSnapshot> findRecentFinished(Long memberId, Instant finishedAfter) {
         return repository
-                .findFirstByMemberIdAndStatusInAndFinishDatetimeAfterOrderByIdDesc(memberId, TERMINAL, finishedAfter)
+                .findFirstByMemberIdAndStatusInAndFinishedAtAfterOrderByIdDesc(memberId, TERMINAL, finishedAfter)
                 .map(YoutubeSyncSnapshot::from);
     }
 

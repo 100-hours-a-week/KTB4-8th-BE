@@ -12,7 +12,7 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
     Optional<YoutubeSync> findFirstByMemberIdAndStatusInOrderByIdDesc(
             Long memberId, Collection<YoutubeSyncStatus> statuses);
 
-    Optional<YoutubeSync> findFirstByMemberIdAndStatusInAndFinishDatetimeAfterOrderByIdDesc(
+    Optional<YoutubeSync> findFirstByMemberIdAndStatusInAndFinishedAtAfterOrderByIdDesc(
             Long memberId, Collection<YoutubeSyncStatus> statuses, Instant finishAfter);
 
     long countByInstanceIdAndStatusIn(String instanceId, Collection<YoutubeSyncStatus> statuses);
@@ -25,7 +25,7 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
                    s.videoFailedCount = coalesce(s.videoFailedCount, 0) + :failedCount,
                    s.progress = case when s.progress < :progress then :progress else s.progress end,
                    s.eventSeq = s.eventSeq + 1,
-                   s.updateDatetime = :now
+                   s.updatedAt = :now
              where s.id = :syncId
             """)
     int recordBatch(Long syncId, int processedCount, int failedCount, int progress, Instant now);

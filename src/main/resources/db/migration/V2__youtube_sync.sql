@@ -16,14 +16,14 @@ create table youtube_sync (
     video_failed_count integer,
     progress integer not null,
     error_code varchar(64),
-    create_datetime datetime(6) not null,
-    update_datetime datetime(6) not null,
-    finish_datetime datetime(6),
+    created_at datetime(6) not null,
+    updated_at datetime(6) not null,
+    finished_at datetime(6),
     -- 진행 중인 동기화만 회원 ID를 가진다. 유일 제약으로 회원당 하나를 DB가 보장한다.
     active_member_id bigint generated always as (
         case when status in ('QUEUED','RUNNING') then member_id else null end
     ) stored,
     primary key (id),
     unique key uk_youtube_sync_active_member (active_member_id),
-    key idx_youtube_sync_member_finish (member_id, finish_datetime)
+    key idx_youtube_sync_member_finished (member_id, finished_at)
 ) engine=InnoDB;

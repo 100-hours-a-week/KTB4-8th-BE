@@ -11,12 +11,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 public class YoutubeSyncConfig {
 
     @Bean("youtubeSyncTaskExecutor")
-    public ThreadPoolTaskExecutor youtubeSyncTaskExecutor() {
+    public ThreadPoolTaskExecutor youtubeSyncTaskExecutor(YoutubeSyncProperties properties) {
         var executor = new ThreadPoolTaskExecutor();
+        int poolSize = Math.max(4, properties.maxConcurrentSyncs());
 
-        executor.setCorePoolSize(4);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(8);
+        executor.setCorePoolSize(poolSize);
+        executor.setMaxPoolSize(poolSize);
+        executor.setQueueCapacity(properties.maxConcurrentSyncs());
         executor.setThreadNamePrefix("youtube-sync-");
 
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());

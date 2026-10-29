@@ -66,6 +66,10 @@ public final class YoutubeStub implements YoutubeVideoProvider {
         delay = Duration.ZERO;
     }
 
+    public boolean isTokenExpired() {
+        return tokenExpired;
+    }
+
     public int callCount() {
         return calls.get();
     }
