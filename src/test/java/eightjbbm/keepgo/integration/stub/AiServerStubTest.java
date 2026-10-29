@@ -101,12 +101,33 @@ class AiServerStubTest {
     }
 
     @Test
+    @DisplayName("k6 측정용 통계 조회와 초기화를 제공한다")
+    void exposesStatsAndResetForPerfHarness() throws Exception {
+        post("/v1/analyze-video", requestBody("video-a"));
+        post("/v1/embed-places", "{}");
+
+        HttpResponse<String> stats = get("/__admin/stats");
+        assertThat(stats.statusCode()).isEqualTo(200);
+        assertThat(stats.body()).contains("\"analysis_requests\":1", "\"embedding_requests\":1");
+
+        assertThat(get("/__admin/reset").statusCode()).isEqualTo(200);
+        HttpResponse<String> reset = get("/__admin/stats");
+        assertThat(reset.body()).contains("\"analysis_requests\":0", "\"embedding_requests\":0");
+    }
+
+    @Test
     @DisplayName("응답 없이 연결을 닫아 전송 실패를 재현한다")
     void closesConnectionWithoutResponse() {
         stub.resetAnalysisConnection();
 
         assertThatThrownBy(() -> post("/v1/analyze-video", requestBody("video-a")))
                 .isInstanceOf(IOException.class);
+    }
+
+    private HttpResponse<String> get(String path) throws IOException, InterruptedException {
+        HttpRequest request =
+                HttpRequest.newBuilder(URI.create(stub.baseUrl() + path)).GET().build();
+        return HTTP.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(String path, String body) throws IOException, InterruptedException {

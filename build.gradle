@@ -157,6 +157,15 @@ tasks.register('aiStub', JavaExec) {
 	dependsOn tasks.named('mysqlIntegrationTestClasses')
 }
 
+// k6 시나리오가 실제 애플리케이션·MySQL·스텁을 고정 조건으로 호출할 수 있게 한다.
+tasks.register('youtubePerfHarness', JavaExec) {
+	description = 'Runs the application with fixed YouTube/AI stubs and writes perf member tokens.'
+	group = 'verification'
+	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
+	mainClass = 'eightjbbm.perf.PerfHarnessApplication'
+	dependsOn tasks.named('mysqlIntegrationTestClasses')
+}
+
 tasks.named('bootRun') {
 	jvmArgs "-javaagent:${configurations.sentryAgent.singleFile.absolutePath}"
 	environment 'SENTRY_AUTO_INIT', 'false'
