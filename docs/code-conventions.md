@@ -2,7 +2,7 @@
 
 이 문서는 사람과 AI 에이전트가 같은 기준으로 코드를 작성하고 리뷰하기 위한 규칙이다. 규칙은 현재 코드에서 다수가 따르는 패턴을 기준으로 정했고, 앞으로 작성·수정하는 코드에 적용한다. 규칙과 다른 기존 코드는 [알려진 예외](#알려진-예외)에 기록하며, 해당 파일을 수정할 때 함께 맞춘다. 기존 코드를 규칙에 맞추려고 일괄 리팩터링하지 않는다.
 
-포매팅과 정적 분석(Spotless, Checkstyle 등)은 이 문서에서 다루지 않는다. 도구 도입은 [PR 전략](pr-strategy.md)에 따라 별도 PR로 진행한다. 예외와 오류 응답은 [예외 처리](exception-handling.md)를 따른다.
+포매팅은 Spotless가 Palantir Java Format으로 강제한다. 설정은 `build.gradle`의 `spotless` 블록에 있고, `./gradlew spotlessApply`로 고친다. 정적 분석 도구는 아직 도입하지 않았고, 도입은 [PR 전략](pr-strategy.md)에 따라 별도 PR로 진행한다. 예외와 오류 응답은 [예외 처리](exception-handling.md)를 따른다.
 
 ## 패키지 구조
 
