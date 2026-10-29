@@ -1,5 +1,0 @@
-Method <eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis.setFailed()> has name matching 'set[A-Z].*' in (VideoAnalysis.java:44)
-Method <eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis.setNotFound()> has name matching 'set[A-Z].*' in (VideoAnalysis.java:37)
-Method <eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis.setSuccess()> has name matching 'set[A-Z].*' in (VideoAnalysis.java:30)
-Method <eightjbbm.keepgo.member.entity.Member.setLikedVideosPlaylistId(java.lang.String)> has name matching 'set[A-Z].*' in (Member.java:27)
-Method <eightjbbm.keepgo.recommendation.entity.OutingCourse.setStops(java.util.List)> has name matching 'set[A-Z].*' in (OutingCourse.java:31)

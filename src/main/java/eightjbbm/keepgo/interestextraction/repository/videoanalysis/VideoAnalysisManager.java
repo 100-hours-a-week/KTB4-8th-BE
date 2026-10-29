@@ -30,8 +30,8 @@ public class VideoAnalysisManager {
     public void completeUnsuccessful(Map<Long, VideoAnalysisStatus> statuses) {
         for (VideoAnalysis analysis : videoAnalysisRepository.findAllById(statuses.keySet())) {
             switch (statuses.get(analysis.getId())) {
-                case NOT_FOUND -> analysis.setNotFound();
-                case FAILED -> analysis.setFailed();
+                case NOT_FOUND -> analysis.markNotFound();
+                case FAILED -> analysis.markFailed();
                 default -> throw new IllegalArgumentException("Unsupported analysis status");
             }
         }
@@ -51,7 +51,7 @@ public class VideoAnalysisManager {
                         throw new IllegalStateException("Persisted outing guide not found");
                     }
 
-                    analysis.setSuccess();
+                    analysis.markSuccess();
                     return new VideoAnalysisResult(analysis, guide);
                 })
                 .toList();

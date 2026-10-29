@@ -7,7 +7,6 @@ import java.util.stream.IntStream;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Getter
@@ -28,7 +27,6 @@ public class OutingCourse {
 
     private Instant createDatetime;
 
-    @Setter
     @OneToMany(mappedBy = "outingCourse")
     private List<OutingStop> stops;
 
@@ -40,6 +38,10 @@ public class OutingCourse {
         this.location = location;
         this.stops = stops;
         this.createDatetime = Instant.now();
+    }
+
+    public void replaceStops(List<OutingStop> newStops) {
+        this.stops = newStops;
     }
 
     public static OutingCourse from(
