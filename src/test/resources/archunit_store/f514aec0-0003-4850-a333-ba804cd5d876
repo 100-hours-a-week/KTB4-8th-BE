@@ -1,5 +1,0 @@
-Method <eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager.completeSuccessful(java.util.Map, java.util.Collection)> is not declared in classes that reside in a package '..service..' in (VideoAnalysisManager.java:42)
-Method <eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager.completeUnsuccessful(java.util.Map)> is not declared in classes that reside in a package '..service..' in (VideoAnalysisManager.java:31)
-Method <eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager.start(java.util.List)> is not declared in classes that reside in a package '..service..' in (VideoAnalysisManager.java:23)
-Method <eightjbbm.keepgo.util.file.FileService.uploadFile(org.springframework.web.multipart.MultipartFile, java.lang.Long)> is not declared in classes that reside in a package '..service..' in (FileService.java:36)
-Method <eightjbbm.keepgo.util.file.FileService.uploadProfileImage(org.springframework.web.multipart.MultipartFile, java.lang.Long)> is not declared in classes that reside in a package '..service..' in (FileService.java:31)

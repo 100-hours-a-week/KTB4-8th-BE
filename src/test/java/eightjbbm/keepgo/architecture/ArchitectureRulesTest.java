@@ -20,6 +20,7 @@ import jakarta.persistence.Entity;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /// [코드 규칙](../../../../../../../docs/code-conventions.md) 중 구조로 검증할 수 있는 항목을 고정한다.
@@ -69,8 +70,8 @@ class ArchitectureRulesTest {
             .areAnnotatedWith(Transactional.class)
             .should()
             .beDeclaredInClassesThat()
-            .resideInAPackage("..service..")
-            .as("@Transactional은 클래스가 아니라 Service 메서드에 붙인다"));
+            .areAnnotatedWith(Service.class)
+            .as("@Transactional은 @Service 메서드에만 붙인다"));
 
     @ArchTest
     static final ArchRule noClassLevelTransactional = FreezingArchRule.freeze(
