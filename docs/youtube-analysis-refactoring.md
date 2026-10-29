@@ -2,6 +2,8 @@
 
 YouTube 좋아요 영상에서 나들이 가이드를 추출하고 분석 이력을 재사용하며, 실패·재시작 뒤에도 작업을 복구하기 위한 설계 문서다. 문서에 정의한 정책은 구현 완료나 운영 전환 완료를 뜻하지 않는다.
 
+> 2026-10-29: 구현 명세·계획·작업 분할과 ADR 0002는 [#248](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/248)로 대체됐다. 현재 설계는 #248과 [ADR 0003](adr/0003-in-process-analysis-mysql-coordination.md)을 따른다.
+
 ## 읽는 순서와 기준
 
 | 문서 | 역할 |
@@ -10,7 +12,7 @@ YouTube 좋아요 영상에서 나들이 가이드를 추출하고 분석 이력
 | [구현 명세](youtube-analysis-refactoring-spec.md) | 해결할 문제, 사용자 스토리, 인수 조건과 비목표 |
 | [구현 계획](youtube-analysis-refactoring-plan.md) | 최종 설계 결정, 실행·저장·재시도·복구 및 전환 순서 |
 | [Guide 동일성과 반복 행사 ADR](adr/0001-guide-identity-and-recurring-events.md) | 유형·이름·도로명주소 동일성과 기존 행사 모델 유지 결정 |
-| [영속 AI Job ADR](adr/0002-durable-ai-jobs.md) | 호출자와 분리된 DB 작업 실행·기동 및 주기적 복구 결정 |
+| [분석 실행과 MySQL 조정 ADR](adr/0003-in-process-analysis-mysql-coordination.md) | 분석은 앱 내부에서 실행하고 동기화·임베딩 조정은 MySQL로 하는 결정 |
 | [작업 분할](youtube-analysis-refactoring-tickets.md) | #223~#237의 범위, 인수 조건과 직접 의존관계 |
 
 명세의 목적·인수 조건을 기준으로 구현 계획과 ADR의 상세 정책을 적용한다. 서로 충돌하면 구현 전에 문서와 관련 이슈에서 결정을 정리한다. 실제 진행 상태는 [상위 이슈 #222](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/222)와 하위 이슈·PR에서 확인한다. 작업 분할 문서의 체크박스는 작성 시점의 기록이다.

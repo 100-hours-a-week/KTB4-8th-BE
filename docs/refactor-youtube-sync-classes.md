@@ -1,5 +1,7 @@
 # YouTube 분석 리팩토링 초기 클래스 설계
 
+> **Superseded:** 이 문서는 [#248](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/248)로 대체됐다. 현재 설계와 인수 조건은 #248과 [ADR 0003](adr/0003-in-process-analysis-mysql-coordination.md)을 따른다. 아래 내용은 기록으로만 보존한다.
+
 > 초기 설계 자료다. 최종 정책과 문서별 적용 순서는 [문서 안내](youtube-analysis-refactoring.md)를 따른다. 현재 구현 완료를 의미하지 않는다.
 
 AI 요청의 실행 관리는 공통화하고 영상 분석·임베딩의 업무 처리는 유형별 Handler가 담당한다. 기존 클래스의 수정·대체 대상도 포함한다.
