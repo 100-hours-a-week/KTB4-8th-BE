@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.aiv2;
+package eightjbbm.keepgo.util.client.ai.analysis;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import java.util.List;

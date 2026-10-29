@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
+import eightjbbm.keepgo.common.domain.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;

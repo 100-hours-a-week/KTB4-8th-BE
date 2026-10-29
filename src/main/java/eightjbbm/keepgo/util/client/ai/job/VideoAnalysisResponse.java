@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.util.client.ai.job;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
+import eightjbbm.keepgo.common.domain.BusinessScheduleDto;
 import java.time.LocalDate;
 import java.util.List;
 

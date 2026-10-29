@@ -1,7 +1,7 @@
-package eightjbbm.keepgo.sandbox;
+package eightjbbm.keepgo.recommendation.repository;
 
+import eightjbbm.keepgo.common.domain.Address;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.sandbox.ds.Address;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

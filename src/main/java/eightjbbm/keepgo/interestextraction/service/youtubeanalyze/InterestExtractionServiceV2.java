@@ -1,16 +1,15 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
-import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.service.*;
-import eightjbbm.keepgo.interestextraction.service.YoutubeApiServiceV2;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,9 +29,9 @@ public class InterestExtractionServiceV2 {
     private static final String PENDING_YOUTUBE_LINK =
             InterestExtractionServiceV2.class.getName() + ".pendingYoutubeLink";
 
-    private final YoutubeApiServiceV2 youtubeApiService;
-    private final UpdateMemberLikedVideoService updateMemberLikedVideoService;
-    private final UpdateOutingCollectionPrivatesService updateOutingCollectionPrivatesService;
+    private final MemberLikedVideoReader memberLikedVideoReader;
+    private final YoutubeVideoAnalyzer youtubeVideoAnalyzer;
+    private final OutingWishlistSyncService outingWishlistSyncService;
     private final YoutubeAuthorizedClientService youtubeAuthorizedClientService;
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final OAuthAccountRepository oauthAccountRepository;
@@ -41,28 +40,13 @@ public class InterestExtractionServiceV2 {
     private final HttpSessionOAuth2AuthorizationRequestRepository authorizationRequests =
             new HttpSessionOAuth2AuthorizationRequestRepository();
 
-    /// 유튜브 API에서 회원과 연결된 유튜브 계정의 좋아요 표시한 동영상 목록을 불러온다.
+    /// 회원이 좋아요 표시한 영상을 분석해 여행 위시리스트를 최신화한다.
     ///
-    /// 응답으로 1개의 페이지를(최대 50개의 결과) 반환하므로 페이지 순회 필요
     public void syncWishlistFromYoutube(Long memberId) {
         log.info("syncWishlistFromYoutube");
-        String pageToken = null;
-        List<Video> videoLists = new ArrayList<>();
-        do {
-            // pageToken = null인 경우 pageToken을 요청에 포함하지 않는다 => 첫 페이지 조회
-            var response = youtubeApiService.getVideoLists(memberId, pageToken);
-            log.info("유튜브 API 호출 결과: " + response.getItems().size());
-            // 비동기 논블로킹 필요
-            /*updateMemberLikedVideoService.updateMemberLikedVideos(
-                   memberId,
-                   response.getItems());
-
-            */
-            videoLists.addAll(response.getItems());
-
-            pageToken = response.getNextPageToken();
-        } while (pageToken != null);
-        updateOutingCollectionPrivatesService.updateOutingCollectionPrivates(memberId, videoLists);
+        var likedVideos = memberLikedVideoReader.readAll(memberId);
+        List<OutingGuide> analyzedGuides = youtubeVideoAnalyzer.analyze(likedVideos);
+        outingWishlistSyncService.sync(memberId, analyzedGuides);
     }
 
     /// 유튜브 연동 API

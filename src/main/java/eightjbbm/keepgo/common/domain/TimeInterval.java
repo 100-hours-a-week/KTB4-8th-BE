@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.ds;
+package eightjbbm.keepgo.common.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;

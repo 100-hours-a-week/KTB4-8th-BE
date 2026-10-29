@@ -5,7 +5,6 @@ import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEn
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
@@ -29,16 +28,6 @@ public interface OutingWishlist
         and og.coordinate.lng is not null
     """)
     List<OutingGuide> findRecommendationCandidates(@Param("memberId") Long memberId);
-
-    @Query("""
-        select o
-        from OutingWishlistEntry o
-        where o.member.id = :memberId
-            and o.outingGuide in :outingGuides
-            and o.deleteDatetime is null
-    """)
-    List<OutingWishlistEntry> findAllByMemberIdAndOutingGuides(
-            @Param("memberId") Long memberId, @Param("outingGuides") Set<OutingGuide> outingGuides);
 
     @Query("""
         select ocp

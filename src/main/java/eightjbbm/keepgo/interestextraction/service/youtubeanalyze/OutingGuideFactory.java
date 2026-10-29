@@ -1,11 +1,11 @@
-package eightjbbm.keepgo.sandbox;
+package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
+import eightjbbm.keepgo.common.domain.BusinessHoursMapper;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
-import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
-import eightjbbm.keepgo.sandbox.ds.BusinessHoursMapper;
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import java.time.Instant;
 import java.time.ZoneId;
 

@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.sandbox.ds;
+package eightjbbm.keepgo.common.domain;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;

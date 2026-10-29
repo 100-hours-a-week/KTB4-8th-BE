@@ -1,4 +1,4 @@
-package eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3;
+package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
 import java.util.List;

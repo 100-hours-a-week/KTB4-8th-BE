@@ -1,8 +1,8 @@
 package eightjbbm.keepgo.recommendation.service.dto;
 
+import eightjbbm.keepgo.common.domain.BusinessScheduleDto;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
-import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
 import java.time.LocalDateTime;
