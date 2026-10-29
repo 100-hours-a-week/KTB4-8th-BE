@@ -10,6 +10,7 @@ spotless {
 	java {
 		target 'src/*/java/**/*.java'
 		palantirJavaFormat('2.103.0')
+		lineEndings 'UNIX'
 		removeUnusedImports()
 		trimTrailingWhitespace()
 		endWithNewline()
