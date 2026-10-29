@@ -6,6 +6,10 @@
 
 PR을 계획·분할·리뷰 요청·병합할 때는 `docs/pr-strategy.md`를 따른다. 한 목적의 검증 가능한 변경으로 나누고, 선행 PR이 미완료인 의존 PR은 Draft로 유지한다.
 
+### 코드 작성 및 리뷰
+
+코드를 작성·리뷰할 때는 `docs/code-conventions.md`를 따른다. 예외와 오류 응답은 `docs/exception-handling.md`를 따른다. 규칙과 다른 기존 코드는 각 문서의 "알려진 예외"에 있으며, 해당 코드를 수정할 때만 함께 맞춘다.
+
 ### Issue tracker
 
 Issues and specs are tracked in GitHub Issues for `100-hours-a-week/KTB4-8th-BE`. See `docs/agents/issue-tracker.md`.
