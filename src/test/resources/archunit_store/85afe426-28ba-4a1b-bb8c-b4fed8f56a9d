@@ -1,1 +1,0 @@
-Method <eightjbbm.keepgo.recommendation.service.RecommendationResultMapper.map(eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria, eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2$SuccessData)> is not declared in classes that are annotated with @Service in (RecommendationResultMapper.java:34)
