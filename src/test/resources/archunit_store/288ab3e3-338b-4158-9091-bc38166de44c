@@ -1,0 +1,3 @@
+eightjbbm.keepgo.auth.SecurityConfig.accessTokenPrivateKey(org.springframework.core.io.Resource) uses @Value
+eightjbbm.keepgo.auth.SecurityConfig.accessTokenPublicKey(org.springframework.core.io.Resource) uses @Value
+eightjbbm.keepgo.recommendation.service.RecommendationServiceV2.<init>(eightjbbm.keepgo.recommendation.service.AiServerRecommendApiService, eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository, eightjbbm.keepgo.recommendation.service.KakaoPlaceSearch, eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist, eightjbbm.keepgo.recommendation.service.RecommendationResultMapper, eightjbbm.keepgo.recommendation.repository.RecommendationJobStore, java.util.concurrent.Executor, double) uses @Value
