@@ -1,62 +1,25 @@
 package eightjbbm.keepgo.recommendation.service;
 
 import eightjbbm.keepgo.recommendation.entity.OutingCourse;
-import eightjbbm.keepgo.recommendation.entity.OutingStop;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
-import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
-import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendOutingCourseResultV2;
-import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@RequiredArgsConstructor
 public class RecommendationResultMapper {
 
-    private final OutingCourseRepository outingCourseRepository;
-    private final OutingStopRepository outingStopRepository;
-    private final OutingGuideRepository outingGuideRepository;
     private static final DateTimeFormatter SCHEDULE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("Asia/Seoul"));
 
-    @Transactional
-    public RecommendOutingCourseResultV2 map(
-            OutingCriteria outingCriteria, RecommendCoursesResponseV2.SuccessData data) {
-        int matchScore = data.matchScore() == null ? 85 : data.matchScore();
-        List<OutingCourse> outingCourses = data.courses().stream()
-                .map(course -> {
-                    var outingCourse = new OutingCourse(
-                            course.title(),
-                            course.totalDurationMinutes(),
-                            matchScore,
-                            outingCriteria.getRequestedLocationName(),
-                            null);
-                    var savedCourse = outingCourseRepository.save(outingCourse);
-                    List<OutingStop> stops = course.places().stream()
-                            .map(place -> new OutingStop(
-                                    savedCourse,
-                                    place.travelMinutes(),
-                                    course.places().indexOf(place),
-                                    outingGuideRepository.getReferenceById(Long.valueOf(place.placeId()))))
-                            .collect(Collectors.toCollection(ArrayList::new));
-                    outingStopRepository.saveAll(stops);
-                    outingCourse.replaceStops(stops);
-                    return outingCourse;
-                })
-                .toList();
-
+    public RecommendOutingCourseResultV2 toResult(OutingCriteria outingCriteria, List<OutingCourse> outingCourses) {
         return new RecommendOutingCourseResultV2(
                 new RecommendOutingCourseResultV2.OutingCourseMetadata(
-                        data.courses().size(),
+                        outingCourses.size(),
                         outingCriteria.getRequestedLocationName(),
                         outingCriteria
                                 .getRequestedDatetime()

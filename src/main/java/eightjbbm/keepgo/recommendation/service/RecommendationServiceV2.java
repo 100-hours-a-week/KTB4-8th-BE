@@ -37,6 +37,7 @@ public class RecommendationServiceV2 {
     private final OutingWishlist collectionRepository;
     private final KakaoPlaceSearch kakaoPlaceSearch;
     private final RecommendationResultMapper resultMapper;
+    private final RecommendationCourseService recommendationCourseService;
     private final RecommendationJobStore jobs;
     private final Executor executor;
     private final double radiusKm;
@@ -49,6 +50,7 @@ public class RecommendationServiceV2 {
             KakaoPlaceSearch kakaoPlaceSearch,
             OutingWishlist collectionRepository,
             RecommendationResultMapper resultMapper,
+            RecommendationCourseService recommendationCourseService,
             RecommendationJobStore jobs,
             @Qualifier("recommendationTaskExecutor") Executor executor,
             RecommendationProperties recommendationProperties) {
@@ -62,6 +64,7 @@ public class RecommendationServiceV2 {
         this.collectionRepository = collectionRepository;
         this.kakaoPlaceSearch = kakaoPlaceSearch;
         this.resultMapper = resultMapper;
+        this.recommendationCourseService = recommendationCourseService;
         this.jobs = jobs;
         this.executor = executor;
         this.radiusKm = radiusKm;
@@ -131,7 +134,8 @@ public class RecommendationServiceV2 {
 
             var data = requireSuccess(response);
             criteriaRepository.deleteById(criteria.getMemberId());
-            var result = resultMapper.map(criteria, data);
+            var courses = recommendationCourseService.saveCourses(criteria, data);
+            var result = resultMapper.toResult(criteria, courses);
             complete(connection, "success", Map.of("result", result));
         } catch (RuntimeException error) {
             log.warn("추천 처리 실패: jobId={}", connection.jobId, error);
