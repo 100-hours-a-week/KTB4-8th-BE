@@ -34,16 +34,22 @@ public final class SseTestClient implements AutoCloseable {
         this.reader = Thread.ofVirtual().name("sse-test-client").start(this::read);
     }
 
+    public static SseTestClient open(URI uri) throws IOException, InterruptedException {
+        return open(uri, null);
+    }
+
     public static SseTestClient open(URI uri, String accessToken) throws IOException, InterruptedException {
         HttpClient client = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .header("Authorization", "Bearer " + accessToken)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.noBody())
-                .build();
+                .POST(HttpRequest.BodyPublishers.noBody());
+        if (accessToken != null) {
+            builder.header("Authorization", "Bearer " + accessToken);
+        }
+        HttpRequest request = builder.build();
 
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() != 200) {
