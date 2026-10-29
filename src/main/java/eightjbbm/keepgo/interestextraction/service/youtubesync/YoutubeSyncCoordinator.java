@@ -111,7 +111,7 @@ public class YoutubeSyncCoordinator {
         try {
             syncService.heartbeat(instanceId);
         } catch (RuntimeException error) {
-            log.warn("YouTube 동기화 heartbeat 기록 실패: instanceId={}", instanceId, error);
+            log.error("YouTube 동기화 heartbeat 기록 실패: instanceId={}", instanceId, error);
         }
     }
 
@@ -124,7 +124,7 @@ public class YoutubeSyncCoordinator {
                 log.warn("heartbeat가 끊긴 YouTube 동기화를 실패 처리했습니다: count={}", failed);
             }
         } catch (RuntimeException error) {
-            log.warn("YouTube 동기화 만료 처리 실패", error);
+            log.error("YouTube 동기화 만료 처리 실패", error);
         }
     }
 

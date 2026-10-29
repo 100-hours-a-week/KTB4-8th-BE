@@ -24,18 +24,22 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE youtube_sync
-               SET heartbeat_at = CURRENT_TIMESTAMP(6)
+               SET heartbeat_at = UTC_TIMESTAMP(6)
              WHERE instance_id = :instanceId
                AND status IN ('QUEUED','RUNNING')
             """, nativeQuery = true)
     int heartbeat(String instanceId);
 
     /// heartbeat가 끊긴 행을 잠그고 ID만 가져온다. 다른 인스턴스가 잠근 행은 건너뛴다.
+    ///
+    /// 한 트랜잭션이 잠그는 행 수를 `LIMIT`으로 제한한다. 남은 행은 다음 sweep 주기에 처리한다.
     @Query(value = """
             SELECT id
               FROM youtube_sync
              WHERE status IN ('QUEUED','RUNNING')
-               AND heartbeat_at < TIMESTAMPADD(SECOND, -:timeoutSeconds, CURRENT_TIMESTAMP(6))
+               AND heartbeat_at < TIMESTAMPADD(SECOND, -:timeoutSeconds, UTC_TIMESTAMP(6))
+             ORDER BY heartbeat_at
+             LIMIT 1000
              FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<Long> findExpiredIdsForUpdate(int timeoutSeconds);
@@ -46,8 +50,8 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
             UPDATE youtube_sync
                SET status = 'FAILED',
                    error_code = :errorCode,
-                   finished_at = CURRENT_TIMESTAMP(6),
-                   updated_at = CURRENT_TIMESTAMP(6),
+                   finished_at = UTC_TIMESTAMP(6),
+                   updated_at = UTC_TIMESTAMP(6),
                    event_seq = event_seq + 1
              WHERE id IN (:ids)
             """, nativeQuery = true)

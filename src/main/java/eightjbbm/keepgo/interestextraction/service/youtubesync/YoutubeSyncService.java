@@ -35,13 +35,23 @@ public class YoutubeSyncService {
     /// 만료 행을 `FOR UPDATE SKIP LOCKED`로 잠가 여러 인스턴스가 동시에 돌아도 한 번만 처리한다.
     @Transactional
     public int failExpired(Duration timeout) {
-        List<Long> expiredIds = repository.findExpiredIdsForUpdate((int) timeout.toSeconds());
+        List<Long> expiredIds = repository.findExpiredIdsForUpdate(toTimeoutSeconds(timeout));
         if (expiredIds.isEmpty()) {
             return 0;
         }
 
         videoAnalysisRepository.markFailedBySyncIds(expiredIds);
         return repository.failExpired(expiredIds, YoutubeSyncError.INTERNAL_ERROR.code());
+    }
+
+    /// 0 이하 설정은 만료 판단을 무력화하므로 거부하고, 1초 미만 값은 1초로 올려 자른다.
+    private int toTimeoutSeconds(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("heartbeatTimeout은 0보다 커야 합니다: " + timeout);
+        }
+
+        long seconds = Math.max(1L, (timeout.toMillis() + 999) / 1000);
+        return (int) Math.min(seconds, Integer.MAX_VALUE);
     }
 
     @Transactional(readOnly = true)

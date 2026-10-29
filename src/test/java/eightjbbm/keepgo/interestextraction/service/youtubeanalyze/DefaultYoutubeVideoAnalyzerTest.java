@@ -72,6 +72,25 @@ class DefaultYoutubeVideoAnalyzerTest {
         verify(ai, times(3)).analyzeVideoV2(batches.capture());
         assertEquals(Set.of(ids(0, 10), ids(10, 20), ids(20, 21)), new HashSet<>(batches.getAllValues()));
         assertEquals(3, threads.size());
+        verify(manager, never()).start(anyLong(), anyList());
+    }
+
+    @Test
+    @DisplayName("동기화 ID가 있으면 분석 이력 시작에 그대로 전달한다")
+    void propagatesSyncIdToAnalysisStart() {
+        long syncId = 42L;
+        when(manager.start(eq(syncId), anyList())).thenAnswer(call -> {
+            List<String> ids = call.getArgument(1);
+            Map<String, Long> result = new HashMap<>();
+            ids.forEach(id -> result.put(id, analysisId(id)));
+            return result;
+        });
+        when(ai.analyzeVideoV2(anyList())).thenReturn(response(List.of()));
+
+        analyzer.analyze(syncId, videos(2), (processedCount, failedCount) -> {});
+
+        verify(manager).start(eq(syncId), anyList());
+        verify(manager, never()).start(anyList());
     }
 
     @Test

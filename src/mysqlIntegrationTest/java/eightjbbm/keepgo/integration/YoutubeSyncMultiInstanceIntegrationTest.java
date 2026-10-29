@@ -20,6 +20,7 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -158,61 +159,99 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
     }
 
     @Test
-    @DisplayName("heartbeat가 끊긴 동기화만 FAILED로 바꾸고, 만료된 회원은 새 동기화를 시작할 수 있다")
+    @DisplayName("heartbeat가 끊긴 QUEUED·RUNNING 동기화만 FAILED로 바꾸고, 만료된 회원은 새 동기화를 시작할 수 있다")
     void failsOnlyExpiredSyncsAndFreesMember() {
-        Member healthy = memberRepository.save(Member.create("정상 회원"));
-        Member stale = memberRepository.save(Member.create("만료 회원"));
+        Member healthyQueued = memberRepository.save(Member.create("정상 대기 회원"));
+        Member healthyRunning = memberRepository.save(Member.create("정상 실행 회원"));
+        Member staleRunning = memberRepository.save(Member.create("만료 실행 회원"));
+        Member staleQueued = memberRepository.save(Member.create("만료 대기 회원"));
 
         var executor = new CapturingExecutor();
         YoutubeSyncCoordinator instanceA = coordinator("instance-a", Duration.ofMinutes(5), executor);
         YoutubeSyncCoordinator instanceB = coordinator("instance-b", Duration.ofSeconds(30), executor);
 
-        instanceA.connect(healthy.getId());
-        instanceB.connect(stale.getId());
-        Long healthySyncId = latestSyncId(healthy);
-        Long staleSyncId = latestSyncId(stale);
+        instanceA.connect(healthyQueued.getId());
+        instanceA.connect(healthyRunning.getId());
+        instanceB.connect(staleRunning.getId());
+        instanceB.connect(staleQueued.getId());
+        Long healthyQueuedSyncId = latestSyncId(healthyQueued);
+        Long healthyRunningSyncId = latestSyncId(healthyRunning);
+        Long staleRunningSyncId = latestSyncId(staleRunning);
+        Long staleQueuedSyncId = latestSyncId(staleQueued);
+        store.start(healthyRunningSyncId, 10, 1, 10);
+        store.start(staleRunningSyncId, 10, 1, 10);
 
-        videoAnalysisManager.start(healthySyncId, List.of("healthy-video"));
-        videoAnalysisManager.start(staleSyncId, List.of("stale-video"));
+        videoAnalysisManager.start(healthyQueuedSyncId, List.of("healthy-queued-video"));
+        videoAnalysisManager.start(healthyRunningSyncId, List.of("healthy-running-video"));
+        videoAnalysisManager.start(staleRunningSyncId, List.of("stale-running-video"));
+        videoAnalysisManager.start(staleQueuedSyncId, List.of("stale-queued-video"));
 
-        // heartbeat와 updated_at/event_seq를 DB 시간으로 과거에 둬 heartbeat가 무엇을 바꾸는지 관찰한다.
-        jdbcTemplate.update("""
-                UPDATE youtube_sync
-                   SET heartbeat_at = TIMESTAMPADD(SECOND, -120, CURRENT_TIMESTAMP(6)),
-                       updated_at = TIMESTAMPADD(SECOND, -120, CURRENT_TIMESTAMP(6)),
-                       event_seq = 7
-                 WHERE id = ?
-                """, healthySyncId);
-        jdbcTemplate.update(
-                "UPDATE youtube_sync SET heartbeat_at = TIMESTAMPADD(SECOND, -5, CURRENT_TIMESTAMP(6)) WHERE id = ?",
-                staleSyncId);
+        // Hibernate가 쓴 updated_at도 새 native UTC 비교와 같은 시각대인지 확인한다.
+        // ±9시간 오차를 잡으면서도 테스트 실행 시간에 흔들리지 않도록 넓게 둔다.
+        assertThat(updatedAgeSeconds(healthyQueuedSyncId)).isBetween(-5, 60);
 
-        // 정상 행은 A가 heartbeat로 살리고, sweeper는 다른 인스턴스(B)가 소유한 만료 행만 처리한다.
+        // sweep 전에는 정상·만료 분석 모두 진행 중이다.
+        assertThat(analysisStatusOf(healthyQueuedSyncId)).isEqualTo("IN_PROGRESS");
+        assertThat(analysisStatusOf(healthyRunningSyncId)).isEqualTo("IN_PROGRESS");
+        assertThat(analysisStatusOf(staleRunningSyncId)).isEqualTo("IN_PROGRESS");
+        assertThat(analysisStatusOf(staleQueuedSyncId)).isEqualTo("IN_PROGRESS");
+
+        // heartbeat와 updated_at/event_seq를 UTC 기준 과거로 둬 heartbeat가 무엇을 바꾸는지 관찰한다.
+        backdateHeartbeat(healthyQueuedSyncId);
+        backdateHeartbeat(healthyRunningSyncId);
+        backdateHeartbeat(staleRunningSyncId);
+        backdateHeartbeat(staleQueuedSyncId);
+
+        // 정상 QUEUED·RUNNING 행은 A가 heartbeat로 살리고, sweeper는 다른 인스턴스(B)가 소유한 만료 행만 처리한다.
         instanceA.heartbeat();
+
+        assertThat(isHeartbeatRecent(healthyQueuedSyncId)).isTrue();
+        assertThat(isHeartbeatRecent(healthyRunningSyncId)).isTrue();
+        assertThat(updatedAgeSeconds(healthyQueuedSyncId)).isGreaterThan(100);
+        assertThat(updatedAgeSeconds(healthyRunningSyncId)).isGreaterThan(100);
+        assertThat(eventSeqOf(healthyQueuedSyncId)).isEqualTo(7);
+        assertThat(eventSeqOf(healthyRunningSyncId)).isEqualTo(7);
+
         instanceA.sweepExpiredSyncs();
 
-        assertThat(statusOf(healthySyncId)).isEqualTo("QUEUED");
-        assertThat(ageSecondsOf("heartbeat_at", healthySyncId)).isLessThan(5);
-        assertThat(ageSecondsOf("updated_at", healthySyncId)).isGreaterThan(100);
-        assertThat(eventSeqOf(healthySyncId)).isEqualTo(7);
-        assertThat(analysisStatusOf(healthySyncId)).isEqualTo("IN_PROGRESS");
+        assertThat(statusOf(healthyQueuedSyncId)).isEqualTo("QUEUED");
+        assertThat(statusOf(healthyRunningSyncId)).isEqualTo("RUNNING");
+        assertThat(eventSeqOf(healthyQueuedSyncId)).isEqualTo(7);
+        assertThat(eventSeqOf(healthyRunningSyncId)).isEqualTo(7);
+        assertThat(analysisStatusOf(healthyQueuedSyncId)).isEqualTo("IN_PROGRESS");
+        assertThat(analysisStatusOf(healthyRunningSyncId)).isEqualTo("IN_PROGRESS");
 
-        assertThat(statusOf(staleSyncId)).isEqualTo("FAILED");
-        assertThat(errorCodeOf(staleSyncId)).isEqualTo("INTERNAL_ERROR");
-        assertThat(finishedAtOf(staleSyncId)).isNotNull();
-        assertThat(analysisStatusOf(staleSyncId)).isEqualTo("FAILED");
+        assertSwept(staleRunningSyncId);
+        assertSwept(staleQueuedSyncId);
 
-        // active_member_id 유일 제약이 풀려 새 동기화를 만들 수 있다.
-        // Hibernate는 Instant를 UTC DATETIME으로 저장하므로 최근 결과 창을 지나도록 DB에서 UTC 기준으로 되돌린다.
+        // 같은 sweeper가 다시 돌아도 이미 FAILED인 행은 건드리지 않는다.
+        long runningEventSeq = eventSeqOf(staleRunningSyncId);
+        long queuedEventSeq = eventSeqOf(staleQueuedSyncId);
+        instanceB.sweepExpiredSyncs();
+        assertThat(statusOf(staleRunningSyncId)).isEqualTo("FAILED");
+        assertThat(eventSeqOf(staleRunningSyncId)).isEqualTo(runningEventSeq);
+        assertThat(eventSeqOf(staleQueuedSyncId)).isEqualTo(queuedEventSeq);
+
+        // 최근 결과 창을 지나도록 finished_at을 UTC로 되돌리면 같은 회원이 새 동기화를 시작할 수 있다.
         jdbcTemplate.update(
                 "UPDATE youtube_sync SET finished_at = TIMESTAMPADD(SECOND, -60, UTC_TIMESTAMP(6)) WHERE id = ?",
-                staleSyncId);
-        assertThat(store.findActive(stale.getId())).isEmpty();
+                staleRunningSyncId);
+        assertThat(store.findRecentFinished(staleRunning.getId(), Instant.now().minus(Duration.ofSeconds(30))))
+                .isEmpty();
 
-        instanceB.connect(stale.getId());
+        instanceB.connect(staleRunning.getId());
 
-        assertThat(syncCount(stale)).isEqualTo(2);
-        assertThat(statusOf(latestSyncId(stale))).isEqualTo("QUEUED");
+        assertThat(syncCount(staleRunning)).isEqualTo(2);
+        assertThat(statusOf(latestSyncId(staleRunning))).isEqualTo("QUEUED");
+    }
+
+    private void assertSwept(Long syncId) {
+        assertThat(statusOf(syncId)).isEqualTo("FAILED");
+        assertThat(errorCodeOf(syncId)).isEqualTo("INTERNAL_ERROR");
+        assertThat(finishedAgeSeconds(syncId)).isBetween(0, 5);
+        assertThat(eventSeqOf(syncId)).isEqualTo(8);
+        assertThat(isUpdatedRecent(syncId)).isTrue();
+        assertThat(analysisStatusOf(syncId)).isEqualTo("FAILED");
     }
 
     private YoutubeSyncCoordinator coordinator(String instanceId, Duration recentResultWindow, Executor executor) {
@@ -240,17 +279,46 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
         return jdbcTemplate.queryForObject("SELECT error_code FROM youtube_sync WHERE id = ?", String.class, syncId);
     }
 
-    private Object finishedAtOf(Long syncId) {
-        return jdbcTemplate.queryForObject("SELECT finished_at FROM youtube_sync WHERE id = ?", Object.class, syncId);
-    }
-
     private long eventSeqOf(Long syncId) {
         return jdbcTemplate.queryForObject("SELECT event_seq FROM youtube_sync WHERE id = ?", Long.class, syncId);
     }
 
-    private int ageSecondsOf(String column, Long syncId) {
+    private void backdateHeartbeat(Long syncId) {
+        jdbcTemplate.update("""
+                UPDATE youtube_sync
+                   SET heartbeat_at = TIMESTAMPADD(SECOND, -120, UTC_TIMESTAMP(6)),
+                       updated_at = TIMESTAMPADD(SECOND, -120, UTC_TIMESTAMP(6)),
+                       event_seq = 7
+                 WHERE id = ?
+                """, syncId);
+    }
+
+    private boolean isHeartbeatRecent(Long syncId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT heartbeat_at >= TIMESTAMPADD(SECOND, -100, UTC_TIMESTAMP(6))
+                  FROM youtube_sync
+                 WHERE id = ?
+                """, Boolean.class, syncId);
+    }
+
+    private boolean isUpdatedRecent(Long syncId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT updated_at >= TIMESTAMPADD(SECOND, -5, UTC_TIMESTAMP(6))
+                  FROM youtube_sync
+                 WHERE id = ?
+                """, Boolean.class, syncId);
+    }
+
+    private int updatedAgeSeconds(Long syncId) {
         return jdbcTemplate.queryForObject(
-                "SELECT TIMESTAMPDIFF(SECOND, " + column + ", CURRENT_TIMESTAMP(6)) FROM youtube_sync WHERE id = ?",
+                "SELECT TIMESTAMPDIFF(SECOND, updated_at, UTC_TIMESTAMP(6)) FROM youtube_sync WHERE id = ?",
+                Integer.class,
+                syncId);
+    }
+
+    private int finishedAgeSeconds(Long syncId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT TIMESTAMPDIFF(SECOND, finished_at, UTC_TIMESTAMP(6)) FROM youtube_sync WHERE id = ?",
                 Integer.class,
                 syncId);
     }
