@@ -18,12 +18,13 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class YoutubeApiServiceV2 {
+public class YoutubeApiServiceV2 implements YoutubeVideoProvider {
 
     private final YoutubeAuthorizedClientService authorizedClientService;
     private final HttpTransport httpTransport;
     private final JsonFactory jsonFactory;
 
+    @Override
     public VideoListResponse getVideoLists(Long memberId, String pageToken) {
         OAuth2AccessToken accessToken = authorizedClientService.getAccessToken(memberId);
         var credentials = GoogleCredentials.create(
