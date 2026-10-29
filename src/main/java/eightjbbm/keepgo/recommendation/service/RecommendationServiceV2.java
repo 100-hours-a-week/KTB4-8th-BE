@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.recommendation.service;
 
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
+import eightjbbm.keepgo.recommendation.RecommendationProperties;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,6 +29,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Slf4j
 @Service
+@EnableConfigurationProperties(RecommendationProperties.class)
 public class RecommendationServiceV2 {
 
     private final AiServerRecommendApiService aiServerService;
@@ -49,7 +51,8 @@ public class RecommendationServiceV2 {
             RecommendationResultMapper resultMapper,
             RecommendationJobStore jobs,
             @Qualifier("recommendationTaskExecutor") Executor executor,
-            @Value("${recommendation.candidate-radius-km:5}") double radiusKm) {
+            RecommendationProperties recommendationProperties) {
+        double radiusKm = recommendationProperties.candidateRadiusKm();
         if (!Double.isFinite(radiusKm) || radiusKm <= 0) {
             throw new IllegalArgumentException("추천 반경은 양수여야 합니다.");
         }
