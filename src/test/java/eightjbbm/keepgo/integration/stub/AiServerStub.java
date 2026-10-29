@@ -58,6 +58,11 @@ public final class AiServerStub implements AutoCloseable {
         }
         server.createContext(ANALYZE_PATH, exchange -> handle(exchange, true));
         server.createContext(EMBED_PATH, exchange -> handle(exchange, false));
+        server.createContext("/__admin/stats", exchange -> write(exchange, new StubResponse(200, statsJson(), false)));
+        server.createContext("/__admin/reset", exchange -> {
+            resetStats();
+            write(exchange, new StubResponse(200, "{\"message\":\"reset\"}", false));
+        });
         server.setExecutor(executor);
         server.start();
         return this;
@@ -71,16 +76,21 @@ public final class AiServerStub implements AutoCloseable {
         return "http://127.0.0.1:" + running.getAddress().getPort();
     }
 
-    public void reset() {
+    /// k6 측정 사이에 요청 수만 초기화한다. 지연·오류 주입 설정은 유지한다.
+    public void resetStats() {
         analysisRequests.set(0);
         embeddingRequests.set(0);
         analysisRequestBodies.clear();
         embeddingRequestBodies.clear();
+        maxInFlight.set(0);
+    }
+
+    public void reset() {
+        resetStats();
         analysisDelay.set(Duration.ZERO);
         embeddingDelay.set(Duration.ZERO);
         analysisResponse.set(null);
         embeddingResponse.set(null);
-        maxInFlight.set(0);
     }
 
     public void setAnalysisDelay(Duration delay) {
@@ -141,6 +151,12 @@ public final class AiServerStub implements AutoCloseable {
 
     public List<String> embeddingRequestBodies() {
         return List.copyOf(embeddingRequestBodies);
+    }
+
+    private String statsJson() {
+        return """
+                {"analysis_requests":%d,"embedding_requests":%d,"request_count":%d,"max_concurrent_requests":%d}
+                """.formatted(analysisRequests.get(), embeddingRequests.get(), requestCount(), maxInFlight.get());
     }
 
     private void handle(HttpExchange exchange, boolean analysis) throws IOException {
