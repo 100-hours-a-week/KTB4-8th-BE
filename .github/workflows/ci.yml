@@ -75,12 +75,26 @@ jobs:
           name: mysql-migration-test-reports
           path: build/reports/tests/mysqlIntegrationTest
 
+  format:
+    name: Java format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      # Spotless는 check에 spotlessCheck를 연결하지만 이 저장소 CI는 check를 실행하지 않으므로 직접 호출한다.
+      - name: Verify Palantir Java Format
+        run: bash gradlew --no-daemon spotlessCheck
+
   main-image:
     name: ${{ github.ref == 'refs/heads/develop' && 'Dev - Build and Push Image' || 'Main - Build and Push Image' }}
 
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
 
-    needs: mysql-migrations
+    needs: [mysql-migrations, format]
 
     runs-on: ubuntu-latest
 
