@@ -5,6 +5,7 @@ import com.google.api.services.youtube.model.VideoContentDetails;
 import com.google.api.services.youtube.model.VideoListResponse;
 import com.google.api.services.youtube.model.VideoStatus;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,6 +23,9 @@ public final class YoutubeStub implements YoutubeVideoProvider {
     private final AtomicInteger calls = new AtomicInteger();
     private volatile boolean tokenExpired;
     private volatile RuntimeException failure;
+    private volatile int expireAfterCalls = -1;
+    private volatile int failAfterCalls = -1;
+    private volatile Duration delay = Duration.ZERO;
 
     public YoutubeStub addPage(List<Video> videos) {
         pages.add(List.copyOf(videos));
@@ -32,8 +36,23 @@ public final class YoutubeStub implements YoutubeVideoProvider {
         tokenExpired = true;
     }
 
+    /// 처음 N번 호출은 성공하고 그 뒤부터 토큰이 만료된 것처럼 동작한다.
+    public void expireTokenAfter(int successfulCalls) {
+        this.expireAfterCalls = successfulCalls;
+    }
+
     public void failWith(RuntimeException failure) {
         this.failure = failure;
+    }
+
+    /// 처음 N번 호출은 성공하고 그 뒤부터 주어진 오류를 던진다.
+    public void failAfter(int successfulCalls, RuntimeException failure) {
+        this.failAfterCalls = successfulCalls;
+        this.failure = failure;
+    }
+
+    public void setDelay(Duration delay) {
+        this.delay = delay;
     }
 
     public void reset() {
@@ -42,6 +61,13 @@ public final class YoutubeStub implements YoutubeVideoProvider {
         calls.set(0);
         tokenExpired = false;
         failure = null;
+        expireAfterCalls = -1;
+        failAfterCalls = -1;
+        delay = Duration.ZERO;
+    }
+
+    public boolean isTokenExpired() {
+        return tokenExpired;
     }
 
     public int callCount() {
@@ -54,13 +80,14 @@ public final class YoutubeStub implements YoutubeVideoProvider {
 
     @Override
     public VideoListResponse getVideoLists(Long memberId, String pageToken) {
-        calls.incrementAndGet();
+        int call = calls.incrementAndGet();
         requestedPageTokens.add(pageToken);
+        sleep();
 
-        if (tokenExpired) {
+        if (tokenExpired || (expireAfterCalls >= 0 && call > expireAfterCalls)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "유튜브 인증이 만료되었습니다. 다시 연동해 주세요.");
         }
-        if (failure != null) {
+        if (failure != null && (failAfterCalls < 0 || call > failAfterCalls)) {
             throw failure;
         }
 
@@ -75,6 +102,17 @@ public final class YoutubeStub implements YoutubeVideoProvider {
             response.setNextPageToken(String.valueOf(page + 1));
         }
         return response;
+    }
+
+    private void sleep() {
+        if (delay.isZero() || delay.isNegative()) {
+            return;
+        }
+        try {
+            Thread.sleep(delay.toMillis());
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /// 필터를 통과하는 1분짜리 공개 업로드 영상을 만든다.
