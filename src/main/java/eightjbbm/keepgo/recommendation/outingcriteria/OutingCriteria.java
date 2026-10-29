@@ -2,12 +2,11 @@ package eightjbbm.keepgo.recommendation.outingcriteria;
 
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
@@ -18,18 +17,12 @@ public class OutingCriteria {
     private Instant requestedDatetime;
     private Integer userAvailableTimeMinutes;
     private Set<String> categories;
-    @Nullable private String userPreferenceSummary;
+
+    @Nullable
+    private String userPreferenceSummary;
 
     public static OutingCriteria emptyOutingCriteriaWithMemberId(Long memberId) {
-        return new OutingCriteria(
-                memberId,
-                new Coordinate(null, null),
-                null,
-                null,
-                null,
-                new HashSet<>(),
-                null
-        );
+        return new OutingCriteria(memberId, new Coordinate(null, null), null, null, null, new HashSet<>(), null);
     }
 
     public OutingCriteria update(
@@ -38,8 +31,7 @@ public class OutingCriteria {
             Instant datetime,
             Integer availableTimeMinutes,
             Set<String> categories,
-            String preferenceSummary
-    ) {
+            String preferenceSummary) {
         return new OutingCriteria(
                 this.memberId,
                 (coordinate == null) ? this.userCoordinate : coordinate,

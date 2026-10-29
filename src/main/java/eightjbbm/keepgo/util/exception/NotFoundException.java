@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class NotFoundException extends ErrorResponseException {
     public NotFoundException() {
-        super(
-                HttpStatus.NOT_FOUND,
-                ProblemDetail.forStatus(HttpStatus.NOT_FOUND),
-                null
-        );
+        super(HttpStatus.NOT_FOUND, ProblemDetail.forStatus(HttpStatus.NOT_FOUND), null);
     }
 }

@@ -17,15 +17,11 @@ public class RecommendationControllerV3 {
 
     @GetMapping("/api/v3/places/hot")
     public ResponseEntity<GetHotPlaceListResponse> getHotPlaceList() {
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(hotPlaceServiceV2.getHotPlaceList());
+        return ResponseEntity.status(HttpStatus.OK).body(hotPlaceServiceV2.getHotPlaceList());
     }
 
     @GetMapping("/api/v3/events/ongoing")
     public ResponseEntity<GetOngoingEventListResponse> getOngoingEventList() {
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(hotPlaceServiceV2.getOngoingEventList());
+        return ResponseEntity.status(HttpStatus.OK).body(hotPlaceServiceV2.getOngoingEventList());
     }
 }

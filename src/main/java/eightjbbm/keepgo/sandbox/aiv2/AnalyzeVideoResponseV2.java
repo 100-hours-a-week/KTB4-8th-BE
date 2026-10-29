@@ -2,18 +2,12 @@ package eightjbbm.keepgo.sandbox.aiv2;
 
 import eightjbbm.keepgo.sandbox.ds.BusinessScheduleDto;
 import jakarta.annotation.Nullable;
-
 import java.time.LocalDate;
 import java.util.List;
 
 public sealed interface AnalyzeVideoResponseV2 {
-    record Success (
-            String message,
-            Data data
-    ) implements AnalyzeVideoResponseV2 {
-        public record Data(
-                List<Result> results
-        ) {}
+    record Success(String message, Data data) implements AnalyzeVideoResponseV2 {
+        public record Data(List<Result> results) {}
 
         public record Result(
                 String videoUrl,
@@ -30,14 +24,10 @@ public sealed interface AnalyzeVideoResponseV2 {
                 Float lat,
                 Float lng,
                 Float confidence,
-                String summary
-        ) {}
+                String summary) {}
     }
 
-    record Failure (
-        String message,
-        Data data
-    ) implements AnalyzeVideoResponseV2 {
+    record Failure(String message, Data data) implements AnalyzeVideoResponseV2 {
         public record Data() {}
     }
 }

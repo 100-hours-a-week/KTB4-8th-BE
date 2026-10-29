@@ -1,21 +1,21 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.google.api.services.youtube.model.*;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.*;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.sandbox.OutingGuideFactory;
 import eightjbbm.keepgo.sandbox.OutingGuideRepository;
 import eightjbbm.keepgo.sandbox.aiv2.*;
-import org.junit.jupiter.api.*;
-import org.mockito.ArgumentCaptor;
-import org.springframework.test.util.ReflectionTestUtils;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.IntStream;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.*;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @Timeout(15)
 class DefaultYoutubeVideoAnalyzerTest {
@@ -41,7 +41,9 @@ class DefaultYoutubeVideoAnalyzerTest {
         // Model read-after-write: analyze's unchanged return queries saved guides again.
         when(guides.findAllByAddresses(anyList())).thenAnswer(call -> {
             List<?> addresses = call.getArgument(0);
-            return stored.values().stream().filter(g -> addresses.contains(g.getAddress())).toList();
+            return stored.values().stream()
+                    .filter(g -> addresses.contains(g.getAddress()))
+                    .toList();
         });
         when(guides.save(any(OutingGuide.class))).thenAnswer(call -> {
             OutingGuide guide = call.getArgument(0);
@@ -75,8 +77,8 @@ class DefaultYoutubeVideoAnalyzerTest {
 
     @Test
     void failureResponseMarksWholeBatchFailed() {
-        when(ai.analyzeVideoV2(anyList())).thenReturn(new AnalyzeVideoResponseV2.Failure(
-                "failure", new AnalyzeVideoResponseV2.Failure.Data()));
+        when(ai.analyzeVideoV2(anyList()))
+                .thenReturn(new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data()));
         assertTrue(analyzer.analyze(videos(2)).isEmpty());
         verify(manager).completeUnsuccessful(Map.of(1L, VideoAnalysisStatus.FAILED, 2L, VideoAnalysisStatus.FAILED));
         verify(manager, never()).completeSuccessful(anyMap(), anyCollection());
@@ -110,20 +112,49 @@ class DefaultYoutubeVideoAnalyzerTest {
         verify(guides, never()).save(any(OutingGuide.class));
     }
 
-    private List<String> ids(int from, int to) { return IntStream.range(from, to).mapToObj(i -> "v" + i).toList(); }
-    private List<Video> videos(int count) { return ids(0, count).stream().map(this::video).toList(); }
+    private List<String> ids(int from, int to) {
+        return IntStream.range(from, to).mapToObj(i -> "v" + i).toList();
+    }
+
+    private List<Video> videos(int count) {
+        return ids(0, count).stream().map(this::video).toList();
+    }
+
     private Video video(String id) {
-        return new Video().setId(id)
+        return new Video()
+                .setId(id)
                 .setStatus(new VideoStatus().setUploadStatus("uploaded").setPrivacyStatus("public"))
                 .setContentDetails(new VideoContentDetails().setDuration("PT1M"));
     }
-    private long analysisId(String id) { return Long.parseLong(id.substring(1)) + 1; }
-    private GuideKey key(OutingGuide guide) { return new GuideKey(guide.getName(), guide.getAddress()); }
+
+    private long analysisId(String id) {
+        return Long.parseLong(id.substring(1)) + 1;
+    }
+
+    private GuideKey key(OutingGuide guide) {
+        return new GuideKey(guide.getName(), guide.getAddress());
+    }
+
     private AnalyzeVideoResponseV2.Success response(List<AnalyzeVideoResponseV2.Success.Result> results) {
         return new AnalyzeVideoResponseV2.Success("ok", new AnalyzeVideoResponseV2.Success.Data(results));
     }
+
     private AnalyzeVideoResponseV2.Success.Result result(String id, String status, String name, String address) {
-        return new AnalyzeVideoResponseV2.Success.Result("https://youtube.com/watch/" + id, status,
-                null, name, address, null, "카페", null, null, null, null, 37.5f, 127.0f, 0.9f, "summary");
+        return new AnalyzeVideoResponseV2.Success.Result(
+                "https://youtube.com/watch/" + id,
+                status,
+                null,
+                name,
+                address,
+                null,
+                "카페",
+                null,
+                null,
+                null,
+                null,
+                37.5f,
+                127.0f,
+                0.9f,
+                "summary");
     }
 }

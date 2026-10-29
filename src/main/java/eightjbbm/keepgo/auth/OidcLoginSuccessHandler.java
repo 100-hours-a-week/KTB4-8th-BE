@@ -9,6 +9,10 @@ import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -20,11 +24,6 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Component
@@ -40,52 +39,46 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+    public void onAuthenticationSuccess(
+            HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+            throws IOException, ServletException {
         OidcUser oidcUser = (OidcUser) authentication.getPrincipal();
         if (!(authentication instanceof OAuth2AuthenticationToken oAuthToken)) {
             throw new IllegalStateException("OAuth2 인증 정보가 아님");
         }
 
         Optional<OAuthAccount> oauthAccount = oAuthAccountRepository.findByIssuerAndSubject(
-                    oidcUser.getIssuer().toString(),
-                    oidcUser.getSubject()
-        );
+                oidcUser.getIssuer().toString(), oidcUser.getSubject());
 
         boolean initialLogin = oauthAccount.isEmpty();
 
-        Member member = oauthAccount.orElseGet(
-                        () -> {
-                            log.info("name: " + (String) oidcUser.getClaims().get("name"));
-                            Member newMember = memberRepository.save(
-                                    Member.create(
-                                            (String) oidcUser.getClaims().get("name")
-                                    )
-                            );
-                            return oAuthAccountRepository.save(
-                                    OAuthAccount.create(
-                                            newMember,
-                                            oidcUser.getEmail(),
-                                            oidcUser.getIssuer().toString(),
-                                            oidcUser.getSubject(),
-                                            oidcUser.getName()
-                                    )
-                            );
-                        }
-                )
+        Member member = oauthAccount
+                .orElseGet(() -> {
+                    log.info("name: " + (String) oidcUser.getClaims().get("name"));
+                    Member newMember = memberRepository.save(
+                            Member.create((String) oidcUser.getClaims().get("name")));
+                    return oAuthAccountRepository.save(OAuthAccount.create(
+                            newMember,
+                            oidcUser.getEmail(),
+                            oidcUser.getIssuer().toString(),
+                            oidcUser.getSubject(),
+                            oidcUser.getName()));
+                })
                 .getMember();
 
         String accessToken = accessTokenManager.issue(member.getId(), List.of());
         String refreshToken = refreshTokenManager.issue(member.getId());
 
-        String refreshTokenCookie = ResponseCookie
-                .from("refresh-token", refreshToken)
+        String refreshTokenCookie = ResponseCookie.from("refresh-token", refreshToken)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
                 .path("/api/v1/user/auth-session")
                 .maxAge(Duration.ofDays(14))
-                .build().toString();
+                .build()
+                .toString();
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie);
-        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken + "&expiresIn=1800&initialLogin=" + initialLogin);
+        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken
+                + "&expiresIn=1800&initialLogin=" + initialLogin);
     }
 }

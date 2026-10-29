@@ -1,9 +1,8 @@
 package eightjbbm.keepgo.util.file;
 
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-
 import java.net.URI;
 import java.net.URISyntaxException;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 public class FileUtil {
 
@@ -33,9 +32,8 @@ public class FileUtil {
             return relativePath;
         }
 
-        String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .build()
-                .toUriString();
+        String baseUrl =
+                ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
 
         return baseUrl + relativePath;
     }

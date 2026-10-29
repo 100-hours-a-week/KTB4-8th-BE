@@ -13,9 +13,7 @@ public class YoutubeAnalyzeServiceConfig {
     public YoutubeVideoAnalyzer youtubeVideoAnalyzer(
             AiServerService aiServerApiService,
             OutingGuideRepository outingGuideRepository,
-            VideoAnalysisManager videoAnalysisManager
-    ) {
-        return new DefaultYoutubeVideoAnalyzer(
-                aiServerApiService, outingGuideRepository, videoAnalysisManager);
+            VideoAnalysisManager videoAnalysisManager) {
+        return new DefaultYoutubeVideoAnalyzer(aiServerApiService, outingGuideRepository, videoAnalysisManager);
     }
 }

@@ -6,13 +6,11 @@ import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.file.File;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.time.Instant;
-
 
 @Entity
 @Getter
@@ -20,15 +18,20 @@ import java.time.Instant;
 @NoArgsConstructor
 @DiscriminatorColumn(name = "type")
 public abstract class OutingGuide {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
+
     private String name;
     private String category;
     private String description;
     private String locationDetail;
+
     @Nullable
     private Address address;
+
     private Coordinate coordinate;
+
     @Nullable
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "business_schedule", columnDefinition = "json")
@@ -58,7 +61,7 @@ public abstract class OutingGuide {
     public abstract boolean isAvailable(Instant instant);
 
     public boolean isSameAs(OutingGuide outingGuide) {
-        return this.name.equals(outingGuide.getName()) &&
-                (this.address == null || this.address.equals(outingGuide.getAddress()));
+        return this.name.equals(outingGuide.getName())
+                && (this.address == null || this.address.equals(outingGuide.getAddress()));
     }
 }

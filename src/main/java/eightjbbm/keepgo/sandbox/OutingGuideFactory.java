@@ -6,44 +6,53 @@ import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.sandbox.aiv2.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.sandbox.ds.BusinessHoursMapper;
 import eightjbbm.keepgo.util.Coordinate;
-
 import java.time.Instant;
 import java.time.ZoneId;
 
 public class OutingGuideFactory {
     public static OutingGuide createOutingGuide(AnalyzeVideoResponseV2.Success.Result result) {
         String type = classifyType(result.category());
-        Instant startDatetime = (result.eventStartDate() == null) ? null : result.eventStartDate().atStartOfDay(ZoneId.systemDefault()).toInstant();
-        Instant endDatetime = (result.eventEndDate() == null) ? null : result.eventEndDate().atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant startDatetime = (result.eventStartDate() == null)
+                ? null
+                : result.eventStartDate().atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant endDatetime = (result.eventEndDate() == null)
+                ? null
+                : result.eventEndDate().atStartOfDay(ZoneId.systemDefault()).toInstant();
         switch (type) {
-            case "place" -> { return new OutingPlace(
-                    result.category(),
-                    result.placeName(),
-                    result.summary(),
-                    result.locationDetail(),
-                    result.address(),
-                    new Coordinate(result.lat(), result.lng()),
-                    BusinessHoursMapper.toBusinessHours(result.businessHours())
-            ); }
-            case "event" -> { return new OutingEvent(
-                    result.category(),
-                    result.placeName(),
-                    result.summary(),
-                    result.locationDetail(),
-                    result.address(),
-                    new Coordinate(result.lat(), result.lng()),
-                    BusinessHoursMapper.toBusinessHours(result.businessHours()),
-                    startDatetime,
-                    endDatetime
-            ); }
+            case "place" -> {
+                return new OutingPlace(
+                        result.category(),
+                        result.placeName(),
+                        result.summary(),
+                        result.locationDetail(),
+                        result.address(),
+                        new Coordinate(result.lat(), result.lng()),
+                        BusinessHoursMapper.toBusinessHours(result.businessHours()));
+            }
+            case "event" -> {
+                return new OutingEvent(
+                        result.category(),
+                        result.placeName(),
+                        result.summary(),
+                        result.locationDetail(),
+                        result.address(),
+                        new Coordinate(result.lat(), result.lng()),
+                        BusinessHoursMapper.toBusinessHours(result.businessHours()),
+                        startDatetime,
+                        endDatetime);
+            }
             default -> throw new IllegalArgumentException();
         }
     }
 
     private static String classifyType(String type) {
         switch (type) {
-            case "팝업", "전시" -> { return "event"; }
-            default -> { return "place"; }
+            case "팝업", "전시" -> {
+                return "event";
+            }
+            default -> {
+                return "place";
+            }
         }
     }
 }

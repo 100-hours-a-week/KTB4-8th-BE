@@ -2,15 +2,14 @@ package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,15 +20,10 @@ public class VideoAnalysisManager {
 
     @Transactional
     public Map<String, Long> start(List<String> videoIds) {
-        return videoAnalysisRepository.saveAll(
-                        videoIds.stream()
-                                .distinct()
-                                .map(VideoAnalysis::new)
-                                .toList())
+        return videoAnalysisRepository
+                .saveAll(videoIds.stream().distinct().map(VideoAnalysis::new).toList())
                 .stream()
-                .collect(Collectors.toMap(
-                        VideoAnalysis::getVideoId,
-                        VideoAnalysis::getId));
+                .collect(Collectors.toMap(VideoAnalysis::getVideoId, VideoAnalysis::getId));
     }
 
     @Transactional
@@ -44,21 +38,14 @@ public class VideoAnalysisManager {
     }
 
     @Transactional
-    public void completeSuccessful(
-            Map<Long, GuideKey> successfulAnalyses,
-            Collection<OutingGuide> persistedGuides
-    ) {
+    public void completeSuccessful(Map<Long, GuideKey> successfulAnalyses, Collection<OutingGuide> persistedGuides) {
         Map<GuideKey, OutingGuide> guidesByKey = persistedGuides.stream()
                 .collect(Collectors.toMap(
-                        guide -> new GuideKey(guide.getName(), guide.getAddress()),
-                        Function.identity()));
+                        guide -> new GuideKey(guide.getName(), guide.getAddress()), Function.identity()));
 
-        List<VideoAnalysisResult> results = videoAnalysisRepository
-                .findAllById(successfulAnalyses.keySet())
-                .stream()
+        List<VideoAnalysisResult> results = videoAnalysisRepository.findAllById(successfulAnalyses.keySet()).stream()
                 .map(analysis -> {
-                    OutingGuide guide = guidesByKey.get(
-                            successfulAnalyses.get(analysis.getId()));
+                    OutingGuide guide = guidesByKey.get(successfulAnalyses.get(analysis.getId()));
 
                     if (guide == null || guide.getId() == null) {
                         throw new IllegalStateException("Persisted outing guide not found");

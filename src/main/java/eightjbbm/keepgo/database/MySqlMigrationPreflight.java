@@ -1,5 +1,8 @@
 package eightjbbm.keepgo.database;
 
+import java.sql.SQLException;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.callback.Callback;
 import org.flywaydb.core.api.callback.Context;
@@ -7,14 +10,11 @@ import org.flywaydb.core.api.callback.Event;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.sql.SQLException;
-import java.util.Locale;
-import java.util.regex.Pattern;
-
 @Component
 @Profile("migration")
 public class MySqlMigrationPreflight implements Callback {
     private static final Pattern VERSION = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+).*");
+
     @Override
     public boolean supports(Event event, Context context) {
         return event == Event.BEFORE_MIGRATE || event == Event.BEFORE_BASELINE;
@@ -36,11 +36,12 @@ public class MySqlMigrationPreflight implements Callback {
                 String version = result.getString(1);
                 String vendor = version + " " + result.getString(2);
                 var parsed = VERSION.matcher(version);
-                if (vendor.toLowerCase(Locale.ROOT).contains("mariadb") || !parsed.matches()
+                if (vendor.toLowerCase(Locale.ROOT).contains("mariadb")
+                        || !parsed.matches()
                         || Integer.parseInt(parsed.group(1)) < 8
                         || (Integer.parseInt(parsed.group(1)) == 8
-                        && Integer.parseInt(parsed.group(2)) == 0
-                        && Integer.parseInt(parsed.group(3)) < 17)) {
+                                && Integer.parseInt(parsed.group(2)) == 0
+                                && Integer.parseInt(parsed.group(3)) < 17)) {
                     throw new FlywayException("MySQL 8.0.17 or newer is required; found " + version);
                 }
                 for (int column = 3; column <= 4; column++) {

@@ -1,10 +1,9 @@
 package eightjbbm.keepgo.chat.service.requeststore;
 
 import eightjbbm.keepgo.util.exception.ConflictException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor

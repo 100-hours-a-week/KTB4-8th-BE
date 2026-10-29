@@ -1,4 +1,3 @@
 package eightjbbm.keepgo.chat.dto;
 
-public record ResetChatroomResult() {
-}
+public record ResetChatroomResult() {}

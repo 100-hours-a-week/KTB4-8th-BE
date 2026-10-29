@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class ServiceUnavailableException extends ErrorResponseException {
     public ServiceUnavailableException() {
-        super(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE),
-                null
-        );
+        super(HttpStatus.SERVICE_UNAVAILABLE, ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE), null);
     }
 }

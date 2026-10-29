@@ -11,16 +11,13 @@ import org.springframework.web.client.RestClient;
 public class AiServerExtractSlotApiService {
     private final RestClient restClient;
 
-    public AiServerExtractSlotApiService(
-            @Qualifier("aiServerRestClient") RestClient restClient) {
+    public AiServerExtractSlotApiService(@Qualifier("aiServerRestClient") RestClient restClient) {
         this.restClient = restClient;
     }
 
-    public ExtractSlotResponseV2 extractSlot(
-            String content,
-            OutingCriteria outingCriteria
-    ) {
-        return restClient.post()
+    public ExtractSlotResponseV2 extractSlot(String content, OutingCriteria outingCriteria) {
+        return restClient
+                .post()
                 .uri("/v1/extract")
                 .body(ExtractSlotRequestV2.from(content, outingCriteria))
                 .exchange((_, res) -> {

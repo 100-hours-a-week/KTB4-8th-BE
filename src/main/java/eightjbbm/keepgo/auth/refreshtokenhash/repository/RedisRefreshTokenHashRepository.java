@@ -1,5 +1,9 @@
 package eightjbbm.keepgo.auth.refreshtokenhash.repository;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
@@ -8,18 +12,9 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.stereotype.Repository;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.Objects;
-import java.util.Optional;
-
 @Repository
-@ConditionalOnProperty(
-        name = "keepgo.ephemeral.provider",
-        havingValue = "redis"
-)
-public class RedisRefreshTokenHashRepository
-        implements RefreshTokenHashRepository {
+@ConditionalOnProperty(name = "keepgo.ephemeral.provider", havingValue = "redis")
+public class RedisRefreshTokenHashRepository implements RefreshTokenHashRepository {
 
     private static final byte[] CONSUME_SCRIPT = """
             if redis.call('GET', KEYS[1]) ~= ARGV[1] then
@@ -43,14 +38,10 @@ public class RedisRefreshTokenHashRepository
 
     public RedisRefreshTokenHashRepository(
             RefreshTokenHashProperties properties,
-            @Qualifier(RefreshTokenHashConfig.CACHE_MANAGER_NAME)
-            CacheManager cacheManager,
-            RedisConnectionFactory connectionFactory
-    ) {
-        this.cache = (RedisCache) Objects.requireNonNull(
-                cacheManager.getCache(properties.name()),
-                "refresh token 캐시가 설정되지 않았습니다."
-        );
+            @Qualifier(RefreshTokenHashConfig.CACHE_MANAGER_NAME) CacheManager cacheManager,
+            RedisConnectionFactory connectionFactory) {
+        this.cache = (RedisCache)
+                Objects.requireNonNull(cacheManager.getCache(properties.name()), "refresh token 캐시가 설정되지 않았습니다.");
         this.connectionFactory = connectionFactory;
     }
 
@@ -65,9 +56,7 @@ public class RedisRefreshTokenHashRepository
 
     @Override
     public Optional<RefreshTokenHash> findById(String hash) {
-        return Optional.ofNullable(
-                cache.get(hash, RefreshTokenHash.class)
-        ).filter(token -> !token.isExpired());
+        return Optional.ofNullable(cache.get(hash, RefreshTokenHash.class)).filter(token -> !token.isExpired());
     }
 
     @Override
@@ -81,9 +70,8 @@ public class RedisRefreshTokenHashRepository
                 return Optional.empty();
             }
 
-            Object value = cache.getCacheConfiguration()
-                    .getValueSerializationPair()
-                    .read(ByteBuffer.wrap(stored));
+            Object value =
+                    cache.getCacheConfiguration().getValueSerializationPair().read(ByteBuffer.wrap(stored));
 
             if (!(value instanceof RefreshTokenHash current)
                     || current.state() != RefreshTokenState.ACTIVE
@@ -91,32 +79,26 @@ public class RedisRefreshTokenHashRepository
                 return Optional.empty();
             }
 
-            Long result = connection.scriptingCommands().eval(
-                    CONSUME_SCRIPT,
-                    ReturnType.INTEGER,
-                    1,
-                    key,
-                    stored,
-                    Long.toString(current.expiredAt().toEpochMilli())
-                            .getBytes(StandardCharsets.UTF_8)
-            );
+            Long result = connection
+                    .scriptingCommands()
+                    .eval(
+                            CONSUME_SCRIPT,
+                            ReturnType.INTEGER,
+                            1,
+                            key,
+                            stored,
+                            Long.toString(current.expiredAt().toEpochMilli()).getBytes(StandardCharsets.UTF_8));
 
-            return Long.valueOf(1).equals(result)
-                    ? Optional.of(current)
-                    : Optional.empty();
+            return Long.valueOf(1).equals(result) ? Optional.of(current) : Optional.empty();
         }
     }
 
     private byte[] serializeKey(String hash) {
         var configuration = cache.getCacheConfiguration();
 
-        String key = configuration.usePrefix()
-                ? configuration.getKeyPrefixFor(cache.getName()) + hash
-                : hash;
+        String key = configuration.usePrefix() ? configuration.getKeyPrefixFor(cache.getName()) + hash : hash;
 
-        return toBytes(
-                configuration.getKeySerializationPair().write(key)
-        );
+        return toBytes(configuration.getKeySerializationPair().write(key));
     }
 
     private static byte[] toBytes(ByteBuffer buffer) {

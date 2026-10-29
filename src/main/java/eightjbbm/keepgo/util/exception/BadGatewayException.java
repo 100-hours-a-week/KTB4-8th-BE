@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class BadGatewayException extends ErrorResponseException {
     public BadGatewayException() {
-        super(
-                HttpStatus.BAD_GATEWAY,
-                ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY),
-                null
-        );
+        super(HttpStatus.BAD_GATEWAY, ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY), null);
     }
 }

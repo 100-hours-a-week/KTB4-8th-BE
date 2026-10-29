@@ -1,22 +1,21 @@
 package eightjbbm.keepgo.recommendation.service;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
-import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
-import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationCommand;
 import eightjbbm.keepgo.recommendation.dto.RequestRecommendationResult;
 import eightjbbm.keepgo.recommendation.dto.StopRecommendationCommand;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.util.cache.recommendationjob.RecommendationJobCacheService;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.dto.RecommendCourseRequest;
 import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -29,27 +28,20 @@ public class RecommendationService {
 
     public RequestRecommendationResult requestRecommendation(RequestRecommendationCommand command) {
         Long memberId = command.memberId();
-        List<OutingWishlistEntry> collection = outingWishlist.findAll(); //location으로 1차 필터링
-        OutingCriteria outingCriteria = outingCriteriaRepository.findById(memberId).orElseThrow();
+        List<OutingWishlistEntry> collection = outingWishlist.findAll(); // location으로 1차 필터링
+        OutingCriteria outingCriteria =
+                outingCriteriaRepository.findById(memberId).orElseThrow();
         recommendationJobCacheService.createJob(memberId, 0L);
 
-        var recommendCourseResponse = aiServerApiClient
-                .recommendCourse(
-                        RecommendCourseRequest.from(
-                                outingCriteria.getUserPreferenceSummary(),
-                                collection,
-                                outingCriteria));
+        var recommendCourseResponse = aiServerApiClient.recommendCourse(
+                RecommendCourseRequest.from(outingCriteria.getUserPreferenceSummary(), collection, outingCriteria));
 
         if (recommendCourseResponse instanceof RecommendCourseResponse.Success successResponse) {
             recommendationJobCacheService.completeJob(command.memberId());
-            return RequestRecommendationResult.from(
-                    outingCriteria,
-                    successResponse,
-                    (k -> (OutingPlace) outingWishlist
-                            .findById(Long.valueOf(k.placeId()))
-                            .orElseThrow()
-                            .getOutingGuide())
-            );
+            return RequestRecommendationResult.from(outingCriteria, successResponse, (k -> (OutingPlace) outingWishlist
+                    .findById(Long.valueOf(k.placeId()))
+                    .orElseThrow()
+                    .getOutingGuide()));
         } else {
             throw new ServiceUnavailableException();
         }

@@ -14,29 +14,30 @@ import org.springframework.web.util.UriBuilder;
 public class GeoCodingApiClient {
 
     private final String path = "/req/address";
+
     @Qualifier("geoCodingRestClient")
     private final RestClient geoCodingRestClient;
+
     private final GeoCodingApiClientProperties properties;
 
     public MapCoordinatesToLocationNameResponse mapCoordinatesToLocationName(Float lat, Float lng) {
-        var response =  geoCodingRestClient.get()
-                .uri(
-                        uriBuilder -> {
-                            UriBuilder builder = uriBuilder
-                                    .path(path)
-                                    .queryParam("service", "address")
-                                    .queryParam("request", "getAddress")
-                                    .queryParam("version", 2.0)
-                                    .queryParam("crs", "epsg:4326")
-                                    .queryParam("point", lng + "," + lat)
-                                    .queryParam("format", "json")
-                                    .queryParam("type", "both")
-                                    .queryParam("zipcode", false)
-                                    .queryParam("simple", true)
-                                    .queryParam("key", properties.key());
-                            return builder.build();
-                        }
-                )
+        var response = geoCodingRestClient
+                .get()
+                .uri(uriBuilder -> {
+                    UriBuilder builder = uriBuilder
+                            .path(path)
+                            .queryParam("service", "address")
+                            .queryParam("request", "getAddress")
+                            .queryParam("version", 2.0)
+                            .queryParam("crs", "epsg:4326")
+                            .queryParam("point", lng + "," + lat)
+                            .queryParam("format", "json")
+                            .queryParam("type", "both")
+                            .queryParam("zipcode", false)
+                            .queryParam("simple", true)
+                            .queryParam("key", properties.key());
+                    return builder.build();
+                })
                 .retrieve()
                 .body(MapCoordinatesToLocationNameResponse.class);
         IO.println("response: " + response);

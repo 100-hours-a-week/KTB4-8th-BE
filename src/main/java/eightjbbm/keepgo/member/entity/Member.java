@@ -2,19 +2,20 @@ package eightjbbm.keepgo.member.entity;
 
 import eightjbbm.keepgo.util.file.File;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.Instant;
 
 @Entity
 @Getter
 @NoArgsConstructor
 public class Member {
 
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
+
     private String nickname;
 
     @OneToOne

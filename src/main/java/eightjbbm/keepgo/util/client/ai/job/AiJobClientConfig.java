@@ -1,11 +1,11 @@
 package eightjbbm.keepgo.util.client.ai.job;
 
 import eightjbbm.keepgo.util.client.ai.AiServerApiClientProperties;
+import java.net.URI;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.ObjectMapper;
-import java.net.URI;
 
 @Configuration
 @EnableConfigurationProperties(AiServerApiClientProperties.class)

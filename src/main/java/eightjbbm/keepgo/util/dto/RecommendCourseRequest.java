@@ -1,10 +1,9 @@
 package eightjbbm.keepgo.util.dto;
 
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
-import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.util.Coordinate;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -25,56 +24,38 @@ public record RecommendCourseRequest(
         Integer availableTime,
         Set<String> category,
         LocalDateTime dateTime,
-        Coordinate origin
-) {
+        Coordinate origin) {
     public record RecommendCandidate(
-            String placeId,
-            String placeName,
-            String summary,
-            Float lat,
-            Float lng,
-            String businessHours
-    ) {
+            String placeId, String placeName, String summary, Float lat, Float lng, String businessHours) {
         public static RecommendCandidate from(OutingGuide place) {
             return new RecommendCandidate(
-                    place.getId().toString(),
-                    place.getName(),
-                    place.getDescription(),
-                    null,
-                    null,
-                    null
-            );
+                    place.getId().toString(), place.getName(), place.getDescription(), null, null, null);
         }
     }
 
-    public record RecommendHistoryPlaceId(
-            String placeId,
-            LocalDate savedAt
-    ) {
+    public record RecommendHistoryPlaceId(String placeId, LocalDate savedAt) {
         public static RecommendHistoryPlaceId from(OutingWishlistEntry place) {
             return new RecommendHistoryPlaceId(
                     place.getOutingGuide().getId().toString(),
-                    place.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate()
-            );
+                    place.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate());
         }
     }
 
     public static RecommendCourseRequest from(
-            String query,
-            List<OutingWishlistEntry> places,
-            OutingCriteria outingCriteria
-    ) {
+            String query, List<OutingWishlistEntry> places, OutingCriteria outingCriteria) {
 
         return new RecommendCourseRequest(
                 query,
-                places.stream().map(
-                        k -> RecommendCandidate.from(k.getOutingGuide())
-                ).toList(),
+                places.stream()
+                        .map(k -> RecommendCandidate.from(k.getOutingGuide()))
+                        .toList(),
                 places.stream().map(RecommendHistoryPlaceId::from).toList(),
                 outingCriteria.getUserAvailableTimeMinutes(),
                 outingCriteria.getCategories(),
-                outingCriteria.getRequestedDatetime().atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                outingCriteria.getUserCoordinate()
-        );
+                outingCriteria
+                        .getRequestedDatetime()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime(),
+                outingCriteria.getUserCoordinate());
     }
 }

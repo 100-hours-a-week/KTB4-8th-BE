@@ -22,15 +22,9 @@ public class ChatControllerV2 {
 
     @PostMapping("/api/v2/member/chat-messages")
     public ResponseEntity<SseEmitter> sendChatMessage(
-            @Valid @RequestBody SendChatMessageRequestV2 request,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+            @Valid @RequestBody SendChatMessageRequestV2 request, @AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(chatService.sendChatMessage(
-                        new SendChatMessageCommandV2(
-                                memberId,
-                                request.content())));
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(chatService.sendChatMessage(new SendChatMessageCommandV2(memberId, request.content())));
     }
 }

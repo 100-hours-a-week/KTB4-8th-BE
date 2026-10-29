@@ -2,7 +2,6 @@ package eightjbbm.keepgo.interestextraction.controller.v2;
 
 import eightjbbm.keepgo.interestextraction.service.GetConnectedServiceListCommand;
 import eightjbbm.keepgo.interestextraction.service.GetYoutubeConnectionCommand;
-import eightjbbm.keepgo.interestextraction.service.InterestExtractionService;
 import eightjbbm.keepgo.interestextraction.service.UnlinkYoutubeAccountCommand;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.InterestExtractionServiceV2;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,74 +22,48 @@ public class InterestExtractionControllerV2 {
     private final InterestExtractionServiceV2 interestExtractionServiceV2;
 
     @PostMapping("/api/v2/member/youtube-sync")
-    public ResponseEntity<Void> syncWishlistFromYoutube(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+    public ResponseEntity<Void> syncWishlistFromYoutube(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
         interestExtractionServiceV2.syncWishlistFromYoutube(memberId);
-        return ResponseEntity
-                .status(HttpStatus.NO_CONTENT)
-                .build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     /// 연결된 서비스 목록 조회 API
-    /// 
+    ///
     @GetMapping("/api/v2/member/external-connections")
-    public ResponseEntity<GetConnectedServiceListResponse> getConnectedServiceList(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+    public ResponseEntity<GetConnectedServiceListResponse> getConnectedServiceList(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        var result = interestExtractionServiceV2.getConnectedServiceList(
-                new GetConnectedServiceListCommand(memberId));
-        return ResponseEntity
-                .status(HttpStatus.OK)
+        var result = interestExtractionServiceV2.getConnectedServiceList(new GetConnectedServiceListCommand(memberId));
+        return ResponseEntity.status(HttpStatus.OK)
                 .body(InterestExtractionMapper.interestExtractionMapper.fromResult(result));
     }
 
     /// 유튜브 연동 API
-    /// 
+    ///
     @PostMapping("/api/v2/member/external-connections/youtube")
     public ResponseEntity<LinkYoutubeAccountResponse> linkYoutubeAccount(
-            @AuthenticationPrincipal Jwt jwt,
-            HttpServletRequest request,
-            HttpServletResponse response
-    ) {
+            @AuthenticationPrincipal Jwt jwt, HttpServletRequest request, HttpServletResponse response) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        String authorizationUrl = interestExtractionServiceV2.linkYoutubeAccount(
-                memberId,
-                request,
-                response
-        );
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(new LinkYoutubeAccountResponse(authorizationUrl));
+        String authorizationUrl = interestExtractionServiceV2.linkYoutubeAccount(memberId, request, response);
+        return ResponseEntity.status(HttpStatus.OK).body(new LinkYoutubeAccountResponse(authorizationUrl));
     }
 
     /// 유튜브 연동 정보 조회 API
-    /// 
+    ///
     @GetMapping("/api/v2/member/external-connections/youtube")
-    public ResponseEntity<GetYoutubeConnectionResponse> getYoutubeConnection(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+    public ResponseEntity<GetYoutubeConnectionResponse> getYoutubeConnection(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        var result = interestExtractionServiceV2.getYoutubeConnection(
-                new GetYoutubeConnectionCommand(memberId));
-        return ResponseEntity
-                .status(HttpStatus.OK)
+        var result = interestExtractionServiceV2.getYoutubeConnection(new GetYoutubeConnectionCommand(memberId));
+        return ResponseEntity.status(HttpStatus.OK)
                 .body(InterestExtractionMapper.interestExtractionMapper.fromResult(result));
     }
 
     /// 유튜브 연동 해제 API
     ///
     @DeleteMapping("/api/v2/member/external-connections/youtube")
-    public ResponseEntity<Void> unlinkYoutubeAccount(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
+    public ResponseEntity<Void> unlinkYoutubeAccount(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        interestExtractionServiceV2.unlinkYoutubeAccount(
-                new UnlinkYoutubeAccountCommand(memberId));
-        return ResponseEntity
-                .status(HttpStatus.NO_CONTENT)
-                .build();
+        interestExtractionServiceV2.unlinkYoutubeAccount(new UnlinkYoutubeAccountCommand(memberId));
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

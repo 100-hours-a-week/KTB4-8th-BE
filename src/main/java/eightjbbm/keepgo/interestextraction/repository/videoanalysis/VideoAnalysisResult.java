@@ -6,8 +6,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -28,9 +26,6 @@ public class VideoAnalysisResult {
     public VideoAnalysisResult(VideoAnalysis videoAnalysis, OutingGuide outingGuide) {
         this.videoAnalysis = videoAnalysis;
         this.outingGuide = outingGuide;
-        this.id = new VideoAnalysisResultId(
-                videoAnalysis.getId(),
-                outingGuide.getId()
-        );
+        this.id = new VideoAnalysisResultId(videoAnalysis.getId(), outingGuide.getId());
     }
 }

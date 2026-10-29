@@ -1,19 +1,18 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
 import com.google.api.services.youtube.model.Video;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -35,20 +34,14 @@ public class UpdateOutingCollectionPrivatesService {
         if (outingGuidesExtracted.isEmpty()) return;
         // 분석 결과 추출된 장소와 행사를 기존 여행 위시리스트와 대조하여 최신화가 필요한 부분을 파악한다.
         // 추출된 장소와 행사 중 이미 여행 위시리스트에 등록되어있는 것들
-        Set<OutingGuide> wishlistedOutingGuides = outingWishlist
-                .findAllByMemberIdAndOutingGuides(
-                        memberId,
-                        new HashSet<>(outingGuidesExtracted)).stream()
-                .map(OutingWishlistEntry::getOutingGuide)
-                .collect(Collectors.toSet());
+        Set<OutingGuide> wishlistedOutingGuides =
+                outingWishlist.findAllByMemberIdAndOutingGuides(memberId, new HashSet<>(outingGuidesExtracted)).stream()
+                        .map(OutingWishlistEntry::getOutingGuide)
+                        .collect(Collectors.toSet());
         // 여행 위시리스트에 추가하여 미처 반영되지 못한 부분을 추가하여 최신화한다.
-        outingWishlist.saveAll(
-                outingGuidesExtracted.stream()
-                        .filter(outingGuide -> !wishlistedOutingGuides.contains(outingGuide))
-                        .map(outingGuide ->
-                                OutingWishlistEntry.from(
-                                        memberRepository.getReferenceById(memberId),
-                                        outingGuide))
-                        .toList());
+        outingWishlist.saveAll(outingGuidesExtracted.stream()
+                .filter(outingGuide -> !wishlistedOutingGuides.contains(outingGuide))
+                .map(outingGuide -> OutingWishlistEntry.from(memberRepository.getReferenceById(memberId), outingGuide))
+                .toList());
     }
 }

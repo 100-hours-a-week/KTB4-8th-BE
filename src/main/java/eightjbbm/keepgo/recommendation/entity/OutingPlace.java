@@ -4,10 +4,9 @@ import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 @Entity
 @Getter

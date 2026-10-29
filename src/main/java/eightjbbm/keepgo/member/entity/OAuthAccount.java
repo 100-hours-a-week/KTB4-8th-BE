@@ -1,21 +1,22 @@
 package eightjbbm.keepgo.member.entity;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-import java.time.Instant;
 
 @Entity
 @Getter
 @NoArgsConstructor
 public class OAuthAccount {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
+
     @ManyToOne
     @JoinColumn(name = "member_id")
     private Member member;
+
     private String email;
     private String issuer;
     private String subject;

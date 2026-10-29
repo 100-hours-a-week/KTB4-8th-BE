@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.outingwishlist.adapter.in.web.dto;
 
 import eightjbbm.keepgo.util.Coordinate;
-
 import jakarta.annotation.Nullable;
 import java.time.LocalDate;
 import java.util.List;
@@ -17,12 +16,6 @@ public record GetEventDetailResponse(
         LocalDate saveDate,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
-        @Nullable Place place
-) {
-    record Place(
-            String name,
-            String addressSg,
-            String addressRoad,
-            Coordinate coordinate
-    ) {}
+        @Nullable Place place) {
+    record Place(String name, String addressSg, String addressRoad, Coordinate coordinate) {}
 }

@@ -10,14 +10,14 @@ import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
 import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
 import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
-import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
+import eightjbbm.keepgo.util.file.FileRepository;
+import eightjbbm.keepgo.util.file.FileUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import eightjbbm.keepgo.util.file.FileUtil;
 
 @Slf4j
 @Service
@@ -37,17 +37,13 @@ public class MemberService {
     /// @param command {@link UpdateMemberInfoCommand}
     /// @return {@link UpdateMemberInfoResult}
     @Transactional
-    public UpdateMemberInfoResult updateMemberInfo(
-            UpdateMemberInfoCommand command
-    ) {
+    public UpdateMemberInfoResult updateMemberInfo(UpdateMemberInfoCommand command) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         member.updateNickname(command.nickname());
 
-        String profileImagePath =
-                FileUtil.extractPathFromUrl(command.profileImagePath());
+        String profileImagePath = FileUtil.extractPathFromUrl(command.profileImagePath());
 
-        fileRepository.findByStoragePath(profileImagePath)
-                .ifPresent(member::updateProfileImage);
+        fileRepository.findByStoragePath(profileImagePath).ifPresent(member::updateProfileImage);
         return UpdateMemberInfoResult.from(member);
     }
 
@@ -56,9 +52,7 @@ public class MemberService {
     /// 상태: 구현 완료
     /// @param command {@link GetMemberInfoCommand}
     /// @result {@link GetMemberInfoResult}
-    public GetMemberInfoResult getMemberInfo(
-            GetMemberInfoCommand command
-    ) {
+    public GetMemberInfoResult getMemberInfo(GetMemberInfoCommand command) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         OAuthAccount oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
         return GetMemberInfoResult.from(member, oAuthAccount);
@@ -68,62 +62,52 @@ public class MemberService {
     ///
     /// 회원의 좋아요한 동영상 재생목록 ID를 가져오는 것은 회원가입 때 진행해야 됨.
     /// @param command {@link SynchronizeYoutubeLikeVideosCommand}
-    public void synchronizeYoutubeLikeVideos(
-            SynchronizeYoutubeLikeVideosCommand command
-    ) {
+    public void synchronizeYoutubeLikeVideos(SynchronizeYoutubeLikeVideosCommand command) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
         var oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
         var client = oAuth2AuthorizedClientService.loadAuthorizedClient("google", oAuthAccount.getName());
         if (client == null) {
-            throw new IllegalStateException(
-                    "Google OAuth 인증 정보가 없습니다."
-            );
+            throw new IllegalStateException("Google OAuth 인증 정보가 없습니다.");
         }
         String oAuth2AccessToken = client.getAccessToken().getTokenValue();
         var likedVideos = googleApiClient.getLikedVideos(oAuth2AccessToken);
         log.info(likedVideos.toString());
-        likedVideos
-                .items()
-                .stream()
-                .map(GetLikedVideosResponse.Item::id)
-                .forEach(
-                        url -> {
-                            /*
-                            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
-                            if (response instanceof AnalyzeVideoResponseV2.Success successResponse) {
-                                OutingGuide guide;
-                                if (isPlaceOrEvent(successResponse.data())) {
-                                    guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
-                                            () -> outingPlaceRepository.save(new OutingPlace(
-                                                    successResponse.getCategory(),
-                                                    successResponse.getName(),
-                                                    successResponse.getSummary(),
-                                                    null,
-                                                    null,
-                                                    null
-                                            ))
-                                    );
-                                } else {
-                                    guide = outingEventRepository.findByName(successResponse.getName()).orElseGet(
-                                            () -> outingEventRepository.save(new OutingEvent(
-                                                    successResponse.getCategory(),
-                                                    successResponse.getName(),
-                                                    successResponse.getSummary(),
-                                                    null, //successResponse.data().eventStartDate(),
-                                                    null, //successResponse.data().eventEndDate(),
-                                                    null,
-                                                    null,
-                                                    null
-                                            ))
-                                    );
-                                }
-                                outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
-                            }
+        likedVideos.items().stream().map(GetLikedVideosResponse.Item::id).forEach(url -> {
+            /*
+            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
+            if (response instanceof AnalyzeVideoResponseV2.Success successResponse) {
+                OutingGuide guide;
+                if (isPlaceOrEvent(successResponse.data())) {
+                    guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
+                            () -> outingPlaceRepository.save(new OutingPlace(
+                                    successResponse.getCategory(),
+                                    successResponse.getName(),
+                                    successResponse.getSummary(),
+                                    null,
+                                    null,
+                                    null
+                            ))
+                    );
+                } else {
+                    guide = outingEventRepository.findByName(successResponse.getName()).orElseGet(
+                            () -> outingEventRepository.save(new OutingEvent(
+                                    successResponse.getCategory(),
+                                    successResponse.getName(),
+                                    successResponse.getSummary(),
+                                    null, //successResponse.data().eventStartDate(),
+                                    null, //successResponse.data().eventEndDate(),
+                                    null,
+                                    null,
+                                    null
+                            ))
+                    );
+                }
+                outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
+            }
 
-                             */
+             */
 
-                        }
-                );
+        });
     }
 
     private boolean isPlaceOrEvent(String category) {

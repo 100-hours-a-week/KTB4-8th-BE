@@ -1,18 +1,18 @@
 package eightjbbm.keepgo.auth.refreshtokenhash;
 
+import java.util.Collection;
+import java.util.List;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 
-import java.util.Collection;
-import java.util.List;
-
 @RequiredArgsConstructor
 public class RefreshAuthentication implements Authentication {
     @Getter
     private final String refreshToken;
+
     private final boolean authenticated;
 
     @Override
@@ -26,9 +26,7 @@ public class RefreshAuthentication implements Authentication {
     }
 
     @Override
-    public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
-
-    }
+    public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {}
 
     @Override
     public @Nullable Object getDetails() {

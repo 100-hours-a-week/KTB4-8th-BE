@@ -2,10 +2,9 @@ package eightjbbm.keepgo.util.metrics;
 
 import io.micrometer.common.KeyValue;
 import io.micrometer.common.KeyValues;
+import java.util.Set;
 import org.springframework.http.server.observation.DefaultServerRequestObservationConvention;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
-
-import java.util.Set;
 
 /// http.server.requests에 traffic_class 태그를 추가하는 Observation Convention
 ///
@@ -17,15 +16,12 @@ public class TrafficClassServerRequestObservationConvention extends DefaultServe
     static final String GENERATION = "generation";
     static final String INTERACTIVE = "interactive";
 
-    private static final Set<String> GENERATION_ROUTES = Set.of(
-            "POST /api/v1/user/recommendation",
-            "POST /api/v1/user/youtube-analyze"
-    );
+    private static final Set<String> GENERATION_ROUTES =
+            Set.of("POST /api/v1/user/recommendation", "POST /api/v1/user/youtube-analyze");
 
     @Override
     public KeyValues getLowCardinalityKeyValues(ServerRequestObservationContext context) {
-        return super.getLowCardinalityKeyValues(context)
-                .and(trafficClass(context));
+        return super.getLowCardinalityKeyValues(context).and(trafficClass(context));
     }
 
     protected KeyValue trafficClass(ServerRequestObservationContext context) {

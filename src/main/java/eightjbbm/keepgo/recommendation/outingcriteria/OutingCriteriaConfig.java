@@ -2,6 +2,9 @@ package eightjbbm.keepgo.recommendation.outingcriteria;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import eightjbbm.keepgo.util.Coordinate;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
@@ -14,10 +17,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.RedisSerializer;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Set;
-
 @Configuration
 public class OutingCriteriaConfig {
 
@@ -25,50 +24,37 @@ public class OutingCriteriaConfig {
     static final String CACHE_NAME = "outing-criteria";
 
     @Bean(CACHE_MANAGER_NAME)
-    @ConditionalOnProperty(
-            name = "keepgo.ephemeral.provider",
-            havingValue = "caffeine",
-            matchIfMissing = true
-    )
+    @ConditionalOnProperty(name = "keepgo.ephemeral.provider", havingValue = "caffeine", matchIfMissing = true)
     public CacheManager caffeineCacheManager() {
         var manager = new SimpleCacheManager();
 
-        manager.setCaches(List.of(new CaffeineCache(
-                CACHE_NAME,
-                Caffeine.newBuilder().build(),
-                false)));
+        manager.setCaches(
+                List.of(new CaffeineCache(CACHE_NAME, Caffeine.newBuilder().build(), false)));
 
         return manager;
     }
 
     @Bean(CACHE_MANAGER_NAME)
-    @ConditionalOnProperty(
-            name = "keepgo.ephemeral.provider",
-            havingValue = "redis"
-    )
+    @ConditionalOnProperty(name = "keepgo.ephemeral.provider", havingValue = "redis")
     public CacheManager redisCacheManager(
-            RedisConnectionFactory connectionFactory,
-            tools.jackson.databind.ObjectMapper mapper
-    ) {
+            RedisConnectionFactory connectionFactory, tools.jackson.databind.ObjectMapper mapper) {
         RedisSerializer<OutingCriteria> serializer = new RedisSerializer<>() {
             @Override
             public byte[] serialize(OutingCriteria value) {
-                return value == null ? null
-                        : mapper.writeValueAsBytes(CriteriaData.from(value));
+                return value == null ? null : mapper.writeValueAsBytes(CriteriaData.from(value));
             }
 
             @Override
             public OutingCriteria deserialize(byte[] bytes) {
-                return bytes == null || bytes.length == 0 ? null
+                return bytes == null || bytes.length == 0
+                        ? null
                         : mapper.readValue(bytes, CriteriaData.class).toCriteria();
             }
         };
 
         var configuration = RedisCacheConfiguration.defaultCacheConfig()
                 .disableCachingNullValues()
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair
-                                .fromSerializer(serializer));
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));
 
         return RedisCacheManager.builder(connectionFactory)
                 .withCacheConfiguration(CACHE_NAME, configuration)
@@ -83,8 +69,7 @@ public class OutingCriteriaConfig {
             Instant datetime,
             Integer minutes,
             Set<String> categories,
-            String preference
-    ) {
+            String preference) {
         static CriteriaData from(OutingCriteria value) {
             return new CriteriaData(
                     value.getMemberId(),
@@ -97,9 +82,7 @@ public class OutingCriteriaConfig {
         }
 
         OutingCriteria toCriteria() {
-            return new OutingCriteria(
-                    memberId, coordinate, location, datetime,
-                    minutes, categories, preference);
+            return new OutingCriteria(memberId, coordinate, location, datetime, minutes, categories, preference);
         }
     }
 }

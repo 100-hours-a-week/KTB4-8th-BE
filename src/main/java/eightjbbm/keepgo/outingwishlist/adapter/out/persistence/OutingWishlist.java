@@ -1,20 +1,20 @@
 package eightjbbm.keepgo.outingwishlist.adapter.out.persistence;
 
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
 @Repository
-public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>, QuerydslPredicateExecutor<OutingWishlistEntry> {
+public interface OutingWishlist
+        extends JpaRepository<OutingWishlistEntry, Long>, QuerydslPredicateExecutor<OutingWishlistEntry> {
 
     Optional<OutingWishlistEntry> findByMemberIdAndIdAndTypeAndDeleteDatetimeIsNull(
             Long memberId, Long wishlistEntryId, OutingWishlistEntryType type);
@@ -28,9 +28,7 @@ public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>
         and og.coordinate.lat is not null
         and og.coordinate.lng is not null
     """)
-    List<OutingGuide> findRecommendationCandidates(
-            @Param("memberId") Long memberId
-    );
+    List<OutingGuide> findRecommendationCandidates(@Param("memberId") Long memberId);
 
     @Query("""
         select o
@@ -40,9 +38,7 @@ public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>
             and o.deleteDatetime is null
     """)
     List<OutingWishlistEntry> findAllByMemberIdAndOutingGuides(
-            @Param("memberId") Long memberId,
-            @Param("outingGuides") Set<OutingGuide> outingGuides
-    );
+            @Param("memberId") Long memberId, @Param("outingGuides") Set<OutingGuide> outingGuides);
 
     @Query("""
         select ocp
@@ -53,8 +49,7 @@ public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>
            and ocp.deleteDatetime is null
     """)
     Optional<OutingWishlistEntry> findByMemberIdAndTypeAndOutingWishlistEntryId(
-            @Param("memberId") Long memberId,
-            @Param("outingWishlistEntryId") Long outingWishlistEntryId);
+            @Param("memberId") Long memberId, @Param("outingWishlistEntryId") Long outingWishlistEntryId);
 
     @Query("""
         select og
@@ -65,7 +60,5 @@ public interface OutingWishlist extends JpaRepository<OutingWishlistEntry, Long>
             and owe.deleteDatetime is null
     """)
     List<OutingGuide> findAllWishlistedOutingGuides(
-            @Param("memberId") Long memberId,
-            @Param("outingGuides") List<OutingGuide> outingGuides
-    );
+            @Param("memberId") Long memberId, @Param("outingGuides") List<OutingGuide> outingGuides);
 }
