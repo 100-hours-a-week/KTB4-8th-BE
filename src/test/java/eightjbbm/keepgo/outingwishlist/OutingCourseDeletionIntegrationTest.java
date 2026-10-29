@@ -8,6 +8,7 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistPageReader;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistService;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.PageTokenCodec;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
@@ -72,12 +73,14 @@ class OutingCourseDeletionIntegrationTest {
         factory = configuration.buildSessionFactory();
         session = factory.openSession();
         var repositories = new JpaRepositoryFactory(session);
+        var queryRepository = new OutingWishlistQueryRepository(new JPAQueryFactory(session));
+        var pageTokenCodec = new PageTokenCodec();
         service = new OutingWishlistService(
                 repositories.getRepository(MemberRepository.class),
                 repositories.getRepository(OutingCourseRepository.class),
                 repositories.getRepository(OutingWishlist.class),
-                new OutingWishlistQueryRepository(new JPAQueryFactory(session)),
-                new PageTokenCodec());
+                queryRepository,
+                new OutingWishlistPageReader(queryRepository, pageTokenCodec));
         transaction(() -> {
             var member = Member.create("소유자");
             var other = Member.create("다른 회원");

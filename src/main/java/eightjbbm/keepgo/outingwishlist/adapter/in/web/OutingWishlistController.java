@@ -47,7 +47,7 @@ public class OutingWishlistController {
             @PathVariable @Positive Long placeId, @AuthenticationPrincipal @NotNull Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
         outingWishlistService.removePlace(memberId, placeId);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     /// 여행 위시리스트에 추가한 행사 목록 조회 API
@@ -77,7 +77,7 @@ public class OutingWishlistController {
             @PathVariable @Positive Long eventId, @AuthenticationPrincipal @NotNull Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
         outingWishlistService.removeEvent(memberId, eventId);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @GetMapping("/api/v2/member/outing-wishlist/outing-courses")
