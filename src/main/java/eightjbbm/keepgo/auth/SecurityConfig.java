@@ -13,7 +13,6 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.micrometer.metrics.autoconfigure.export.prometheus.PrometheusScrapeEndpoint;
@@ -21,7 +20,6 @@ import org.springframework.boot.security.autoconfigure.actuate.web.servlet.Endpo
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -49,17 +47,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    RSAPublicKey accessTokenPublicKey(@Value("${keepgo.security.jwt.public-key}") Resource publicKeyResource)
-            throws IOException {
-        try (InputStream inputStream = publicKeyResource.getInputStream()) {
+    RSAPublicKey accessTokenPublicKey() throws IOException {
+        try (InputStream inputStream = jwtProperties.publicKey().getInputStream()) {
             return RsaKeyConverters.x509().convert(inputStream);
         }
     }
 
     @Bean
-    RSAPrivateKey accessTokenPrivateKey(@Value("${keepgo.security.jwt.private-key}") Resource privateKeyResource)
-            throws IOException {
-        try (InputStream inputStream = privateKeyResource.getInputStream()) {
+    RSAPrivateKey accessTokenPrivateKey() throws IOException {
+        try (InputStream inputStream = jwtProperties.privateKey().getInputStream()) {
             return RsaKeyConverters.pkcs8().convert(inputStream);
         }
     }
