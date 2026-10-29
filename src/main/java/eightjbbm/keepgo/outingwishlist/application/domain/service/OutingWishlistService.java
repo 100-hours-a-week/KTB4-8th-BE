@@ -5,17 +5,14 @@ import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
-import eightjbbm.keepgo.outingwishlist.common.InvalidPageTokenException;
 import eightjbbm.keepgo.outingwishlist.common.OutingCourseNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.util.exception.UnprocessableContentException;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,26 +25,15 @@ public class OutingWishlistService {
     private final OutingCourseRepository outingCourseRepository;
     private final OutingWishlist outingWishlist;
     private final OutingWishlistQueryRepository outingWishlistQueryRepository;
-    private final PageTokenCodec pageTokenCodec;
-
-    private static final int PAGE_SIZE = 10;
+    private final OutingWishlistPageReader outingWishlistPageReader;
 
     /// 여행 위시리스트에 추가한 장소 목록 조회 API
     ///
     @Transactional(readOnly = true)
     public GetPlaceListResult getPlaceList(GetPlaceListCommand command) {
-        var pageToken = (command.cursor() == null)
-                ? new PageToken(null, null)
-                : pageTokenCodec.decode(command.cursor()).orElseThrow(InvalidPageTokenException::new);
-        List<OutingWishlistEntry> wishlistEntries =
-                outingWishlistQueryRepository.findAllByCursor(command.memberId(), "place", pageToken, PAGE_SIZE);
-        String nextCursor = (wishlistEntries.size() <= PAGE_SIZE)
-                ? null
-                : pageTokenCodec.encode(new PageToken(
-                        wishlistEntries.getLast().getId(),
-                        wishlistEntries.getLast().getCreateDatetime()));
-        return GetPlaceListResult.from(
-                wishlistEntries.subList(0, Math.min(PAGE_SIZE, wishlistEntries.size())), nextCursor);
+        var page = outingWishlistPageReader.readGuides(
+                command.memberId(), OutingWishlistEntryType.PLACE, command.location(), false, command.cursor());
+        return GetPlaceListResult.from(page.entries(), page.nextCursor());
     }
 
     /// 여행 위시리스트에 추가한 장소 상세 조회 API
@@ -67,18 +53,13 @@ public class OutingWishlistService {
     ///
     @Transactional(readOnly = true)
     public GetEventListResult getEventList(GetEventListCommand command) {
-        var pageToken = command.cursor() == null
-                ? new PageToken(null, null)
-                : pageTokenCodec.decode(command.cursor()).orElseThrow(InvalidPageTokenException::new);
-        List<OutingWishlistEntry> wishlistEntries =
-                outingWishlistQueryRepository.findAllByCursor(command.memberId(), "event", pageToken, PAGE_SIZE);
-        String nextCursor = (wishlistEntries.size() <= PAGE_SIZE)
-                ? null
-                : pageTokenCodec.encode(new PageToken(
-                        wishlistEntries.getLast().getId(),
-                        wishlistEntries.getLast().getCreateDatetime()));
-        return GetEventListResult.from(
-                wishlistEntries.subList(0, Math.min(PAGE_SIZE, wishlistEntries.size())), nextCursor);
+        var page = outingWishlistPageReader.readGuides(
+                command.memberId(),
+                OutingWishlistEntryType.EVENT,
+                null,
+                Boolean.TRUE.equals(command.ongoing()),
+                command.cursor());
+        return GetEventListResult.from(page.entries(), page.nextCursor());
     }
 
     /// 여행 위시리스트에 추가한 행사 상세 조회 API
@@ -96,37 +77,16 @@ public class OutingWishlistService {
 
     @Transactional(readOnly = true)
     public GetOutingCourseListResult getOutingCourseList(GetOutingCourseListCommand command) {
-        var pageToken = command.cursor() == null
-                ? new PageToken(null, null)
-                : pageTokenCodec.decode(command.cursor()).orElseThrow(InvalidPageTokenException::new);
+        var page = outingWishlistPageReader.readCourses(command.memberId(), command.location(), command.cursor());
 
-        if ((pageToken.id() == null) != (pageToken.createDatetime() == null)) {
-            throw new InvalidPageTokenException();
-        }
-
-        var entries = outingWishlistQueryRepository.findCoursesByCursor(
-                command.memberId(), command.location(), pageToken, PAGE_SIZE);
-
-        boolean hasNext = entries.size() > PAGE_SIZE;
-
-        var pageEntries = entries.subList(0, Math.min(entries.size(), PAGE_SIZE));
-
-        String nextCursor = null;
-
-        if (hasNext) {
-            var lastEntry = pageEntries.getLast();
-
-            nextCursor = pageTokenCodec.encode(new PageToken(lastEntry.getId(), lastEntry.getCreateDatetime()));
-        }
-
-        var courseIds = pageEntries.stream()
+        var courseIds = page.entries().stream()
                 .map(entry -> entry.getOutingCourse().getId())
                 .distinct()
                 .toList();
 
         var stops = outingWishlistQueryRepository.findStopsByCourseIds(courseIds);
 
-        return GetOutingCourseListResult.from(pageEntries, stops, nextCursor);
+        return GetOutingCourseListResult.from(page.entries(), stops, page.nextCursor());
     }
 
     @Transactional(readOnly = true)

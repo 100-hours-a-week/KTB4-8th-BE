@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.outingwishlist.adapter.out.persistence;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
@@ -18,7 +19,13 @@ import org.springframework.stereotype.Repository;
 public class OutingWishlistQueryRepository {
     private final JPAQueryFactory queryFactory;
 
-    public List<OutingWishlistEntry> findAllByCursor(Long memberId, String type, PageToken pageToken, int size) {
+    public List<OutingWishlistEntry> findAllByCursor(
+            Long memberId,
+            OutingWishlistEntryType type,
+            String location,
+            boolean ongoing,
+            PageToken pageToken,
+            int size) {
         var ow = QOutingWishlistEntry.outingWishlistEntry;
         var og = QOutingGuide.outingGuide;
 
@@ -29,6 +36,8 @@ public class OutingWishlistQueryRepository {
                 .where(
                         ow.member.id.eq(memberId),
                         guideTypeEq(og, type),
+                        guideLocationStartsWith(og, type, location),
+                        ongoingEvent(og, type, ongoing),
                         cursorCondition(ow, pageToken.createDatetime(), pageToken.id()),
                         ow.deleteDatetime.isNull())
                 .orderBy(ow.createDatetime.desc(), ow.id.desc())
@@ -114,18 +123,39 @@ public class OutingWishlistQueryRepository {
         return Optional.ofNullable(result);
     }
 
-    private BooleanExpression guideTypeEq(QOutingGuide outingGuide, String type) {
+    private BooleanExpression guideTypeEq(QOutingGuide outingGuide, OutingWishlistEntryType type) {
         return switch (type) {
-            case "place" -> outingGuide.instanceOf(OutingPlace.class);
-            case "event" -> outingGuide.instanceOf(OutingEvent.class);
-            default -> throw new IllegalArgumentException();
+            case PLACE -> outingGuide.instanceOf(OutingPlace.class);
+            case EVENT -> outingGuide.instanceOf(OutingEvent.class);
+            default -> throw new IllegalArgumentException("Unsupported wishlist guide type: " + type);
         };
+    }
+
+    private BooleanExpression guideLocationStartsWith(
+            QOutingGuide outingGuide, OutingWishlistEntryType type, String location) {
+        if (type != OutingWishlistEntryType.PLACE || location == null || location.isBlank()) {
+            return null;
+        }
+        return outingGuide.address.address.startsWith(location.strip());
+    }
+
+    private BooleanExpression ongoingEvent(QOutingGuide outingGuide, OutingWishlistEntryType type, boolean ongoing) {
+        if (type != OutingWishlistEntryType.EVENT || !ongoing) {
+            return null;
+        }
+
+        var now = Instant.now();
+        var event = QOutingEvent.outingEvent;
+        return JPAExpressions.selectOne()
+                .from(event)
+                .where(event.id.eq(outingGuide.id), event.startDatetime.loe(now), event.endDatetime.goe(now))
+                .exists();
     }
 
     private BooleanExpression cursorCondition(QOutingWishlistEntry ow, Instant cursorCreateDatetime, Long cursorId) {
         if (cursorCreateDatetime == null && cursorId == null) return null;
         return ow.createDatetime
                 .lt(cursorCreateDatetime)
-                .or(ow.createDatetime.eq(cursorCreateDatetime).and(ow.id.loe(cursorId)));
+                .or(ow.createDatetime.eq(cursorCreateDatetime).and(ow.id.lt(cursorId)));
     }
 }
