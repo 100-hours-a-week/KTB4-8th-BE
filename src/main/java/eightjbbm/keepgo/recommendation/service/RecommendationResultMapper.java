@@ -49,7 +49,7 @@ public class RecommendationResultMapper {
                                     outingGuideRepository.getReferenceById(Long.valueOf(place.placeId()))))
                             .collect(Collectors.toCollection(ArrayList::new));
                     outingStopRepository.saveAll(stops);
-                    outingCourse.setStops(stops);
+                    outingCourse.replaceStops(stops);
                     return outingCourse;
                 })
                 .toList();

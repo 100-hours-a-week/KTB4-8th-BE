@@ -26,21 +26,21 @@ public class VideoAnalysis {
         this.createDatetime = Instant.now();
     }
 
-    public void setSuccess() {
+    public void markSuccess() {
         if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
             throw new IllegalStateException();
         }
         this.status = VideoAnalysisStatus.SUCCESS;
     }
 
-    public void setNotFound() {
+    public void markNotFound() {
         if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
             throw new IllegalStateException();
         }
         this.status = VideoAnalysisStatus.NOT_FOUND;
     }
 
-    public void setFailed() {
+    public void markFailed() {
         if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
             throw new IllegalStateException();
         }
