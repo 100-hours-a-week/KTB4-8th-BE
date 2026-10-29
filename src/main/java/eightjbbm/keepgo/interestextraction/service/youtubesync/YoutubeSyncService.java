@@ -1,8 +1,10 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
+import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisRepository;
 import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSync;
 import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncRepository;
 import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +22,27 @@ public class YoutubeSyncService {
             List.of(YoutubeSyncStatus.SUCCEEDED, YoutubeSyncStatus.FAILED);
 
     private final YoutubeSyncRepository repository;
+    private final VideoAnalysisRepository videoAnalysisRepository;
+
+    /// 이 인스턴스가 맡은 QUEUED·RUNNING 동기화의 heartbeat를 DB 시간으로 남긴다.
+    @Transactional
+    public int heartbeat(String instanceId) {
+        return repository.heartbeat(instanceId);
+    }
+
+    /// heartbeat가 timeout 이상 끊긴 동기화와 그 동기화의 진행 중 분석만 실패로 마감한다.
+    ///
+    /// 만료 행을 `FOR UPDATE SKIP LOCKED`로 잠가 여러 인스턴스가 동시에 돌아도 한 번만 처리한다.
+    @Transactional
+    public int failExpired(Duration timeout) {
+        List<Long> expiredIds = repository.findExpiredIdsForUpdate((int) timeout.toSeconds());
+        if (expiredIds.isEmpty()) {
+            return 0;
+        }
+
+        videoAnalysisRepository.markFailedBySyncIds(expiredIds);
+        return repository.failExpired(expiredIds, YoutubeSyncError.INTERNAL_ERROR.code());
+    }
 
     @Transactional(readOnly = true)
     public Optional<YoutubeSyncSnapshot> findActive(Long memberId) {

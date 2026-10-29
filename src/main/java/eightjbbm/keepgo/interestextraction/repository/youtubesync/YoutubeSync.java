@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.interestextraction.repository.youtubesync;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -50,6 +51,10 @@ public class YoutubeSync {
     private Instant updatedAt;
 
     private Instant finishedAt;
+
+    /// heartbeat는 native UPDATE로만 갱신하고 insert 시에는 DB 기본값을 쓴다.
+    @Column(name = "heartbeat_at", insertable = false, updatable = false)
+    private Instant heartbeatAt;
 
     public static YoutubeSync queued(Long memberId, String instanceId, String traceId) {
         YoutubeSync sync = new YoutubeSync();

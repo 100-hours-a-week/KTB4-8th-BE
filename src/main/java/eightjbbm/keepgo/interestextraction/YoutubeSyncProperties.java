@@ -12,7 +12,8 @@ public record YoutubeSyncProperties(
         @DefaultValue("15000") long keepAliveMs,
         @DefaultValue("1800000") long emitterTimeoutMs,
         @DefaultValue("10") int fetchWeight,
-        @DefaultValue("5m") Duration recentResultWindow) {
+        @DefaultValue("5m") Duration recentResultWindow,
+        @DefaultValue("60s") Duration heartbeatTimeout) {
 
     /// 실행 인스턴스 식별자. 설정하지 않으면 프로세스마다 다른 값을 쓴다.
     public String resolvedInstanceId() {
