@@ -143,6 +143,8 @@ class OutingWishlistServiceTest {
 
 ## 리뷰 체크리스트
 
+아래 항목 중 구조로 판정할 수 있는 것(`Controller`→`Repository` 의존, `@Value`, 필드 주입, `@Transactional` 위치, 엔티티 setter)은 `ArchitectureRulesTest`가 검사한다. 리뷰에서는 나머지를 본다.
+
 - [ ] 기능 패키지 안이 계층형으로 구성되어 있는가. 헥사고날 구조는 `outingwishlist`에만 있는가.
 - [ ] 클래스 이름에 버전 접미사가 없는가.
 - [ ] DTO가 `record`이고 `Request`/`Command`/`Result`/`Response` 접미사를 따르는가.
@@ -165,11 +167,10 @@ class OutingWishlistServiceTest {
 | 공용 코드 위치 | 공용 `Address`가 `sandbox.ds`에, `QuerydslConfig`가 `outingwishlist` 안에 있다. |
 | 버전 접미사 | `ChatControllerV2`, `ChatServiceV2`, `RecommendationControllerV2/V3`, `InterestExtractionControllerV3`, `InterestExtractionServiceV2/V3`, `YoutubeApiServiceV2`와 관련 DTO |
 | MapStruct | `MemberMapper`, `ChatMapper` 등이 `INSTANCE` 싱글턴으로 사용된다. `InterestExtractionMapper`는 싱글턴 이름도 다르다. |
-| 트랜잭션 | `outingwishlist` 외의 조회 메서드에 `readOnly`가 없다. `RecommendationResultMapper`, `VideoAnalysisManager`에 `@Transactional`이 있다. |
+| 트랜잭션 | `outingwishlist` 외의 조회 메서드에 `readOnly`가 없다. |
 | 엔티티 생성자 | `Member`, `OAuthAccount`, `Chat`, `VideoAnalysis`, `MemberLikedVideo`, `File`, `OutingGuide`, `OutingPlace`, `OutingEvent`가 public 기본 생성자를 쓴다. |
-| `@Setter` | `Member.likedVideosPlaylistId`, `OutingCourse.stops` |
 | fetch 전략 | `Member.profileImage`가 기본값 EAGER인 `@OneToOne`이다. |
 | 시간 필드 | `OutingCourse`, `VideoAnalysis`, `MemberLikedVideo`, `OutingWishlistEntry`가 `createDatetime`/`deleteDatetime`을 쓴다. |
 | 테스트 | 한국어 snake_case 메서드 이름, `@DisplayName` 누락, JUnit `assertEquals` 사용이 섞여 있다. `GoogleApiClientUnitTests.test1` |
-| 설정값 | `SecurityConfig`, `RecommendationServiceV2`가 `@Value`를 쓴다. `OutingCriteriaProperties`에 `keepgo.*` 접두사가 없다. |
+| 설정값 | `OutingCriteriaProperties`에 `keepgo.*` 접두사가 없다. |
 | 로깅·주석 | `MemberService`에 `toString()` 로깅과 주석 처리된 코드가 있다. |
