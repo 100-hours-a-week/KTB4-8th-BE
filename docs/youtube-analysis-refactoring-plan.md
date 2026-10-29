@@ -1,5 +1,7 @@
 # YouTube 영상 분석 리팩토링 구현 계획
 
+> **Superseded:** 이 문서는 [#248](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/248)로 대체됐다. 현재 설계와 인수 조건은 #248과 [ADR 0003](adr/0003-in-process-analysis-mysql-coordination.md)을 따른다. 아래 내용은 기록으로만 보존한다.
+
 작성일: 2026-10-28
 대상: `DefaultYoutubeVideoAnalyzer#analyze`
 기준: 사용자 제공 `refactor-youtube-sync.md` 및 클래스 설계 논의

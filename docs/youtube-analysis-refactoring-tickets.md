@@ -1,5 +1,7 @@
 # YouTube 영상 분석 리팩토링 작업 분할안
 
+> **Superseded:** 이 문서는 [#248](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/248)로 대체됐다. 현재 설계와 인수 조건은 #248과 [ADR 0003](adr/0003-in-process-analysis-mysql-coordination.md)을 따른다. 아래 내용은 기록으로만 보존한다.
+
 작성 시점의 작업 분할 기록이다. 체크박스와 게시 상태는 실시간 진행률이 아니며 실제 상태는 GitHub 이슈·PR을 따른다.
 
 부모 명세: [#222](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/222)
