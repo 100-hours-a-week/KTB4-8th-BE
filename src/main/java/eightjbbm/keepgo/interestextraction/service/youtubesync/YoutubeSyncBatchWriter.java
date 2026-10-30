@@ -90,13 +90,7 @@ public class YoutubeSyncBatchWriter {
         switch (video.status()) {
             case SUCCESS -> analysis.markSuccess();
             case NOT_FOUND -> analysis.markNotFound();
-            case FAILED -> {
-                if (video.failureCode() == null) {
-                    analysis.markFailed();
-                } else {
-                    analysis.markFailed(video.failureCode());
-                }
-            }
+            case FAILED -> analysis.markFailed(video.failureCode());
             default -> throw new IllegalArgumentException("지원하지 않는 분석 상태입니다: " + video.status());
         }
         if (!video.excludedCandidates().isEmpty()) {
