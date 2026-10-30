@@ -49,7 +49,8 @@ import tools.jackson.databind.ObjectMapper;
             "keepgo.youtube-sync.poll-interval-ms=50",
             "keepgo.youtube-sync.instance-id=instance-a",
             "keepgo.youtube-sync.heartbeat-interval-ms=3600000",
-            "keepgo.youtube-sync.sweep-interval-ms=3600000"
+            "keepgo.youtube-sync.sweep-interval-ms=3600000",
+            "keepgo.embedding-outbox.poll-interval=3600000"
         })
 @DisplayName("YouTube 동기화 다중 인스턴스 통합 테스트")
 class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSupport {

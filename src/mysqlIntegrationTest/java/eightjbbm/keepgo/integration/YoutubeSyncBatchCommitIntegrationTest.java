@@ -48,7 +48,9 @@ import tools.jackson.databind.ObjectMapper;
             "keepgo.youtube-sync.poll-interval-ms=50",
             "keepgo.youtube-sync.max-concurrent-syncs=3",
             "keepgo.youtube-sync.recent-result-window=2s",
-            "keepgo.youtube-sync.fetch-weight=10"
+            "keepgo.youtube-sync.fetch-weight=10",
+            // 아웃박스 폴러는 별도 티켓의 관찰 대상이므로 이 테스트에서는 돌리지 않는다.
+            "keepgo.embedding-outbox.poll-interval=3600000"
         })
 @DisplayName("YouTube 동기화 배치 커밋 통합 테스트")
 class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport {
@@ -159,8 +161,23 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("임베딩 호출이 실패해도 동기화는 성공한다")
-    void ignoresEmbeddingFailure() throws Exception {
+    @DisplayName("동기화 중에는 임베딩을 호출하지 않고 신규 가이드마다 아웃박스 행이 생긴다")
+    void recordsOutboxInsteadOfEmbeddingDuringSync() throws Exception {
+        YOUTUBE.addPage(videos("video-a", "video-b"));
+        Member member = newMember();
+
+        List<SseEvent> events = runToSuccess(token(member));
+
+        assertThat(data(events.getLast()).get("video_failed_count").asInt()).isZero();
+        assertThat(AI_STUB.embeddingRequestCount()).isZero();
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(outboxCount()).isEqualTo(2);
+        assertThat(pendingOutboxCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("임베딩 실패는 동기화 결과에 영향을 주지 않고 아웃박스에 남는다")
+    void leavesEmbeddingRetryToOutbox() throws Exception {
         YOUTUBE.addPage(videos("video-a", "video-b"));
         AI_STUB.failEmbedding(500, "{\"message\":\"failure\"}");
         Member member = newMember();
@@ -170,6 +187,8 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         assertThat(data(events.getLast()).get("video_failed_count").asInt()).isZero();
         assertThat(syncStatus(member)).isEqualTo("SUCCEEDED");
         assertThat(wishlistCount(member)).isEqualTo(2);
+        assertThat(AI_STUB.embeddingRequestCount()).isZero();
+        assertThat(pendingOutboxCount()).isEqualTo(2);
     }
 
     @Test
@@ -270,6 +289,15 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
 
     private int guideCount() {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide", Integer.class);
+    }
+
+    private int outboxCount() {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide_embedding_outbox", Integer.class);
+    }
+
+    private int pendingOutboxCount() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outing_guide_embedding_outbox WHERE status = 'PENDING'", Integer.class);
     }
 
     private int analysisCount() {

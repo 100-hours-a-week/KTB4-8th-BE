@@ -46,7 +46,8 @@ import tools.jackson.databind.ObjectMapper;
             "keepgo.youtube-sync.poll-interval-ms=50",
             "keepgo.youtube-sync.max-concurrent-syncs=1",
             "keepgo.youtube-sync.recent-result-window=2s",
-            "keepgo.youtube-sync.fetch-weight=10"
+            "keepgo.youtube-sync.fetch-weight=10",
+            "keepgo.embedding-outbox.poll-interval=3600000"
         })
 @DisplayName("YouTube SSE 동기화 통합 테스트")
 class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
