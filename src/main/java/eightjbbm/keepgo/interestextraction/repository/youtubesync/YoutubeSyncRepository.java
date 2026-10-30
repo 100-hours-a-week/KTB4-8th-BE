@@ -18,6 +18,15 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
 
     long countByInstanceIdAndStatusIn(String instanceId, Collection<YoutubeSyncStatus> statuses);
 
+    /// 같은 요청 스레드의 1차 캐시에 갇히지 않도록 상태만 질의한다.
+    @Query("""
+            select new eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncState(
+                       s.status, s.errorCode)
+              from YoutubeSync s
+             where s.id = :syncId
+            """)
+    Optional<YoutubeSyncState> findStateById(Long syncId);
+
     /// 이 인스턴스가 맡은 QUEUED·RUNNING 행만 DB 시간으로 heartbeat를 남긴다.
     ///
     /// `updated_at`과 `event_seq`는 바꾸지 않아 heartbeat 때문에 SSE 이벤트가 생기지 않는다.

@@ -3,6 +3,7 @@ package eightjbbm.keepgo.interestextraction.service.youtubesync;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisRepository;
 import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSync;
 import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncRepository;
+import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncState;
 import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus;
 import java.time.Duration;
 import java.time.Instant;
@@ -73,6 +74,12 @@ public class YoutubeSyncService {
     @Transactional(readOnly = true)
     public Optional<YoutubeSyncSnapshot> find(Long syncId) {
         return repository.findById(syncId).map(YoutubeSyncSnapshot::from);
+    }
+
+    /// 요청 스레드의 1차 캐시를 우회해 종료 여부를 판단할 최신 상태를 읽는다.
+    @Transactional(readOnly = true)
+    public Optional<YoutubeSyncState> findState(Long syncId) {
+        return repository.findStateById(syncId);
     }
 
     @Transactional(readOnly = true)

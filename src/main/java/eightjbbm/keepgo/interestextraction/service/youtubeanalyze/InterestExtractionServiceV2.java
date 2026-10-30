@@ -4,15 +4,11 @@ import eightjbbm.keepgo.interestextraction.service.*;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
@@ -21,7 +17,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InterestExtractionServiceV2 {
@@ -29,9 +24,6 @@ public class InterestExtractionServiceV2 {
     private static final String PENDING_YOUTUBE_LINK =
             InterestExtractionServiceV2.class.getName() + ".pendingYoutubeLink";
 
-    private final MemberLikedVideoReader memberLikedVideoReader;
-    private final YoutubeVideoAnalyzer youtubeVideoAnalyzer;
-    private final OutingWishlistSyncService outingWishlistSyncService;
     private final YoutubeAuthorizedClientService youtubeAuthorizedClientService;
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final OAuthAccountRepository oauthAccountRepository;
@@ -39,15 +31,6 @@ public class InterestExtractionServiceV2 {
 
     private final HttpSessionOAuth2AuthorizationRequestRepository authorizationRequests =
             new HttpSessionOAuth2AuthorizationRequestRepository();
-
-    /// 회원이 좋아요 표시한 영상을 분석해 여행 위시리스트를 최신화한다.
-    ///
-    public void syncWishlistFromYoutube(Long memberId) {
-        log.info("syncWishlistFromYoutube");
-        var likedVideos = memberLikedVideoReader.readAll(memberId);
-        List<OutingGuide> analyzedGuides = youtubeVideoAnalyzer.analyze(likedVideos);
-        outingWishlistSyncService.sync(memberId, analyzedGuides);
-    }
 
     /// 유튜브 연동 API
     ///

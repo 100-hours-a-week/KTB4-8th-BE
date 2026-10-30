@@ -13,11 +13,19 @@ public record YoutubeSyncProperties(
         @DefaultValue("1800000") long emitterTimeoutMs,
         @DefaultValue("10") int fetchWeight,
         @DefaultValue("5m") Duration recentResultWindow,
-        @DefaultValue("60s") Duration heartbeatTimeout) {
+        @DefaultValue("60s") Duration heartbeatTimeout,
+        @DefaultValue("50s") Duration v2WaitTimeout,
+        @DefaultValue("500ms") Duration v2WaitPollInterval) {
 
     public YoutubeSyncProperties {
-        if (heartbeatTimeout == null || heartbeatTimeout.isZero() || heartbeatTimeout.isNegative()) {
-            throw new IllegalArgumentException("heartbeatTimeout은 0보다 커야 합니다: " + heartbeatTimeout);
+        requirePositive("heartbeatTimeout", heartbeatTimeout);
+        requirePositive("v2WaitTimeout", v2WaitTimeout);
+        requirePositive("v2WaitPollInterval", v2WaitPollInterval);
+    }
+
+    private static void requirePositive(String name, Duration value) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(name + "은 0보다 커야 합니다: " + value);
         }
     }
 

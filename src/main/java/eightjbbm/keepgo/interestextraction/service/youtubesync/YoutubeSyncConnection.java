@@ -103,7 +103,7 @@ final class YoutubeSyncConnection {
         if (snapshot.status() == YoutubeSyncStatus.SUCCEEDED) {
             send("success", YoutubeSyncEvent.from(snapshot), eventId);
         } else {
-            YoutubeSyncError error = errorOf(snapshot.errorCode());
+            YoutubeSyncError error = YoutubeSyncError.fromCode(snapshot.errorCode());
             send(error.event(), YoutubeSyncErrorPayload.of(snapshot.traceId(), error), eventId);
         }
         complete();
@@ -136,16 +136,5 @@ final class YoutubeSyncConnection {
             log.debug("YouTube 동기화 SSE 전송 실패: syncId={}", syncId, error);
         }
         emitter.completeWithError(error);
-    }
-
-    private static YoutubeSyncError errorOf(String code) {
-        if (code == null) {
-            return YoutubeSyncError.INTERNAL_ERROR;
-        }
-        try {
-            return YoutubeSyncError.valueOf(code);
-        } catch (IllegalArgumentException error) {
-            return YoutubeSyncError.INTERNAL_ERROR;
-        }
     }
 }

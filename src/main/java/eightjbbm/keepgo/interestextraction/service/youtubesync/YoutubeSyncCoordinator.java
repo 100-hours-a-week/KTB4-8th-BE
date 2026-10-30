@@ -2,9 +2,13 @@ package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.YoutubeSyncProperties;
+import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus;
 import eightjbbm.keepgo.interestextraction.service.MemberLikedVideoReader;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoValidator;
+import eightjbbm.keepgo.util.exception.BadGatewayException;
 import eightjbbm.keepgo.util.exception.ConflictException;
+import eightjbbm.keepgo.util.exception.InternalServerErrorException;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,6 +23,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -57,14 +62,46 @@ public class YoutubeSyncCoordinator {
     }
 
     public SseEmitter connect(Long memberId) {
-        var active = syncService.findActive(memberId);
-        if (active.isPresent()) {
-            return attach(active.get());
+        SyncStart start = startOrAttach(memberId, true);
+        if (start.rejection() != null) {
+            return reject(start.rejection());
         }
 
-        var recent = syncService.findRecentFinished(memberId, Instant.now().minus(properties.recentResultWindow()));
-        if (recent.isPresent()) {
-            return attach(recent.get());
+        SseEmitter emitter = attach(start.snapshot());
+        if (start.created()) {
+            submit(start.snapshot().id(), start.snapshot().memberId());
+        }
+        return emitter;
+    }
+
+    /// 동기화를 시작하거나 이미 실행 중인 동기화에 붙고, 종료 상태가 될 때까지 기다린다.
+    ///
+    /// V2 API가 같은 조정기를 거쳐 V3와 같은 안정성 보장을 받게 한다. SSE 연결 없이
+    /// 행의 상태만 폴링하므로 다른 인스턴스가 실행한 동기화에도 붙을 수 있다.
+    /// 최근에 끝난 결과는 SSE 재연결용이므로 재사용하지 않고 새 동기화를 시작한다.
+    public void syncAndWait(Long memberId) {
+        SyncStart start = startOrAttach(memberId, false);
+        if (start.rejection() != null) {
+            throw failure(start.rejection());
+        }
+
+        if (start.created()) {
+            submit(start.snapshot().id(), start.snapshot().memberId());
+        }
+        awaitTerminal(start.snapshot().id());
+    }
+
+    private SyncStart startOrAttach(Long memberId, boolean reuseRecentResult) {
+        var active = syncService.findActive(memberId);
+        if (active.isPresent()) {
+            return new SyncStart(active.get(), false, null);
+        }
+
+        if (reuseRecentResult) {
+            var recent = syncService.findRecentFinished(memberId, Instant.now().minus(properties.recentResultWindow()));
+            if (recent.isPresent()) {
+                return new SyncStart(recent.get(), false, null);
+            }
         }
 
         // 스트림을 열기 전에 연동 여부만 확인해야 409를 HTTP 상태로 돌려줄 수 있다.
@@ -74,7 +111,7 @@ public class YoutubeSyncCoordinator {
         // 같은 인스턴스의 상한 검사와 행 생성을 한 임계 구역에서 처리해 동시에 상한을 넘지 않게 한다.
         synchronized (creationLock) {
             if (syncService.countRunningByInstance(instanceId) >= properties.maxConcurrentSyncs()) {
-                return reject(YoutubeSyncError.SYNC_BUSY);
+                return new SyncStart(null, false, YoutubeSyncError.SYNC_BUSY);
             }
 
             boolean created = true;
@@ -88,12 +125,48 @@ public class YoutubeSyncCoordinator {
                 snapshot = syncService.findActive(memberId).orElseThrow(ConflictException::new);
             }
 
-            SseEmitter emitter = attach(snapshot);
-            if (created) {
-                submit(snapshot.id(), snapshot.memberId());
-            }
-            return emitter;
+            return new SyncStart(snapshot, created, null);
         }
+    }
+
+    private void awaitTerminal(Long syncId) {
+        // 프록시 유휴 타임아웃보다 먼저 끝내고, 실행 스레드만 멈춰 sweeper가 회수하지 못하는 경우도 끊는다.
+        long deadline = System.currentTimeMillis() + properties.v2WaitTimeout().toMillis();
+        while (true) {
+            var state = syncService.findState(syncId).orElseThrow(InternalServerErrorException::new);
+            if (state.isTerminal()) {
+                if (state.status() == YoutubeSyncStatus.FAILED) {
+                    YoutubeSyncError error = YoutubeSyncError.fromCode(state.errorCode());
+                    log.warn("YouTube 동기화가 실패로 끝났습니다: syncId={}, code={}", syncId, error);
+                    throw failure(error);
+                }
+                return;
+            }
+            if (System.currentTimeMillis() >= deadline) {
+                log.error("YouTube 동기화 종료 대기 시간을 초과했습니다: syncId={}", syncId);
+                throw new ServiceUnavailableException();
+            }
+            sleepBeforePoll(syncId);
+        }
+    }
+
+    private void sleepBeforePoll(Long syncId) {
+        try {
+            Thread.sleep(properties.v2WaitPollInterval());
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            log.error("YouTube 동기화 종료 대기가 중단되었습니다: syncId={}", syncId, error);
+            throw new InternalServerErrorException();
+        }
+    }
+
+    private ErrorResponseException failure(YoutubeSyncError error) {
+        return switch (error) {
+            case YOUTUBE_REAUTHORIZATION_REQUIRED -> new ConflictException();
+            case YOUTUBE_FETCH_FAILED -> new BadGatewayException();
+            case SYNC_BUSY -> new ServiceUnavailableException();
+            case INTERNAL_ERROR -> new InternalServerErrorException();
+        };
     }
 
     /// 실행 중인 동기화의 heartbeat를 주기적으로 남겨 인스턴스 장애를 다른 인스턴스가 감지하게 한다.
@@ -247,4 +320,7 @@ public class YoutubeSyncCoordinator {
         }
         return List.copyOf(unique.values());
     }
+
+    /// 시작·부착 결과. 거절이면 snapshot은 null이고 created는 false다.
+    private record SyncStart(YoutubeSyncSnapshot snapshot, boolean created, YoutubeSyncError rejection) {}
 }

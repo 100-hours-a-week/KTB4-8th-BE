@@ -22,6 +22,7 @@ spring:
     password: ${DB_PASSWORD:0000}
     driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
   jpa:
+    open-in-view: false
     database-platform: org.hibernate.dialect.${DB_DIALECT:MySQL}Dialect
   security:
     oauth2:

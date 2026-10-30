@@ -117,7 +117,15 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
                     memberId -> {},
                     executor,
                     new YoutubeSyncProperties(
-                            "instance-b", 3, 15_000L, 1_800_000L, 10, Duration.ofMinutes(5), Duration.ofSeconds(60)));
+                            "instance-b",
+                            3,
+                            15_000L,
+                            1_800_000L,
+                            10,
+                            Duration.ofMinutes(5),
+                            Duration.ofSeconds(60),
+                            Duration.ofSeconds(50),
+                            Duration.ofMillis(500)));
 
             otherInstance.connect(member.getId());
 
@@ -258,7 +266,15 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
                 memberId -> {},
                 executor,
                 new YoutubeSyncProperties(
-                        instanceId, 3, 15_000L, 1_800_000L, 10, recentResultWindow, Duration.ofSeconds(1)));
+                        instanceId,
+                        3,
+                        15_000L,
+                        1_800_000L,
+                        10,
+                        recentResultWindow,
+                        Duration.ofSeconds(1),
+                        Duration.ofSeconds(50),
+                        Duration.ofMillis(500)));
     }
 
     private Long latestSyncId(Member member) {
