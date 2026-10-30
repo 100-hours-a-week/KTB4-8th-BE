@@ -35,10 +35,27 @@ public interface OutingWishlist
         join fetch ocp.outingGuide og
         where ocp.member.id = :memberId
            and ocp.id = :outingWishlistEntryId
+           and ocp.type = :type
            and ocp.deleteDatetime is null
     """)
     Optional<OutingWishlistEntry> findByMemberIdAndTypeAndOutingWishlistEntryId(
-            @Param("memberId") Long memberId, @Param("outingWishlistEntryId") Long outingWishlistEntryId);
+            @Param("memberId") Long memberId,
+            @Param("outingWishlistEntryId") Long outingWishlistEntryId,
+            @Param("type") OutingWishlistEntryType type);
+
+    @Query("""
+        select ocp
+        from OutingWishlistEntry ocp
+        where ocp.member.id = :memberId
+           and ocp.outingCourse.id = :outingCourseId
+           and ocp.type = :type
+           and ocp.deleteDatetime is null
+        order by ocp.id
+    """)
+    List<OutingWishlistEntry> findActiveByMemberIdAndOutingCourseId(
+            @Param("memberId") Long memberId,
+            @Param("outingCourseId") Long outingCourseId,
+            @Param("type") OutingWishlistEntryType type);
 
     /// 삭제한 항목도 포함해 회원이 한 번이라도 위시리스트에 담았던 가이드를 찾는다.
     @Query("""

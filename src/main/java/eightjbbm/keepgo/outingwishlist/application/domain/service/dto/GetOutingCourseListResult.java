@@ -19,7 +19,7 @@ public record GetOutingCourseListResult(@Nullable String nextCursor, List<Course
             Long courseId,
             String name,
             String addressSg,
-            Integer durationHours,
+            Integer durationMinutes,
             LocalDate saveDate,
             List<Stop> stops) {}
 
@@ -61,7 +61,7 @@ public record GetOutingCourseListResult(@Nullable String nextCursor, List<Course
                 entry.getId(),
                 course.getName(),
                 course.getLocation(),
-                course.getDurationHours(),
+                course.getDurationMinutes(),
                 entry.getCreateDatetime().atZone(zone).toLocalDate(),
                 List.of(new Stop(items.size(), items)));
     }

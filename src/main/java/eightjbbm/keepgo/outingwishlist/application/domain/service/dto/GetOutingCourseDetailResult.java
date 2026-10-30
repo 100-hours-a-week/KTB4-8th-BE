@@ -10,7 +10,7 @@ import java.util.List;
 
 /// 여행 위시리스트에 추가한 여행 코스 상세 조회 API 서비스 응답 DTO
 ///
-public record GetOutingCourseDetailResult(Long courseId, String name, Integer durationHours, Stop stops) {
+public record GetOutingCourseDetailResult(Long courseId, String name, Integer durationMinutes, Stop stops) {
     public record Stop(Integer count, List<Item> items) {}
 
     public record Item(
@@ -32,7 +32,7 @@ public record GetOutingCourseDetailResult(Long courseId, String name, Integer du
                 .toList();
 
         return new GetOutingCourseDetailResult(
-                entry.getId(), course.getName(), course.getDurationHours(), new Stop(items.size(), items));
+                entry.getId(), course.getName(), course.getDurationMinutes(), new Stop(items.size(), items));
     }
 
     private static Item toItem(OutingStop stop, Instant referenceTime) {
