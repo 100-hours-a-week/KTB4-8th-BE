@@ -9,10 +9,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /// 동기화 행의 트랜잭션 경계. 조정기는 이 서비스 밖에서 실행·SSE를 다룬다.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class YoutubeSyncService {
@@ -84,23 +86,34 @@ public class YoutubeSyncService {
         return YoutubeSyncSnapshot.from(repository.saveAndFlush(YoutubeSync.queued(memberId, instanceId, traceId)));
     }
 
+    /// 실행 인스턴스가 소유한 QUEUED 동기화만 RUNNING으로 바꾼다.
+    ///
+    /// 이미 sweeper가 FAILED로 마감했다면 `SyncFencedException`으로 알린다.
     @Transactional
-    public void start(Long syncId, int fetchedCount, int targetCount, int progress) {
-        repository.findById(syncId).ifPresent(sync -> sync.start(fetchedCount, targetCount, progress));
+    public void start(Long syncId, String instanceId, int fetchedCount, int targetCount, int progress) {
+        int updated = repository.startFenced(syncId, instanceId, fetchedCount, targetCount, progress, Instant.now());
+        if (updated == 0) {
+            throw new SyncFencedException(syncId);
+        }
     }
 
+    /// 실행 인스턴스가 소유한 RUNNING 동기화만 성공으로 마감한다.
+    ///
+    /// 이미 종료된 동기화는 건드리지 않는다.
     @Transactional
-    public void recordBatch(Long syncId, int processedCount, int failedCount, int progress) {
-        repository.recordBatch(syncId, processedCount, failedCount, progress, Instant.now());
+    public void succeed(Long syncId, String instanceId, int progress) {
+        int updated = repository.succeedFenced(syncId, instanceId, progress, Instant.now());
+        if (updated == 0) {
+            log.warn("이미 종료된 YouTube 동기화는 성공으로 마감하지 않습니다: syncId={}", syncId);
+        }
     }
 
+    /// 실행 인스턴스가 소유한 QUEUED·RUNNING 동기화만 실패로 마감한다.
     @Transactional
-    public void succeed(Long syncId, int progress) {
-        repository.findById(syncId).ifPresent(sync -> sync.succeed(progress));
-    }
-
-    @Transactional
-    public void fail(Long syncId, YoutubeSyncError error) {
-        repository.findById(syncId).ifPresent(sync -> sync.fail(error.code()));
+    public void fail(Long syncId, String instanceId, YoutubeSyncError error) {
+        int updated = repository.failFenced(syncId, instanceId, error.code(), Instant.now());
+        if (updated == 0) {
+            log.warn("이미 종료된 YouTube 동기화는 실패로 마감하지 않습니다: syncId={}", syncId);
+        }
     }
 }

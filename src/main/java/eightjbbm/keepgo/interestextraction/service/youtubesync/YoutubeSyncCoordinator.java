@@ -3,10 +3,7 @@ package eightjbbm.keepgo.interestextraction.service.youtubesync;
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.YoutubeSyncProperties;
 import eightjbbm.keepgo.interestextraction.service.MemberLikedVideoReader;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoAnalyzer;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoValidator;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.exception.ConflictException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -16,7 +13,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,13 +29,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Service
 public class YoutubeSyncCoordinator {
 
-    private static final int BATCH_SIZE = 10;
-
     private final YoutubeSyncService syncService;
     private final MemberLikedVideoReader memberLikedVideoReader;
-    private final YoutubeVideoAnalyzer youtubeVideoAnalyzer;
+    private final YoutubeSyncBatchProcessor batchProcessor;
     private final YoutubeConnectionChecker connectionChecker;
-    private final OutingWishlistSyncService outingWishlistSyncService;
     private final Executor executor;
     private final YoutubeSyncProperties properties;
     private final String instanceId;
@@ -50,16 +43,14 @@ public class YoutubeSyncCoordinator {
     public YoutubeSyncCoordinator(
             YoutubeSyncService syncService,
             MemberLikedVideoReader memberLikedVideoReader,
-            YoutubeVideoAnalyzer youtubeVideoAnalyzer,
+            YoutubeSyncBatchProcessor batchProcessor,
             YoutubeConnectionChecker connectionChecker,
-            OutingWishlistSyncService outingWishlistSyncService,
             @Qualifier("youtubeSyncTaskExecutor") Executor executor,
             YoutubeSyncProperties properties) {
         this.syncService = syncService;
         this.memberLikedVideoReader = memberLikedVideoReader;
-        this.youtubeVideoAnalyzer = youtubeVideoAnalyzer;
+        this.batchProcessor = batchProcessor;
         this.connectionChecker = connectionChecker;
-        this.outingWishlistSyncService = outingWishlistSyncService;
         this.executor = executor;
         this.properties = properties;
         this.instanceId = properties.resolvedInstanceId();
@@ -193,7 +184,7 @@ public class YoutubeSyncCoordinator {
             executor.execute(() -> execute(syncId, memberId));
         } catch (RuntimeException error) {
             log.error("YouTube 동기화 실행을 시작하지 못했습니다: syncId={}", syncId, error);
-            syncService.fail(syncId, YoutubeSyncError.INTERNAL_ERROR);
+            syncService.fail(syncId, instanceId, YoutubeSyncError.INTERNAL_ERROR);
         }
     }
 
@@ -204,25 +195,32 @@ public class YoutubeSyncCoordinator {
         } catch (RuntimeException error) {
             YoutubeSyncError failure = fetchError(error);
             logFetchFailure(syncId, failure, error);
-            syncService.fail(syncId, failure);
+            syncService.fail(syncId, instanceId, failure);
             return;
         }
 
         List<Video> targets = distinctById(YoutubeVideoValidator.validate(videos));
-        int batchCount = (targets.size() + BATCH_SIZE - 1) / BATCH_SIZE;
-        syncService.start(syncId, videos.size(), targets.size(), fetchProgress(targets.size()));
-
-        AtomicInteger completedBatches = new AtomicInteger();
         try {
-            List<OutingGuide> guides = youtubeVideoAnalyzer.analyze(syncId, targets, (processedCount, failedCount) -> {
-                int completed = completedBatches.incrementAndGet();
-                recordBatch(syncId, processedCount, failedCount, batchProgress(completed, batchCount));
-            });
-            outingWishlistSyncService.sync(memberId, guides);
-            syncService.succeed(syncId, 100);
+            syncService.start(
+                    syncId,
+                    instanceId,
+                    videos.size(),
+                    targets.size(),
+                    YoutubeSyncProgress.afterFetch(targets.size(), properties.fetchWeight()));
+        } catch (SyncFencedException fenced) {
+            log.warn("YouTube 동기화 시작이 차단되었습니다: syncId={}", syncId);
+            return;
+        }
+
+        try {
+            batchProcessor.process(syncId, instanceId, memberId, targets, properties.fetchWeight());
+            syncService.succeed(syncId, instanceId, 100);
+        } catch (SyncFencedException fenced) {
+            // sweeper가 이미 실패로 마감했다. 추가 쓰기 없이 끝낸다.
+            log.warn("YouTube 동기화 쓰기가 차단되어 중단합니다: syncId={}", syncId);
         } catch (RuntimeException error) {
             log.error("YouTube 동기화 실행 실패: syncId={}", syncId, error);
-            syncService.fail(syncId, YoutubeSyncError.INTERNAL_ERROR);
+            syncService.fail(syncId, instanceId, YoutubeSyncError.INTERNAL_ERROR);
         }
     }
 
@@ -232,27 +230,6 @@ public class YoutubeSyncCoordinator {
         } else {
             log.error("YouTube 동기화 조회 실패: syncId={}", syncId, error);
         }
-    }
-
-    private void recordBatch(Long syncId, int processedCount, int failedCount, int progress) {
-        try {
-            syncService.recordBatch(syncId, processedCount, failedCount, progress);
-        } catch (RuntimeException error) {
-            // 진척도 기록 실패가 분석 결과를 버리지 않게 한다.
-            log.warn("YouTube 동기화 진척도 기록 실패: syncId={}", syncId, error);
-        }
-    }
-
-    private int fetchProgress(int targetCount) {
-        return targetCount == 0 ? 100 : Math.min(100, properties.fetchWeight());
-    }
-
-    private int batchProgress(int completedBatches, int batchCount) {
-        if (batchCount == 0) {
-            return 100;
-        }
-        int remaining = 100 - properties.fetchWeight();
-        return Math.min(100, properties.fetchWeight() + (completedBatches * remaining) / batchCount);
     }
 
     private YoutubeSyncError fetchError(RuntimeException error) {

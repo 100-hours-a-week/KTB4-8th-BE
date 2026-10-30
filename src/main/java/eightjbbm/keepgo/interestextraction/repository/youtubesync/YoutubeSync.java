@@ -68,33 +68,4 @@ public class YoutubeSync {
         sync.updatedAt = sync.createdAt;
         return sync;
     }
-
-    public void start(int fetchedCount, int targetCount, int nextProgress) {
-        this.status = YoutubeSyncStatus.RUNNING;
-        this.videoFetchedCount = fetchedCount;
-        this.videoTargetCount = targetCount;
-        this.videoAnalyzedCount = 0;
-        this.videoFailedCount = 0;
-        this.progress = Math.max(this.progress, nextProgress);
-        touch();
-    }
-
-    public void succeed(int nextProgress) {
-        this.status = YoutubeSyncStatus.SUCCEEDED;
-        this.progress = Math.max(this.progress, nextProgress);
-        this.finishedAt = Instant.now();
-        touch();
-    }
-
-    public void fail(String failureCode) {
-        this.status = YoutubeSyncStatus.FAILED;
-        this.errorCode = failureCode;
-        this.finishedAt = Instant.now();
-        touch();
-    }
-
-    private void touch() {
-        this.eventSeq += 1;
-        this.updatedAt = Instant.now();
-    }
 }

@@ -11,13 +11,12 @@ import eightjbbm.keepgo.interestextraction.YoutubeSyncProperties;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
 import eightjbbm.keepgo.interestextraction.service.MemberLikedVideoReader;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.YoutubeVideoAnalyzer;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeConnectionChecker;
+import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncBatchProcessor;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncCoordinator;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncService;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,8 +63,7 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
     private final ObjectMapper objectMapper;
     private final YoutubeSyncService store;
     private final MemberLikedVideoReader memberLikedVideoReader;
-    private final YoutubeVideoAnalyzer youtubeVideoAnalyzer;
-    private final OutingWishlistSyncService outingWishlistSyncService;
+    private final YoutubeSyncBatchProcessor batchProcessor;
     private final VideoAnalysisManager videoAnalysisManager;
 
     YoutubeSyncMultiInstanceIntegrationTest(
@@ -76,8 +74,7 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
             ObjectMapper objectMapper,
             YoutubeSyncService store,
             MemberLikedVideoReader memberLikedVideoReader,
-            YoutubeVideoAnalyzer youtubeVideoAnalyzer,
-            OutingWishlistSyncService outingWishlistSyncService,
+            YoutubeSyncBatchProcessor batchProcessor,
             VideoAnalysisManager videoAnalysisManager) {
         this.port = port;
         this.accessTokenManager = accessTokenManager;
@@ -86,8 +83,7 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
         this.objectMapper = objectMapper;
         this.store = store;
         this.memberLikedVideoReader = memberLikedVideoReader;
-        this.youtubeVideoAnalyzer = youtubeVideoAnalyzer;
-        this.outingWishlistSyncService = outingWishlistSyncService;
+        this.batchProcessor = batchProcessor;
         this.videoAnalysisManager = videoAnalysisManager;
     }
 
@@ -116,9 +112,8 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
             YoutubeSyncCoordinator otherInstance = new YoutubeSyncCoordinator(
                     store,
                     memberLikedVideoReader,
-                    youtubeVideoAnalyzer,
+                    batchProcessor,
                     memberId -> {},
-                    outingWishlistSyncService,
                     executor,
                     new YoutubeSyncProperties(
                             "instance-b", 3, 15_000L, 1_800_000L, 10, Duration.ofMinutes(5), Duration.ofSeconds(60)));
@@ -178,8 +173,8 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
         Long healthyRunningSyncId = latestSyncId(healthyRunning);
         Long staleRunningSyncId = latestSyncId(staleRunning);
         Long staleQueuedSyncId = latestSyncId(staleQueued);
-        store.start(healthyRunningSyncId, 10, 1, 10);
-        store.start(staleRunningSyncId, 10, 1, 10);
+        store.start(healthyRunningSyncId, "instance-a", 10, 1, 10);
+        store.start(staleRunningSyncId, "instance-b", 10, 1, 10);
 
         videoAnalysisManager.start(healthyQueuedSyncId, List.of("healthy-queued-video"));
         videoAnalysisManager.start(healthyRunningSyncId, List.of("healthy-running-video"));
@@ -258,9 +253,8 @@ class YoutubeSyncMultiInstanceIntegrationTest extends MySqlIntegrationTestSuppor
         return new YoutubeSyncCoordinator(
                 store,
                 memberLikedVideoReader,
-                youtubeVideoAnalyzer,
+                batchProcessor,
                 memberId -> {},
-                outingWishlistSyncService,
                 executor,
                 new YoutubeSyncProperties(
                         instanceId, 3, 15_000L, 1_800_000L, 10, recentResultWindow, Duration.ofSeconds(1)));

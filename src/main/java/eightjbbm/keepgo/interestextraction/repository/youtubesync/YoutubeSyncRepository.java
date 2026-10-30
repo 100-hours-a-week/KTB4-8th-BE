@@ -57,7 +57,30 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
             """, nativeQuery = true)
     int failExpired(Collection<Long> ids, String errorCode);
 
-    /// 배치 완료 콜백은 병렬로 오므로 한 UPDATE로 누적한다.
+    /// 실행 인스턴스가 맡은 QUEUED 행만 RUNNING으로 바꾼다.
+    ///
+    /// heartbeat가 끊겨 sweeper가 이미 FAILED로 마감한 행은 영향받은 행이 0개가 되어,
+    /// 늦게 깨어난 이전 실행자가 동기화를 되살리지 못한다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update YoutubeSync s
+               set s.status = eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.RUNNING,
+                   s.videoFetchedCount = :fetchedCount,
+                   s.videoTargetCount = :targetCount,
+                   s.videoAnalyzedCount = 0,
+                   s.videoFailedCount = 0,
+                   s.progress = case when s.progress < :progress then :progress else s.progress end,
+                   s.eventSeq = s.eventSeq + 1,
+                   s.updatedAt = :now
+             where s.id = :syncId
+               and s.instanceId = :instanceId
+               and s.status = eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.QUEUED
+            """)
+    int startFenced(Long syncId, String instanceId, int fetchedCount, int targetCount, int progress, Instant now);
+
+    /// 배치 결과를 커밋하는 트랜잭션 안에서 진척도를 누적한다.
+    ///
+    /// 실행 인스턴스와 RUNNING 상태를 조건으로 하므로, 영향받은 행이 0개면 호출자가 롤백한다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update YoutubeSync s
@@ -67,6 +90,44 @@ public interface YoutubeSyncRepository extends JpaRepository<YoutubeSync, Long> 
                    s.eventSeq = s.eventSeq + 1,
                    s.updatedAt = :now
              where s.id = :syncId
+               and s.instanceId = :instanceId
+               and s.status = eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.RUNNING
             """)
-    int recordBatch(Long syncId, int processedCount, int failedCount, int progress, Instant now);
+    int recordBatchFenced(
+            Long syncId, String instanceId, int processedCount, int failedCount, int progress, Instant now);
+
+    /// 실행 인스턴스가 소유한 RUNNING 동기화만 성공으로 마감한다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update YoutubeSync s
+               set s.status = eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.SUCCEEDED,
+                   s.progress = case when s.progress < :progress then :progress else s.progress end,
+                   s.finishedAt = :now,
+                   s.eventSeq = s.eventSeq + 1,
+                   s.updatedAt = :now
+             where s.id = :syncId
+               and s.instanceId = :instanceId
+               and s.status = eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.RUNNING
+            """)
+    int succeedFenced(Long syncId, String instanceId, int progress, Instant now);
+
+    /// 실행 인스턴스가 소유한 QUEUED·RUNNING 동기화만 실패로 마감한다.
+    ///
+    /// sweeper가 먼저 FAILED로 마감한 행은 건드리지 않아 오류 코드와 종료 시각을 덮어쓰지 않는다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update YoutubeSync s
+               set s.status = eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.FAILED,
+                   s.errorCode = :errorCode,
+                   s.finishedAt = :now,
+                   s.eventSeq = s.eventSeq + 1,
+                   s.updatedAt = :now
+             where s.id = :syncId
+               and s.instanceId = :instanceId
+               and s.status in (
+                   eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.QUEUED,
+                   eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncStatus.RUNNING
+               )
+            """)
+    int failFenced(Long syncId, String instanceId, String errorCode, Instant now);
 }
