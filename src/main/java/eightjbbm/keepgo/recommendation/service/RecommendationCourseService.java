@@ -67,7 +67,7 @@ public class RecommendationCourseService {
                     if (guide == null || place.travelMinutes() == null) {
                         throw new ServiceUnavailableException();
                     }
-                    return new OutingStop(savedCourse, place.travelMinutes(), index + 1, guide);
+                    return new OutingStop(savedCourse, place.travelMinutes(), index, guide);
                 })
                 .toList();
 

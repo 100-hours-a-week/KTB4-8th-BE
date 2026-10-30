@@ -34,8 +34,8 @@ class RecommendationCourseServiceTest {
             new RecommendationCourseService(courseRepository, stopRepository, guideRepository);
 
     @Test
-    @DisplayName("소요 시간은 분 단위로 저장하고 정류장 순번은 1부터 매긴다")
-    void storesDurationInMinutesAndNumbersStopsFromOne() {
+    @DisplayName("소요 시간은 분 단위로 저장하고 정류장 순번은 0부터 매긴다")
+    void storesDurationInMinutesAndNumbersStopsFromZero() {
         var first = guide(1L);
         var second = guide(2L);
         when(guideRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(first, second));
@@ -47,7 +47,7 @@ class RecommendationCourseServiceTest {
         assertThat(course.getDurationMinutes()).isEqualTo(95);
 
         var stops = capturedStops();
-        assertThat(stops).extracting(stop -> stop.getId().sequence()).containsExactly(1, 2);
+        assertThat(stops).extracting(stop -> stop.getId().sequence()).containsExactly(0, 1);
         assertThat(stops).extracting(OutingStop::getOutingGuide).containsExactly(first, second);
     }
 
@@ -60,7 +60,7 @@ class RecommendationCourseServiceTest {
 
         service.saveCourses(criteria(), data(course(places("1", "1"), 30)));
 
-        assertThat(capturedStops()).extracting(stop -> stop.getId().sequence()).containsExactly(1, 2);
+        assertThat(capturedStops()).extracting(stop -> stop.getId().sequence()).containsExactly(0, 1);
     }
 
     @Test

@@ -21,6 +21,8 @@ public class OutingCourse {
 
     private int recommendationScore;
 
+    // shortcut: 컬럼 이름은 아직 duration_hours다, 후속 마이그레이션에서 duration_minutes로 바꾼다.
+    @Column(name = "duration_hours")
     private int durationMinutes;
 
     private String location;
