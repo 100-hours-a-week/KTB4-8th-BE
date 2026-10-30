@@ -23,11 +23,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.TestPropertySource;
 
@@ -53,7 +55,7 @@ import org.springframework.test.context.TestPropertySource;
 class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
 
     private static final String INSTANCE_ID = "embedding-outbox-instance";
-    private static final AtomicReference<Boolean> FAIL_WISHLIST = new AtomicReference<>(false);
+    private static final AtomicBoolean FAIL_WISHLIST = new AtomicBoolean(false);
 
     private final MemberRepository memberRepository;
     private final YoutubeSyncService syncService;
@@ -65,6 +67,7 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
     private final AiServerService aiServerService;
     private final MeterRegistry meterRegistry;
     private final JdbcTemplate jdbcTemplate;
+    private final Map<String, TaskScheduler> taskSchedulers;
 
     EmbeddingOutboxIntegrationTest(
             MemberRepository memberRepository,
@@ -76,7 +79,8 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
             EmbeddingOutboxProperties properties,
             AiServerService aiServerService,
             MeterRegistry meterRegistry,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            Map<String, TaskScheduler> taskSchedulers) {
         this.memberRepository = memberRepository;
         this.syncService = syncService;
         this.batchWriter = batchWriter;
@@ -87,6 +91,7 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
         this.aiServerService = aiServerService;
         this.meterRegistry = meterRegistry;
         this.jdbcTemplate = jdbcTemplate;
+        this.taskSchedulers = taskSchedulers;
     }
 
     @BeforeEach
@@ -252,6 +257,13 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
         assertThat(outboxStatus()).isEqualTo("PENDING");
         assertThat(outboxAttemptCount()).isEqualTo(2);
         assertThat(outboxLastError()).isNull();
+    }
+
+    @Test
+    @DisplayName("임베딩 전용 스케줄러를 추가해도 다른 작업용 기본 스케줄러가 따로 남는다")
+    void keepsDefaultSchedulerSeparate() {
+        assertThat(taskSchedulers).containsKeys("taskScheduler", "embeddingOutboxTaskScheduler");
+        assertThat(taskSchedulers.get("taskScheduler")).isNotSameAs(taskSchedulers.get("embeddingOutboxTaskScheduler"));
     }
 
     private EmbeddingOutboxPoller otherPoller() {
