@@ -40,14 +40,14 @@ public interface OutingWishlist
     Optional<OutingWishlistEntry> findByMemberIdAndTypeAndOutingWishlistEntryId(
             @Param("memberId") Long memberId, @Param("outingWishlistEntryId") Long outingWishlistEntryId);
 
+    /// 삭제한 항목도 포함해 회원이 한 번이라도 위시리스트에 담았던 가이드를 찾는다.
     @Query("""
-        select og
+        select distinct og
         from OutingWishlistEntry owe
         join owe.outingGuide og
         where owe.member.id = :memberId
             and og in :outingGuides
-            and owe.deleteDatetime is null
     """)
-    List<OutingGuide> findAllWishlistedOutingGuides(
+    List<OutingGuide> findPreviouslyWishlistedGuides(
             @Param("memberId") Long memberId, @Param("outingGuides") List<OutingGuide> outingGuides);
 }
