@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -43,5 +44,21 @@ class YoutubeSyncBatchProcessorTest {
 
         verify(batchWriter).commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
         verify(batchWriter).recordFailed(1L, "instance-a", List.of("v0"), 100);
+    }
+
+    @Test
+    @DisplayName("sweeper가 마감해 중단되면 이미 전송한 배치의 분석 중 기록을 FAILED로 정리한다")
+    void failsInProgressAnalysesWhenFenced() {
+        when(gateway.submitAnalysis(anyLong(), anyList(), any()))
+                .thenReturn(completedFuture(
+                        new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data())));
+        doThrow(new SyncFencedException(1L))
+                .when(batchWriter)
+                .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
+
+        assertThatThrownBy(() -> processor.process(1L, "instance-a", 2L, YoutubeStub.videos("v0"), 10))
+                .isInstanceOf(SyncFencedException.class);
+
+        verify(videoAnalysisManager).failInProgress(1L);
     }
 }

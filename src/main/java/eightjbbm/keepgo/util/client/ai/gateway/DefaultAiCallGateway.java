@@ -7,10 +7,12 @@ import jakarta.annotation.PreDestroy;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -113,6 +115,8 @@ public class DefaultAiCallGateway implements AiCallGateway {
                 cursor = Math.floorMod(cursor, keys.size());
 
                 boolean acquired = false;
+                // 한 바퀴 안에서 이미 꽉 찬 유형은 대기열마다 DB에 다시 묻지 않는다.
+                Set<AiCallType> exhausted = EnumSet.noneOf(AiCallType.class);
                 for (int offset = 0; offset < keys.size() && !acquired; offset++) {
                     int index = (cursor + offset) % keys.size();
                     String key = keys.get(index);
@@ -129,8 +133,12 @@ public class DefaultAiCallGateway implements AiCallGateway {
                         }
                         continue;
                     }
+                    if (exhausted.contains(next.type())) {
+                        continue;
+                    }
                     Optional<String> leased = slots.acquire(next.type(), properties.leaseDuration());
                     if (leased.isEmpty()) {
+                        exhausted.add(next.type());
                         continue;
                     }
                     call = next;
@@ -145,9 +153,6 @@ public class DefaultAiCallGateway implements AiCallGateway {
                 if (!acquired) {
                     return;
                 }
-            }
-            if (call == null || holder == null) {
-                continue;
             }
             execute(call, holder);
         }

@@ -168,7 +168,7 @@ class OutingWishlistServiceTest {
 | 버전 접미사 | `ChatControllerV2`, `ChatServiceV2`, `RecommendationControllerV2/V3`, `InterestExtractionControllerV3`, `InterestExtractionServiceV2/V3`, `YoutubeApiServiceV2`와 관련 DTO |
 | MapStruct | `MemberMapper`, `ChatMapper` 등이 `INSTANCE` 싱글턴으로 사용된다. `InterestExtractionMapper`는 싱글턴 이름도 다르다. |
 | 트랜잭션 | `outingwishlist` 외의 조회 메서드에 `readOnly`가 없다. |
-| 엔티티 생성자 | `Member`, `OAuthAccount`, `Chat`, `VideoAnalysis`, `MemberLikedVideo`, `File`, `OutingGuide`, `OutingPlace`, `OutingEvent`가 public 기본 생성자를 쓴다. |
+| 엔티티 생성자 | `Member`, `OAuthAccount`, `Chat`, `MemberLikedVideo`, `File`, `OutingGuide`, `OutingPlace`, `OutingEvent`가 public 기본 생성자를 쓴다. |
 | fetch 전략 | `Member.profileImage`가 기본값 EAGER인 `@OneToOne`이다. |
 | 시간 필드 | `OutingCourse`, `VideoAnalysis`, `MemberLikedVideo`, `OutingWishlistEntry`가 `createDatetime`/`deleteDatetime`을 쓴다. |
 | 테스트 | 한국어 snake_case 메서드 이름, `@DisplayName` 누락, JUnit `assertEquals` 사용이 섞여 있다. `GoogleApiClientUnitTests.test1` |

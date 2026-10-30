@@ -25,6 +25,11 @@ public record AiCallProperties(
         requirePositive(retryInterval, "retryInterval");
         requirePositive(analysisTimeout, "analysisTimeout");
         requirePositive(connectTimeout, "connectTimeout");
+        // 임대가 HTTP 호출보다 먼저 끝나면 다른 호출이 같은 슬롯을 가져가 상한을 넘는다.
+        if (leaseDuration.compareTo(analysisTimeout.plus(connectTimeout)) <= 0) {
+            throw new IllegalArgumentException(
+                    "leaseDuration은 analysisTimeout + connectTimeout보다 길어야 합니다: " + leaseDuration);
+        }
     }
 
     private static void requirePositive(Duration duration, String name) {

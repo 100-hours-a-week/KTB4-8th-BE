@@ -52,6 +52,16 @@ public class YoutubeSyncBatchProcessor {
         } finally {
             // sweeper가 이미 마감한 동기화라면 아직 전송되지 않은 배치를 시작하지 않는다.
             submitted.forEach(future -> future.cancel(false));
+            // 중간에 끝나면 이미 전송한 배치의 IN_PROGRESS 행을 커밋할 곳이 없다. 정상 종료면 바뀌는 행이 없다.
+            failInProgress(syncId);
+        }
+    }
+
+    private void failInProgress(Long syncId) {
+        try {
+            videoAnalysisManager.failInProgress(syncId);
+        } catch (RuntimeException error) {
+            log.error("남은 분석 중 기록 정리 실패: syncId={}", syncId, error);
         }
     }
 

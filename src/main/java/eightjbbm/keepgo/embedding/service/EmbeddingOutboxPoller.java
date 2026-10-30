@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -103,6 +104,11 @@ public class EmbeddingOutboxPoller {
             aiCallGateway.submitEmbedding(List.of(guide.get())).join();
             outboxService.complete(entry.getGuideId(), attempt);
             embedded.increment();
+            return true;
+        } catch (CompletionException error) {
+            // last_error에 CompletionException이 아닌 실제 AI 호출 실패를 남긴다.
+            RuntimeException cause = error.getCause() instanceof RuntimeException runtime ? runtime : error;
+            handleFailure(entry.getGuideId(), attempt, cause);
             return true;
         } catch (RuntimeException error) {
             handleFailure(entry.getGuideId(), attempt, error);
