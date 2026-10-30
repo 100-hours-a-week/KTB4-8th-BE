@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,8 @@ import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,14 +71,14 @@ class RecommendationCourseServiceTest {
 
         assertThatThrownBy(() -> service.saveCourses(criteria(), data(course(places("99"), 30))))
                 .isInstanceOf(ServiceUnavailableException.class);
-        verify(stopRepository, org.mockito.Mockito.never()).saveAll(any());
+        verify(stopRepository, never()).saveAll(any());
     }
 
     private List<OutingStop> capturedStops() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Iterable<OutingStop>> captor = ArgumentCaptor.forClass(Iterable.class);
         verify(stopRepository).saveAll(captor.capture());
-        var result = new java.util.ArrayList<OutingStop>();
+        var result = new ArrayList<OutingStop>();
         captor.getValue().forEach(result::add);
         return result;
     }
@@ -99,7 +102,7 @@ class RecommendationCourseServiceTest {
     }
 
     private List<RecommendCoursesResponseV2.Place> places(String... placeIds) {
-        return java.util.Arrays.stream(placeIds)
+        return Arrays.stream(placeIds)
                 .map(placeId -> new RecommendCoursesResponseV2.Place(placeId, "장소 " + placeId, 10, null, 30, null))
                 .toList();
     }
