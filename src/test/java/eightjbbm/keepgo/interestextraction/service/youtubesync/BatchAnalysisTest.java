@@ -133,6 +133,28 @@ class BatchAnalysisTest {
     }
 
     @Test
+    @DisplayName("저장 한도보다 긴 AI 오류 코드는 INVALID_AI_RESPONSE로 바꾼다")
+    void replacesTooLongFailureCode() {
+        BatchAnalysis analysis = BatchAnalysis.from(
+                List.of("v0", "v1"),
+                response(
+                        new VideoAnalysisResponse.Result(
+                                "v0",
+                                Status.FAILED,
+                                new VideoAnalysisResponse.Failure("e".repeat(64), null),
+                                List.of()),
+                        new VideoAnalysisResponse.Result(
+                                "v1",
+                                Status.FAILED,
+                                new VideoAnalysisResponse.Failure("e".repeat(65), null),
+                                List.of())));
+
+        assertThat(analysis.videos())
+                .extracting(BatchAnalysis.AnalyzedVideo::failureCode)
+                .containsExactly("e".repeat(64), BatchAnalysis.INVALID_AI_RESPONSE);
+    }
+
+    @Test
     @DisplayName("응답에 없는 영상은 INVALID_AI_RESPONSE로 실패한다")
     void failsMissingVideo() {
         BatchAnalysis analysis = BatchAnalysis.from(

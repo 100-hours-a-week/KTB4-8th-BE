@@ -13,6 +13,8 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @NoArgsConstructor
 public class VideoAnalysis {
+    public static final int MAX_FAILURE_CODE_LENGTH = 64;
+
     @Id
     @GeneratedValue
     private Long id;
@@ -26,7 +28,7 @@ public class VideoAnalysis {
 
     /// 알 수 없는 AI 응답, 저장 불가 후보만 있음 등 실패 원인을 남긴다.
     @Nullable
-    @Column(length = 64)
+    @Column(length = MAX_FAILURE_CODE_LENGTH)
     private String failureCode;
 
     /// 저장하지 않은 후보의 위치와 사유. 분석 이력에서 제외 근거를 확인할 수 있게 한다.
@@ -36,9 +38,6 @@ public class VideoAnalysis {
     private List<ExcludedCandidate> excludedCandidates;
 
     private Instant createDatetime;
-
-    @Nullable
-    private Instant completedAt;
 
     public VideoAnalysis(String videoId) {
         this(videoId, null);
@@ -77,6 +76,5 @@ public class VideoAnalysis {
             throw new IllegalStateException();
         }
         this.status = status;
-        this.completedAt = Instant.now();
     }
 }

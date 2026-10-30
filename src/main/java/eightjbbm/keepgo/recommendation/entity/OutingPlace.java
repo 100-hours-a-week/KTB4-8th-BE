@@ -29,4 +29,9 @@ public class OutingPlace extends OutingGuide {
     public boolean isAvailable(Instant instant) {
         return this.getBusinessSchedule() != null && this.getBusinessSchedule().isAvailable(instant);
     }
+
+    @Override
+    public GuideType guideType() {
+        return GuideType.PLACE;
+    }
 }

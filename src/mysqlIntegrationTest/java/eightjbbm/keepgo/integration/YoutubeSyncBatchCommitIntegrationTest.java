@@ -9,6 +9,7 @@ import eightjbbm.keepgo.integration.sse.SseEvent;
 import eightjbbm.keepgo.integration.sse.SseTestClient;
 import eightjbbm.keepgo.integration.stub.AiServerStub;
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
+import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisStatus;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.BatchAnalysis;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.SyncFencedException;
@@ -20,14 +21,22 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
+import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.recommendation.entity.OutingPlace;
+import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.exception.YoutubeNotConnectedException;
 import java.net.URI;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,13 +58,16 @@ import tools.jackson.databind.ObjectMapper;
             "keepgo.youtube-sync.poll-interval-ms=50",
             "keepgo.youtube-sync.max-concurrent-syncs=3",
             "keepgo.youtube-sync.recent-result-window=2s",
-            "keepgo.youtube-sync.fetch-weight=10"
+            "keepgo.youtube-sync.fetch-weight=10",
+            // 아웃박스 폴러는 별도 티켓의 관찰 대상이므로 이 테스트에서는 돌리지 않는다.
+            "keepgo.embedding-outbox.poll-interval=3600000"
         })
 @DisplayName("YouTube 동기화 배치 커밋 통합 테스트")
 class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport {
 
     private static final YoutubeStub YOUTUBE = new YoutubeStub();
     private static final AtomicReference<String> FAIL_WISHLIST_FOR_VIDEO = new AtomicReference<>();
+    private static final AtomicReference<CountDownLatch> WISHLIST_BARRIER = new AtomicReference<>();
 
     private final int port;
     private final AccessTokenManager accessTokenManager;
@@ -87,6 +99,7 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         AI_STUB.reset();
         YOUTUBE.reset();
         FAIL_WISHLIST_FOR_VIDEO.set(null);
+        WISHLIST_BARRIER.set(null);
 
         jdbcTemplate.update("DELETE FROM youtube_sync");
         jdbcTemplate.update("DELETE FROM video_analysis_result");
@@ -94,6 +107,99 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         jdbcTemplate.update("DELETE FROM outing_collection_private");
         jdbcTemplate.update("DELETE FROM outing_guide");
         jdbcTemplate.update("DELETE FROM member");
+    }
+
+    @AfterEach
+    void dropTemporaryConstraint() {
+        Integer exists = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'outing_guide'
+                  AND index_name = 'uk_guide_identity'
+                """, Integer.class);
+        if (exists != null && exists > 0) {
+            jdbcTemplate.execute("ALTER TABLE outing_guide DROP INDEX uk_guide_identity");
+        }
+    }
+
+    @Test
+    @DisplayName("이름과 주소가 같은 장소와 행사는 서로 다른 가이드로 저장한다")
+    void storesPlaceAndEventSeparately() {
+        createGuideIdentityIndex();
+        Member member = newMember();
+        YoutubeSyncSnapshot sync = syncService.create(member.getId(), "instance-a", "trace-id");
+        syncService.start(sync.id(), "instance-a", 2, 2, 10);
+
+        BatchAnalysis batch = new BatchAnalysis(List.of(
+                new BatchAnalysis.AnalyzedVideo(
+                        "v0", VideoAnalysisStatus.SUCCESS, List.of(place("같은 이름", "서울특별시 종로구 같은로 1"))),
+                new BatchAnalysis.AnalyzedVideo(
+                        "v1", VideoAnalysisStatus.SUCCESS, List.of(event("같은 이름", "서울특별시 종로구 같은로 1")))));
+
+        batchWriter.commit(sync.id(), "instance-a", member.getId(), batch, 100);
+
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("두 동기화가 같은 새 가이드를 동시에 저장해도 한 가이드로 수렴하고 AI 호출은 늘지 않는다")
+    void concurrentSyncsReuseGuideWithoutExtraAiCalls() throws Exception {
+        createGuideIdentityIndex();
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useSharedGuide("동시 가이드", "서울특별시 종로구 동시로 1");
+        Member first = newMember();
+        Member second = newMember();
+        WISHLIST_BARRIER.set(new CountDownLatch(2));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<List<SseEvent>> firstRun = executor.submit(() -> runToSuccess(token(first)));
+            Future<List<SseEvent>> secondRun = executor.submit(() -> runToSuccess(token(second)));
+            firstRun.get(30, TimeUnit.SECONDS);
+            secondRun.get(30, TimeUnit.SECONDS);
+        } finally {
+            WISHLIST_BARRIER.set(null);
+        }
+
+        assertThat(guideCount()).isEqualTo(1);
+        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(2);
+        assertThat(wishlistCount(first)).isEqualTo(1);
+        assertThat(wishlistCount(second)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("충돌 재시도 때 앞선 시도에서 저장하려던 다른 새 가이드도 함께 저장한다")
+    void retrySavesOtherNewGuidesOfRolledBackAttempt() throws Exception {
+        createGuideIdentityIndex();
+        Member first = newMember();
+        Member second = newMember();
+        YoutubeSyncSnapshot firstSync = syncService.create(first.getId(), "instance-a", "trace-a");
+        YoutubeSyncSnapshot secondSync = syncService.create(second.getId(), "instance-b", "trace-b");
+        syncService.start(firstSync.id(), "instance-a", 1, 1, 10);
+        syncService.start(secondSync.id(), "instance-b", 1, 1, 10);
+        BatchAnalysis firstBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "v0", VideoAnalysisStatus.SUCCESS, List.of(place("충돌 가이드", "서울특별시 종로구 충돌로 1")))));
+        BatchAnalysis secondBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "v1",
+                VideoAnalysisStatus.SUCCESS,
+                List.of(place("충돌 가이드", "서울특별시 종로구 충돌로 1"), place("새 가이드", "서울특별시 종로구 새로 1")))));
+        WISHLIST_BARRIER.set(new CountDownLatch(2));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> firstRun = executor.submit(
+                    () -> batchWriter.commit(firstSync.id(), "instance-a", first.getId(), firstBatch, 100));
+            Future<?> secondRun = executor.submit(
+                    () -> batchWriter.commit(secondSync.id(), "instance-b", second.getId(), secondBatch, 100));
+            firstRun.get(30, TimeUnit.SECONDS);
+            secondRun.get(30, TimeUnit.SECONDS);
+        } finally {
+            WISHLIST_BARRIER.set(null);
+        }
+
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(wishlistCount(first)).isEqualTo(1);
+        assertThat(wishlistCount(second)).isEqualTo(2);
     }
 
     @Test
@@ -178,24 +284,6 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("이름과 주소가 같아도 유형이 다르면 서로 다른 가이드로 저장한다")
-    void storesSameNameAndAddressWithDifferentGuideTypes() throws Exception {
-        YOUTUBE.addPage(videos("video-a"));
-        AI_STUB.useGuidesForVideo(
-                "video-a",
-                new AiServerStub.GuideTemplate("같은 이름", "같은 주소", "장소"),
-                new AiServerStub.GuideTemplate("같은 이름", "같은 주소", "이벤트"));
-        Member member = newMember();
-
-        runToSuccess(token(member));
-
-        assertThat(guideCount()).isEqualTo(2);
-        assertThat(guideTypeCount("place")).isEqualTo(1);
-        assertThat(guideTypeCount("event")).isEqualTo(1);
-        assertThat(wishlistCount(member)).isEqualTo(2);
-    }
-
-    @Test
     @DisplayName("저장할 수 없는 후보는 제외하고 유효한 후보와 제외 사유를 남긴다")
     void excludesInvalidCandidatesAndRecordsReasons() throws Exception {
         YOUTUBE.addPage(videos("video-a"));
@@ -224,7 +312,6 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         Member member = newMember();
 
         List<SseEvent> events = runToSuccess(token(member));
-
         assertThat(syncStatus(member)).isEqualTo("SUCCEEDED");
         assertThat(analysisStatus("video-a")).isEqualTo("FAILED");
         assertThat(failureCode("video-a")).isEqualTo("INVALID_GUIDE_DATA");
@@ -297,8 +384,23 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("임베딩 호출이 실패해도 동기화는 성공한다")
-    void ignoresEmbeddingFailure() throws Exception {
+    @DisplayName("동기화 중에는 임베딩을 호출하지 않고 신규 가이드마다 아웃박스 행이 생긴다")
+    void recordsOutboxInsteadOfEmbeddingDuringSync() throws Exception {
+        YOUTUBE.addPage(videos("video-a", "video-b"));
+        Member member = newMember();
+
+        List<SseEvent> events = runToSuccess(token(member));
+
+        assertThat(data(events.getLast()).get("video_failed_count").asInt()).isZero();
+        assertThat(AI_STUB.embeddingRequestCount()).isZero();
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(outboxCount()).isEqualTo(2);
+        assertThat(pendingOutboxCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("임베딩 실패는 동기화 결과에 영향을 주지 않고 아웃박스에 남는다")
+    void leavesEmbeddingRetryToOutbox() throws Exception {
         YOUTUBE.addPage(videos("video-a", "video-b"));
         AI_STUB.failEmbedding(500, "{\"message\":\"failure\"}");
         Member member = newMember();
@@ -308,6 +410,8 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         assertThat(data(events.getLast()).get("video_failed_count").asInt()).isZero();
         assertThat(syncStatus(member)).isEqualTo("SUCCEEDED");
         assertThat(wishlistCount(member)).isEqualTo(2);
+        assertThat(AI_STUB.embeddingRequestCount()).isZero();
+        assertThat(pendingOutboxCount()).isEqualTo(2);
     }
 
     @Test
@@ -410,10 +514,6 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide", Integer.class);
     }
 
-    private int guideTypeCount(String type) {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide WHERE type = ?", Integer.class, type);
-    }
-
     private String analysisStatus(String videoId) {
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM video_analysis WHERE video_id = ? ORDER BY id DESC LIMIT 1", String.class, videoId);
@@ -431,6 +531,15 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                 "SELECT excluded_candidates FROM video_analysis WHERE video_id = ? ORDER BY id DESC LIMIT 1",
                 String.class,
                 videoId));
+    }
+
+    private int outboxCount() {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide_embedding_outbox", Integer.class);
+    }
+
+    private int pendingOutboxCount() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outing_guide_embedding_outbox WHERE status = 'PENDING'", Integer.class);
     }
 
     private int analysisCount() {
@@ -453,6 +562,19 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     private Timestamp analysisCreatedAt(String videoId) {
         return jdbcTemplate.queryForObject(
                 "SELECT create_datetime FROM video_analysis WHERE video_id = ?", Timestamp.class, videoId);
+    }
+
+    /// DB 유일성 제약은 별도 이관 티켓이 적용한다. 이 테스트는 같은 제약을 임시로 걸어 충돌을 재현한다.
+    private void createGuideIdentityIndex() {
+        jdbcTemplate.execute("ALTER TABLE outing_guide ADD UNIQUE KEY uk_guide_identity (type, name, address)");
+    }
+
+    private static OutingPlace place(String name, String address) {
+        return new OutingPlace("카페", name, "설명", "상세", address, new Coordinate(37.5f, 127.0f), null);
+    }
+
+    private static OutingEvent event(String name, String address) {
+        return new OutingEvent("전시", name, "설명", "상세", address, new Coordinate(37.5f, 127.0f), null, null, null);
     }
 
     private void backdateHeartbeat(Long syncId) {
@@ -502,6 +624,21 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                                     .anyMatch(guide -> ("스텁 가이드 " + failingVideo).equals(guide.getName()))) {
                         throw new IllegalStateException("테스트용 위시리스트 오류");
                     }
+
+                    // 두 배치 트랜잭션이 가이드를 저장한 뒤 동시에 커밋하도록 맞춘다.
+                    CountDownLatch barrier = WISHLIST_BARRIER.get();
+                    if (barrier != null) {
+                        barrier.countDown();
+                        try {
+                            if (!barrier.await(5, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("테스트용 위시리스트 배리어 대기 시간 초과");
+                            }
+                        } catch (InterruptedException error) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException("테스트용 위시리스트 배리어 대기가 중단되었습니다", error);
+                        }
+                    }
+
                     super.sync(memberId, analyzedGuides);
                 }
             };

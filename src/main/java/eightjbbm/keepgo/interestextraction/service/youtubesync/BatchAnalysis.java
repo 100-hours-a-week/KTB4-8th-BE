@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.ExcludedCandidate;
+import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisStatus;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
@@ -24,6 +25,10 @@ public record BatchAnalysis(List<AnalyzedVideo> videos) {
             String failureCode,
             List<OutingGuide> guides,
             List<ExcludedCandidate> excludedCandidates) {
+
+        public AnalyzedVideo(String videoId, VideoAnalysisStatus status, List<OutingGuide> guides) {
+            this(videoId, status, null, guides, List.of());
+        }
 
         public boolean succeeded() {
             return status == VideoAnalysisStatus.SUCCESS;
@@ -85,13 +90,7 @@ public record BatchAnalysis(List<AnalyzedVideo> videos) {
         return switch (result.status()) {
             case SUCCESS -> analyzeGuides(videoId, result.guides());
             case NOT_FOUND -> new AnalyzedVideo(videoId, VideoAnalysisStatus.NOT_FOUND, null, List.of(), List.of());
-            case FAILED ->
-                new AnalyzedVideo(
-                        videoId,
-                        VideoAnalysisStatus.FAILED,
-                        result.error() == null ? null : result.error().code(),
-                        List.of(),
-                        List.of());
+            case FAILED -> failedVideo(videoId, failureCodeOf(result.error()));
             case UNKNOWN -> failedVideo(videoId, INVALID_AI_RESPONSE);
         };
     }
@@ -124,6 +123,15 @@ public record BatchAnalysis(List<AnalyzedVideo> videos) {
         }
         return new AnalyzedVideo(
                 videoId, VideoAnalysisStatus.SUCCESS, null, List.copyOf(validGuides), List.copyOf(excluded));
+    }
+
+    /// AI는 오류 코드 길이를 보장하지 않는다. 컬럼보다 긴 코드는 배치 커밋을 깨뜨리므로 그 영상만 계약 위반으로 남긴다.
+    private static String failureCodeOf(VideoAnalysisResponse.Failure error) {
+        if (error == null) {
+            return null;
+        }
+        String code = error.code();
+        return code != null && code.length() > VideoAnalysis.MAX_FAILURE_CODE_LENGTH ? INVALID_AI_RESPONSE : code;
     }
 
     private static AnalyzedVideo failedVideo(String videoId, String failureCode) {

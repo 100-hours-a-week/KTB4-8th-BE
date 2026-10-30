@@ -1,169 +1,70 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
-import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis;
-import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisRepository;
-import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisResult;
-import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisResultRepository;
-import eightjbbm.keepgo.interestextraction.repository.youtubesync.YoutubeSyncRepository;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
-import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistSyncService;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.sql.SQLException;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-/// 배치 하나의 결과를 트랜잭션 하나로 저장한다.
+/// 배치 트랜잭션을 충돌 시 다시 실행한다.
 ///
-/// 가이드 찾기·생성, 분석 이력과 매핑, 위시리스트 반영, 동기화 진척도 갱신을 같은 트랜잭션에
-/// 담는다. 진척도 갱신은 실행 인스턴스와 RUNNING 상태를 조건으로 하므로, heartbeat가 만료된
-/// 이전 실행자의 커밋은 영향받은 행이 0개가 되어 롤백된다.
+/// AI 응답은 이미 메모리에 있으므로 재시도할 때 AI를 다시 호출하지 않는다. 재시도마다
+/// [YoutubeSyncBatchCommitService]가 fencing 조건을 다시 확인한다. 유일성 위반과 교착상태는
+/// 다른 동기화가 같은 가이드를 먼저 저장했거나 행 잠금이 엉킨 경우이므로, 트랜잭션 전체를
+/// 롤백하고 다시 실행하면 기존 가이드를 재사용하거나 잠금을 새로 얻는다.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class YoutubeSyncBatchWriter {
 
-    private final YoutubeSyncRepository syncRepository;
-    private final VideoAnalysisRepository videoAnalysisRepository;
-    private final VideoAnalysisResultRepository videoAnalysisResultRepository;
-    private final OutingGuideRepository outingGuideRepository;
-    private final OutingWishlistSyncService outingWishlistSyncService;
+    /// 최초 실행 1회와 재시도 2회.
+    private static final int MAX_ATTEMPTS = 3;
 
-    /// 배치 결과를 저장하고, 새로 만든 가이드를 돌려준다. 새 가이드만 임베딩 대상이다.
-    @Transactional
-    public List<OutingGuide> commit(Long syncId, String instanceId, Long memberId, BatchAnalysis batch, int progress) {
-        fence(syncId, instanceId, batch.processedCount(), batch.failedCount(), progress);
+    private static final Set<Integer> RETRYABLE_MYSQL_ERRORS = Set.of(1062, 1205, 1213);
 
-        List<OutingGuide> createdGuides = new ArrayList<>();
-        Map<GuideKey, OutingGuide> guidesByKey = resolveGuides(batch.guides(), createdGuides);
+    private final YoutubeSyncBatchCommitService commitService;
 
-        List<VideoAnalysis> analyses =
-                batch.videos().stream().map(video -> analysis(video, syncId)).toList();
-        videoAnalysisRepository.saveAll(analyses);
-
-        Map<String, VideoAnalysis> analysesByVideoId =
-                analyses.stream().collect(Collectors.toMap(VideoAnalysis::getVideoId, Function.identity()));
-        List<VideoAnalysisResult> mappings = mappings(batch, analysesByVideoId, guidesByKey);
-        videoAnalysisResultRepository.saveAll(mappings);
-
-        outingWishlistSyncService.sync(memberId, List.copyOf(guidesByKey.values()));
-        return List.copyOf(createdGuides);
+    /// 배치 결과를 저장한다. 새로 만든 가이드의 임베딩 작업도 같은 트랜잭션에 기록한다.
+    public void commit(Long syncId, String instanceId, Long memberId, BatchAnalysis batch, int progress) {
+        withRetry("commit", () -> commitService.commit(syncId, instanceId, memberId, batch, progress));
     }
 
     /// 커밋에 실패한 배치를 실패 영상으로만 기록한다. 이미 커밋된 배치는 건드리지 않는다.
-    @Transactional
     public void recordFailed(Long syncId, String instanceId, List<String> videoIds, int progress) {
-        fence(syncId, instanceId, videoIds.size(), videoIds.size(), progress);
-
-        List<VideoAnalysis> analyses = videoIds.stream()
-                .distinct()
-                .map(videoId -> {
-                    VideoAnalysis analysis = new VideoAnalysis(videoId, syncId);
-                    analysis.markFailed();
-                    return analysis;
-                })
-                .toList();
-        videoAnalysisRepository.saveAll(analyses);
+        commitService.recordFailed(syncId, instanceId, videoIds, progress);
     }
 
-    private void fence(Long syncId, String instanceId, int processedCount, int failedCount, int progress) {
-        int updated = syncRepository.recordBatchFenced(
-                syncId, instanceId, processedCount, failedCount, progress, Instant.now());
-        if (updated == 0) {
-            throw new SyncFencedException(syncId);
-        }
-    }
-
-    private VideoAnalysis analysis(BatchAnalysis.AnalyzedVideo video, Long syncId) {
-        VideoAnalysis analysis = new VideoAnalysis(video.videoId(), syncId);
-        switch (video.status()) {
-            case SUCCESS -> analysis.markSuccess();
-            case NOT_FOUND -> analysis.markNotFound();
-            case FAILED -> analysis.markFailed(video.failureCode());
-            default -> throw new IllegalArgumentException("지원하지 않는 분석 상태입니다: " + video.status());
-        }
-        if (!video.excludedCandidates().isEmpty()) {
-            analysis.recordExcludedCandidates(video.excludedCandidates());
-        }
-        return analysis;
-    }
-
-    /// 같은 배치 안의 중복 가이드를 하나로 합치고, GuideKey 순서로 찾기·생성을 고정한다.
-    private Map<GuideKey, OutingGuide> resolveGuides(List<OutingGuide> guides, List<OutingGuide> createdGuides) {
-        Map<GuideKey, OutingGuide> unique = new LinkedHashMap<>();
-        for (OutingGuide guide : guides) {
-            unique.putIfAbsent(keyOf(guide), guide);
-        }
-        if (unique.isEmpty()) {
-            return Map.of();
-        }
-
-        var addresses = unique.values().stream()
-                .map(OutingGuide::getAddress)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        Map<GuideKey, OutingGuide> existing = addresses.isEmpty()
-                ? Map.of()
-                : outingGuideRepository.findAllByAddresses(addresses).stream()
-                        .collect(Collectors.toMap(
-                                YoutubeSyncBatchWriter::keyOf, Function.identity(), (first, duplicate) -> first));
-
-        Map<GuideKey, OutingGuide> resolved = new LinkedHashMap<>();
-        for (GuideKey key : sorted(unique.keySet())) {
-            OutingGuide guide = existing.get(key);
-            if (guide == null) {
-                guide = outingGuideRepository.save(unique.get(key));
-                createdGuides.add(guide);
-            }
-            resolved.put(key, guide);
-        }
-        return resolved;
-    }
-
-    private List<VideoAnalysisResult> mappings(
-            BatchAnalysis batch, Map<String, VideoAnalysis> analysesByVideoId, Map<GuideKey, OutingGuide> guidesByKey) {
-        Map<String, Set<GuideKey>> mappedKeysByVideo = new HashMap<>();
-        List<VideoAnalysisResult> mappings = new ArrayList<>();
-
-        for (BatchAnalysis.AnalyzedVideo video : batch.videos()) {
-            VideoAnalysis analysis = analysesByVideoId.get(video.videoId());
-            Set<GuideKey> mappedKeys = mappedKeysByVideo.computeIfAbsent(video.videoId(), key -> new HashSet<>());
-
-            for (OutingGuide guide : video.guides()) {
-                GuideKey key = keyOf(guide);
-                if (mappedKeys.add(key)) {
-                    mappings.add(new VideoAnalysisResult(analysis, guidesByKey.get(key)));
+    private void withRetry(String action, Runnable attempt) {
+        for (int tries = 1; tries <= MAX_ATTEMPTS; tries++) {
+            try {
+                attempt.run();
+                return;
+            } catch (RuntimeException error) {
+                if (!isRetryable(error)) {
+                    throw error;
                 }
+                if (tries == MAX_ATTEMPTS) {
+                    log.error("YouTube 동기화 배치 {} 충돌 재시도를 모두 소진했습니다: attempts={}", action, MAX_ATTEMPTS, error);
+                    throw error;
+                }
+                log.warn("YouTube 동기화 배치 {} 충돌, 재시도합니다: attempt={}", action, tries, error);
             }
         }
-        return mappings;
+        throw new IllegalStateException("배치 커밋 재시도 상태가 올바르지 않습니다");
     }
 
-    private static List<GuideKey> sorted(Set<GuideKey> keys) {
-        return keys.stream()
-                .sorted(Comparator.comparing(GuideKey::type, Comparator.nullsFirst(Comparator.naturalOrder()))
-                        .thenComparing(GuideKey::name, Comparator.nullsFirst(Comparator.naturalOrder()))
-                        .thenComparing(
-                                key -> key.address() == null
-                                        ? null
-                                        : key.address().address(),
-                                Comparator.nullsFirst(Comparator.naturalOrder())))
-                .toList();
-    }
-
-    private static GuideKey keyOf(OutingGuide guide) {
-        return GuideKey.from(guide);
+    /// 유일성 위반, 교착상태, 잠금 대기 시간 초과만 재시도한다.
+    static boolean isRetryable(Throwable error) {
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof PessimisticLockingFailureException) {
+                return true;
+            }
+            if (current instanceof SQLException sql && RETRYABLE_MYSQL_ERRORS.contains(sql.getErrorCode())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

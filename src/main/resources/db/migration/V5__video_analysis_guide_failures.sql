@@ -2,4 +2,3 @@
 -- excluded_candidates는 [{ "index": 0, "reason": "NAME_MISSING" }] 형태의 JSON 배열이다.
 alter table video_analysis add column failure_code varchar(64) null;
 alter table video_analysis add column excluded_candidates json null;
-alter table video_analysis add column completed_at datetime(6) null;

@@ -42,4 +42,9 @@ public class OutingEvent extends OutingGuide {
                 && instant.isAfter(startDatetime)
                 && instant.isBefore(endDatetime);
     }
+
+    @Override
+    public GuideType guideType() {
+        return GuideType.EVENT;
+    }
 }
