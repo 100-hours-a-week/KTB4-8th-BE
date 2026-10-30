@@ -5,9 +5,9 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +25,15 @@ public class OutingWishlistSyncService {
     public void sync(Long memberId, List<OutingGuide> analyzedGuides) {
         if (analyzedGuides.isEmpty()) return;
 
-        Set<OutingGuide> wishlistedGuides =
-                new HashSet<>(outingWishlist.findAllWishlistedOutingGuides(memberId, analyzedGuides));
+        Set<Long> previouslyWishlistedGuideIds =
+                outingWishlist.findPreviouslyWishlistedGuides(memberId, analyzedGuides).stream()
+                        .map(OutingGuide::getId)
+                        .collect(Collectors.toSet());
 
         Member member = memberRepository.getReferenceById(memberId);
         outingWishlist.saveAll(analyzedGuides.stream()
                 .distinct()
-                .filter(guide -> !wishlistedGuides.contains(guide))
+                .filter(guide -> !previouslyWishlistedGuideIds.contains(guide.getId()))
                 .map(guide -> OutingWishlistEntry.from(member, guide))
                 .toList());
     }

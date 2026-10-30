@@ -16,6 +16,7 @@ import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeConnectionChecker;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistService;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import eightjbbm.keepgo.util.exception.YoutubeNotConnectedException;
 import java.net.URI;
@@ -53,24 +54,28 @@ import tools.jackson.databind.ObjectMapper;
 class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
 
     private static final YoutubeStub YOUTUBE = new YoutubeStub();
+    private static final long RECENT_RESULT_WINDOW_MILLIS = 2_200;
 
     private final int port;
     private final AccessTokenManager accessTokenManager;
     private final MemberRepository memberRepository;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final OutingWishlistService outingWishlistService;
 
     YoutubeSyncIntegrationTest(
             @LocalServerPort int port,
             AccessTokenManager accessTokenManager,
             MemberRepository memberRepository,
             JdbcTemplate jdbcTemplate,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            OutingWishlistService outingWishlistService) {
         this.port = port;
         this.accessTokenManager = accessTokenManager;
         this.memberRepository = memberRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.outingWishlistService = outingWishlistService;
     }
 
     @BeforeEach
@@ -210,13 +215,47 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
                 .containsExactly("youtube-sync.accepted", "youtube-sync.success");
         assertThat(syncCount(member)).isEqualTo(1);
 
-        Thread.sleep(2_200);
+        Thread.sleep(RECENT_RESULT_WINDOW_MILLIS);
 
         ReconnectResult renewed = reconnect(token);
         assertThat(renewed.events().get(0).event()).isEqualTo("youtube-sync.accepted");
         assertThat(data(renewed.events().get(0)).get("video_target_count").isNull())
                 .isTrue();
         assertThat(renewed.events()).extracting(SseEvent::event).endsWith("youtube-sync.success");
+        assertThat(syncCount(member)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("삭제한 가이드는 다시 담지 않고, 새 가이드만 추가하며 삭제 이력은 보존한다")
+    void doesNotReAddDeletedGuides() throws Exception {
+        YOUTUBE.addPage(videos("video-a", "video-b"));
+        Member member = newMember();
+        String token = token(member);
+
+        runToSuccess(token);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+        Long deletedEntryId = jdbcTemplate.queryForObject("""
+                SELECT ocp.id
+                FROM outing_collection_private ocp
+                JOIN outing_guide og ON og.id = ocp.guide_id
+                WHERE ocp.member_id = ? AND og.name = ? AND ocp.deleted_at IS NULL
+                """, Long.class, member.getId(), "스텁 가이드 video-a");
+        outingWishlistService.removePlace(member.getId(), deletedEntryId);
+        assertThat(deletedWishlistCount(member)).isEqualTo(1);
+
+        // 같은 영상과 새 영상을 함께 동기화한다.
+        YOUTUBE.reset();
+        YOUTUBE.addPage(videos("video-a", "video-b", "video-c"));
+        Thread.sleep(RECENT_RESULT_WINDOW_MILLIS);
+        List<SseEvent> events = runToSuccess(token);
+
+        assertThat(data(events.get(events.size() - 1))
+                        .get("video_analyzed_count")
+                        .asInt())
+                .isEqualTo(3);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+        assertThat(deletedWishlistCount(member)).isEqualTo(1);
+        assertThat(wishlistHistoryCount(member)).isEqualTo(3);
         assertThat(syncCount(member)).isEqualTo(2);
     }
 
@@ -407,6 +446,18 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
                 "SELECT COUNT(*) FROM outing_collection_private WHERE member_id = ? AND deleted_at IS NULL",
                 Integer.class,
                 member.getId());
+    }
+
+    private int deletedWishlistCount(Member member) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outing_collection_private WHERE member_id = ? AND deleted_at IS NOT NULL",
+                Integer.class,
+                member.getId());
+    }
+
+    private int wishlistHistoryCount(Member member) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outing_collection_private WHERE member_id = ?", Integer.class, member.getId());
     }
 
     private void awaitStatus(Member member, String expected) throws InterruptedException {

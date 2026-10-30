@@ -21,6 +21,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("분석 결과 위시리스트 최신화")
 class OutingWishlistSyncServiceTest {
@@ -30,15 +31,16 @@ class OutingWishlistSyncServiceTest {
     private final OutingWishlistSyncService service = new OutingWishlistSyncService(outingWishlist, memberRepository);
 
     @Test
-    @DisplayName("이미 위시리스트에 있는 가이드는 건너뛰고 새 가이드만 저장한다")
+    @DisplayName("이미 담았거나 삭제한 이력이 있는 가이드는 건너뛰고 한 번도 담지 않은 가이드만 저장한다")
     void savesOnlyNewGuides() {
-        OutingGuide existing = guide("이미 담은 장소");
-        OutingGuide added = guide("새 장소");
-        when(outingWishlist.findAllWishlistedOutingGuides(eq(1L), anyList())).thenReturn(List.of(existing));
+        OutingGuide active = guide("이미 담은 장소", 10L);
+        OutingGuide deleted = guide("삭제한 장소", 11L);
+        OutingGuide added = guide("새 장소", 12L);
+        when(outingWishlist.findPreviouslyWishlistedGuides(eq(1L), anyList())).thenReturn(List.of(active, deleted));
         Member member = mock(Member.class);
         when(memberRepository.getReferenceById(1L)).thenReturn(member);
 
-        service.sync(1L, List.of(existing, added));
+        service.sync(1L, List.of(active, deleted, added));
 
         ArgumentCaptor<List<OutingWishlistEntry>> saved = ArgumentCaptor.captor();
         verify(outingWishlist).saveAll(saved.capture());
@@ -55,7 +57,10 @@ class OutingWishlistSyncServiceTest {
         verifyNoInteractions(memberRepository);
     }
 
-    private OutingGuide guide(String name) {
-        return new OutingPlace("카페", name, "설명", "상세 위치", "서울특별시 성동구 도로명 1", new Coordinate(37.5f, 127.0f), null);
+    private OutingGuide guide(String name, Long id) {
+        OutingGuide guide =
+                new OutingPlace("카페", name, "설명", "상세 위치", "서울특별시 성동구 도로명 1", new Coordinate(37.5f, 127.0f), null);
+        ReflectionTestUtils.setField(guide, "id", id);
+        return guide;
     }
 }
