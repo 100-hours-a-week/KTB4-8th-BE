@@ -47,9 +47,8 @@ public class VideoAnalysisManager {
 
     @Transactional
     public void completeSuccessful(Map<Long, GuideKey> successfulAnalyses, Collection<OutingGuide> persistedGuides) {
-        Map<GuideKey, OutingGuide> guidesByKey = persistedGuides.stream()
-                .collect(Collectors.toMap(
-                        guide -> new GuideKey(guide.getName(), guide.getAddress()), Function.identity()));
+        Map<GuideKey, OutingGuide> guidesByKey =
+                persistedGuides.stream().collect(Collectors.toMap(GuideKey::from, Function.identity()));
 
         List<VideoAnalysisResult> results = videoAnalysisRepository.findAllById(successfulAnalyses.keySet()).stream()
                 .map(analysis -> {
