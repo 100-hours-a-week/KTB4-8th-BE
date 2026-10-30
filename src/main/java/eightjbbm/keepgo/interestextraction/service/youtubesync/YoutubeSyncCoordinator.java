@@ -34,8 +34,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Service
 public class YoutubeSyncCoordinator {
 
-    private static final long WAIT_POLL_MILLIS = 100;
-
     private final YoutubeSyncService syncService;
     private final MemberLikedVideoReader memberLikedVideoReader;
     private final YoutubeSyncBatchProcessor batchProcessor;
@@ -132,8 +130,8 @@ public class YoutubeSyncCoordinator {
     }
 
     private void awaitTerminal(Long syncId) {
-        // 인스턴스는 살아 있고 실행 스레드만 멈추면 heartbeat가 계속 갱신되어 sweeper가 회수하지 못한다.
-        long deadline = System.currentTimeMillis() + properties.emitterTimeoutMs();
+        // 프록시 유휴 타임아웃보다 먼저 끝내고, 실행 스레드만 멈춰 sweeper가 회수하지 못하는 경우도 끊는다.
+        long deadline = System.currentTimeMillis() + properties.v2WaitTimeout().toMillis();
         while (true) {
             var state = syncService.findState(syncId).orElseThrow(InternalServerErrorException::new);
             if (state.isTerminal()) {
@@ -154,7 +152,7 @@ public class YoutubeSyncCoordinator {
 
     private void sleepBeforePoll(Long syncId) {
         try {
-            Thread.sleep(WAIT_POLL_MILLIS);
+            Thread.sleep(properties.v2WaitPollInterval());
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             log.error("YouTube 동기화 종료 대기가 중단되었습니다: syncId={}", syncId, error);

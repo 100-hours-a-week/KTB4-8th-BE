@@ -38,6 +38,8 @@ import org.springframework.test.context.TestPropertySource;
             "keepgo.youtube-sync.max-concurrent-syncs=3",
             "keepgo.youtube-sync.recent-result-window=2s",
             "keepgo.youtube-sync.fetch-weight=10",
+            "keepgo.youtube-sync.v2-wait-timeout=3s",
+            "keepgo.youtube-sync.v2-wait-poll-interval=100ms",
             "keepgo.embedding-outbox.poll-interval-ms=3600000"
         })
 @DisplayName("YouTube V2 동기화 위임 통합 테스트")
@@ -144,6 +146,27 @@ class YoutubeSyncDelegationIntegrationTest extends MySqlIntegrationTestSupport {
         assertThat(response.statusCode()).isEqualTo(409);
         assertThat(syncStatus(member)).isEqualTo("FAILED");
         assertThat(wishlistCount(member)).isZero();
+    }
+
+    @Test
+    @DisplayName("V2 대기 상한을 넘으면 503을 반환하고 동기화는 계속 진행된다")
+    void returnsServiceUnavailableWhenWaitTimesOut() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.setAnalysisDelay(Duration.ofSeconds(5));
+        Member member = newMember();
+
+        HttpResponse<String> response = syncV2(token(member));
+
+        assertThat(response.statusCode()).isEqualTo(503);
+        awaitStatus(member, "SUCCEEDED");
+    }
+
+    private void awaitStatus(Member member, String expected) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 15_000;
+        while (!expected.equals(syncStatus(member)) && System.currentTimeMillis() < deadline) {
+            Thread.sleep(100);
+        }
+        assertThat(syncStatus(member)).isEqualTo(expected);
     }
 
     private HttpResponse<String> syncV2(String token) throws Exception {
