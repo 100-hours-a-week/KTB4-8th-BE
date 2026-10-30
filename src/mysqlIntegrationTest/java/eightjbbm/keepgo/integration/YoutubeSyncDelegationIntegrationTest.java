@@ -132,6 +132,20 @@ class YoutubeSyncDelegationIntegrationTest extends MySqlIntegrationTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("동기화가 재연동 필요로 실패하면 V2 요청은 409를 반환한다")
+    void returnsConflictWhenReauthorizationRequired() throws Exception {
+        YOUTUBE.addPage(videos("video-a")).addPage(videos("video-b"));
+        YOUTUBE.expireTokenAfter(1);
+        Member member = newMember();
+
+        HttpResponse<String> response = syncV2(token(member));
+
+        assertThat(response.statusCode()).isEqualTo(409);
+        assertThat(syncStatus(member)).isEqualTo("FAILED");
+        assertThat(wishlistCount(member)).isZero();
+    }
+
     private HttpResponse<String> syncV2(String token) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(syncV2Uri())
                 .header("Authorization", "Bearer " + token)

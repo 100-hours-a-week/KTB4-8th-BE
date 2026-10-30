@@ -132,24 +132,32 @@ public class YoutubeSyncCoordinator {
     }
 
     private void awaitTerminal(Long syncId) {
+        // 인스턴스는 살아 있고 실행 스레드만 멈추면 heartbeat가 계속 갱신되어 sweeper가 회수하지 못한다.
+        long deadline = System.currentTimeMillis() + properties.emitterTimeoutMs();
         while (true) {
             var state = syncService.findState(syncId).orElseThrow(InternalServerErrorException::new);
             if (state.isTerminal()) {
                 if (state.status() == YoutubeSyncStatus.FAILED) {
-                    throw failure(YoutubeSyncError.fromCode(state.errorCode()));
+                    YoutubeSyncError error = YoutubeSyncError.fromCode(state.errorCode());
+                    log.warn("YouTube 동기화가 실패로 끝났습니다: syncId={}, code={}", syncId, error);
+                    throw failure(error);
                 }
                 return;
             }
-            sleepBeforePoll();
+            if (System.currentTimeMillis() >= deadline) {
+                log.error("YouTube 동기화 종료 대기 시간을 초과했습니다: syncId={}", syncId);
+                throw new ServiceUnavailableException();
+            }
+            sleepBeforePoll(syncId);
         }
     }
 
-    private void sleepBeforePoll() {
+    private void sleepBeforePoll(Long syncId) {
         try {
             Thread.sleep(WAIT_POLL_MILLIS);
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
-            log.warn("YouTube 동기화 종료 대기가 중단되었습니다");
+            log.error("YouTube 동기화 종료 대기가 중단되었습니다: syncId={}", syncId, error);
             throw new InternalServerErrorException();
         }
     }
