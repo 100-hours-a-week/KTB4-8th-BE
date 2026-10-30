@@ -1,11 +1,14 @@
 package eightjbbm.keepgo.util.client.ai.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
@@ -26,7 +29,13 @@ import org.junit.jupiter.api.Test;
 class DefaultAiCallGatewayTest {
 
     private static final AiCallProperties PROPERTIES = new AiCallProperties(
-            3, 1, Duration.ofSeconds(150), Duration.ofMillis(20), Duration.ofSeconds(130), Duration.ofSeconds(5));
+            3,
+            1,
+            Duration.ofSeconds(150),
+            Duration.ofMillis(20),
+            Duration.ofSeconds(130),
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(30));
 
     private final AiServerService ai = mock(AiServerService.class);
     private final AiCallSlotRepository slots = mock(AiCallSlotRepository.class);
@@ -143,8 +152,59 @@ class DefaultAiCallGatewayTest {
         assertThat(gateway.submitAnalysis(2, List.of("b"), () -> {})).isCompletedExceptionally();
     }
 
+    @Test
+    @DisplayName("전체 제한을 넘긴 호출은 실패로 끝내고 전송을 인터럽트한 뒤 슬롯을 반납한다")
+    void failsCallExceedingTotalTimeout() throws Exception {
+        givenSlots(1);
+        CountDownLatch interrupted = new CountDownLatch(1);
+        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+            try {
+                Thread.sleep(5_000);
+            } catch (InterruptedException error) {
+                interrupted.countDown();
+            }
+            return failure();
+        });
+        gateway = startedGateway(new AiCallProperties(
+                1,
+                1,
+                Duration.ofSeconds(150),
+                Duration.ofMillis(20),
+                Duration.ofMillis(200),
+                Duration.ofMillis(100),
+                Duration.ofSeconds(30)));
+
+        CompletableFuture<AnalyzeVideoResponseV2> call = gateway.submitAnalysis(1, List.of("a"), () -> {});
+
+        assertThat(call)
+                .failsWithin(Duration.ofSeconds(2))
+                .withThrowableThat()
+                .havingRootCause()
+                .isInstanceOf(java.util.concurrent.TimeoutException.class);
+        assertThat(interrupted.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(slots, timeout(2_000)).release(any(AiCallType.class), anyString());
+    }
+
+    @Test
+    @DisplayName("임대가 전체 제한보다 짧은 설정은 거부한다")
+    void rejectsLeaseShorterThanTimeout() {
+        assertThatThrownBy(() -> new AiCallProperties(
+                        3,
+                        1,
+                        Duration.ofSeconds(30),
+                        Duration.ofMillis(200),
+                        Duration.ofSeconds(130),
+                        Duration.ofSeconds(5),
+                        Duration.ofSeconds(30)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private DefaultAiCallGateway startedGateway() {
-        DefaultAiCallGateway started = new DefaultAiCallGateway(ai, slots, PROPERTIES);
+        return startedGateway(PROPERTIES);
+    }
+
+    private DefaultAiCallGateway startedGateway(AiCallProperties properties) {
+        DefaultAiCallGateway started = new DefaultAiCallGateway(ai, slots, properties);
         started.start();
         return started;
     }

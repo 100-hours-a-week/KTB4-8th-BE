@@ -20,16 +20,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestConstructor;
-import org.springframework.test.context.TestPropertySource;
 
 /// 같은 MySQL 슬롯 테이블을 쓰는 게이트웨이 두 개로 인스턴스 간 전역 상한과 임대 만료 회수를 검증한다.
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
-@TestPropertySource(properties = "keepgo.ai-call.analysis-timeout=1s")
 @DisplayName("AI 호출 게이트웨이 MySQL 통합 테스트")
 class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
 
     private static final AiCallProperties PROPERTIES = new AiCallProperties(
-            3, 1, Duration.ofSeconds(150), Duration.ofMillis(200), Duration.ofSeconds(130), Duration.ofSeconds(5));
+            3,
+            1,
+            Duration.ofSeconds(150),
+            Duration.ofMillis(200),
+            Duration.ofSeconds(130),
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(30));
 
     private final AiCallSlotRepository slots;
     private final AiServerService aiServerService;
@@ -103,10 +107,16 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     @DisplayName("대기열에서 오래 기다린 배치도 전송 후 타임아웃 안에 응답하면 성공한다")
     void waitingTimeIsNotPartOfHttpTimeout() {
-        // 이 클래스의 읽기 타임아웃은 1초다. 대기(앞 배치 0.7초 x 2)가 더 길어도 마지막 배치는 성공해야 한다.
+        // 전체 제한은 1초다. 대기(앞 배치 0.7초 x 2)가 더 길어도 마지막 배치는 성공해야 한다.
         AI_STUB.setAnalysisDelay(Duration.ofMillis(700));
         DefaultAiCallGateway gateway = gateway(new AiCallProperties(
-                1, 1, Duration.ofSeconds(150), Duration.ofMillis(50), Duration.ofSeconds(130), Duration.ofSeconds(5)));
+                1,
+                1,
+                Duration.ofSeconds(150),
+                Duration.ofMillis(50),
+                Duration.ofSeconds(1),
+                Duration.ofMillis(500),
+                Duration.ofSeconds(30)));
 
         List<CompletableFuture<AnalyzeVideoResponseV2>> calls = new ArrayList<>();
         for (int i = 0; i < 3; i++) {

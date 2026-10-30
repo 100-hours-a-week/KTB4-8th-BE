@@ -5,6 +5,7 @@ import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -19,8 +20,10 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -176,7 +179,7 @@ public class DefaultAiCallGateway implements AiCallGateway {
             try {
                 if (!call.future().isCancelled()) {
                     call.beforeSend().run();
-                    call.future().complete(call.call().get());
+                    call.future().complete(sendWithin(call));
                 }
             } catch (Throwable error) {
                 call.future().completeExceptionally(unwrap(error));
@@ -189,6 +192,19 @@ public class DefaultAiCallGateway implements AiCallGateway {
                 dispatcher.execute(this::dispatchSafely);
             }
         });
+    }
+
+    /// 응답 수신까지 포함한 전체 제한을 건다. 넘으면 전송 스레드를 인터럽트해 HTTP 요청을 취소한다.
+    private <T> T sendWithin(QueuedCall<T> call) throws Exception {
+        Duration timeout = properties.timeout(call.type());
+        Future<T> sending = callers.submit(call.call()::get);
+        try {
+            return sending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException error) {
+            throw new IllegalStateException("AI 호출이 전체 제한 " + timeout + "을 넘었습니다: type=" + call.type(), error);
+        } finally {
+            sending.cancel(true);
+        }
     }
 
     private static Throwable unwrap(Throwable error) {
