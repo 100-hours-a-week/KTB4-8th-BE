@@ -2,8 +2,9 @@ package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
+import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -35,10 +36,10 @@ public class YoutubeSyncBatchProcessor {
         }
 
         BlockingQueue<BatchAnalysis> completed = new LinkedBlockingQueue<>();
-        List<CompletableFuture<AnalyzeVideoResponseV2>> submitted = new ArrayList<>();
+        List<CompletableFuture<VideoAnalysisResponse>> submitted = new ArrayList<>();
         for (List<String> batch : batches) {
-            CompletableFuture<AnalyzeVideoResponseV2> future =
-                    aiCallGateway.submitAnalysis(syncId, batch, () -> videoAnalysisManager.start(syncId, batch));
+            CompletableFuture<VideoAnalysisResponse> future =
+                    aiCallGateway.submitVideoAnalysis(syncId, batch, () -> videoAnalysisManager.start(syncId, batch));
             submitted.add(future);
             future.handle((response, error) -> completed.add(analyze(batch, response, error)));
         }
@@ -66,12 +67,24 @@ public class YoutubeSyncBatchProcessor {
     }
 
     /// AI 호출 실패는 배치 전체를 FAILED로 만들고 예외를 밖으로 던지지 않는다.
-    private BatchAnalysis analyze(List<String> videoIds, AnalyzeVideoResponseV2 response, Throwable error) {
+    ///
+    /// 구조 오류는 `INVALID_AI_RESPONSE`, 그 밖의 전송·HTTP·시간 초과는 해당 오류 종류를
+    /// 분석 이력의 실패 코드로 남긴다. 이전 분석 계약으로 되돌아가는 fallback은 없다.
+    private BatchAnalysis analyze(List<String> videoIds, VideoAnalysisResponse response, Throwable error) {
+        if (error instanceof AiRequestException failure) {
+            log.error("AI 배치 분석 실패: videoCount={}, kind={}", videoIds.size(), failure.kind(), failure);
+            return BatchAnalysis.failed(videoIds, failure.kind().name());
+        }
         if (error != null) {
             log.error("AI 배치 분석 실패: videoCount={}", videoIds.size(), error);
             return BatchAnalysis.failed(videoIds);
         }
-        return BatchAnalysis.from(videoIds, response);
+        try {
+            return BatchAnalysis.from(videoIds, response);
+        } catch (RuntimeException failure) {
+            log.error("AI 배치 분석 실패: videoCount={}", videoIds.size(), failure);
+            return BatchAnalysis.failed(videoIds);
+        }
     }
 
     private BatchAnalysis await(BlockingQueue<BatchAnalysis> completed) {

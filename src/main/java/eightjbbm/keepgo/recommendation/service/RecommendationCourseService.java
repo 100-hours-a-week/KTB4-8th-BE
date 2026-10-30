@@ -8,11 +8,12 @@ import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
-import java.util.ArrayList;
+import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,13 +60,16 @@ public class RecommendationCourseService {
                 course.title(), course.totalDurationMinutes(), matchScore, criteria.getRequestedLocationName(), null);
         var savedCourse = outingCourseRepository.save(outingCourse);
 
-        List<OutingStop> stops = course.places().stream()
-                .map(place -> new OutingStop(
-                        savedCourse,
-                        place.travelMinutes(),
-                        course.places().indexOf(place),
-                        guidesById.get(Long.valueOf(place.placeId()))))
-                .collect(Collectors.toCollection(ArrayList::new));
+        List<OutingStop> stops = IntStream.range(0, course.places().size())
+                .mapToObj(index -> {
+                    var place = course.places().get(index);
+                    var guide = guidesById.get(Long.valueOf(place.placeId()));
+                    if (guide == null || place.travelMinutes() == null) {
+                        throw new ServiceUnavailableException();
+                    }
+                    return new OutingStop(savedCourse, place.travelMinutes(), index, guide);
+                })
+                .toList();
 
         outingStopRepository.saveAll(stops);
         savedCourse.replaceStops(stops);

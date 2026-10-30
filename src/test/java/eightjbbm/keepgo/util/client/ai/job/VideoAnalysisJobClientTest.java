@@ -109,9 +109,7 @@ class VideoAnalysisJobClientTest {
             strings = {
                 "{\"video_url\":\"https://youtube.com/shorts/other\",\"status\":\"not_found\",\"error\":null}",
                 "{\"status\":\"not_found\",\"error\":null}",
-                "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"UNKNOWN\",\"error\":null}",
                 "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"success\",\"error\":null}",
-                "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"success\",\"error\":null,\"place_type\":\"OTHER\"}",
                 "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"not_found\",\"error\":null,\"place_name\":\"잘못된 후보\"}",
                 "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"failed\",\"error\":null}",
                 "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"failed\",\"error\":{\"code\":\"nested\"}}",
@@ -125,6 +123,43 @@ class VideoAnalysisJobClientTest {
                 assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
         assertEquals(1, calls.get());
+    }
+
+    @Test
+    @DisplayName("알 수 없는 상태는 영상 단위 실패로 보존한다")
+    void preservesUnknownStatusForVideoLevelFailure() throws Exception {
+        serve(
+                200,
+                "{\"message\":\"analyze_success\",\"data\":{\"results\":["
+                        + "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"UNKNOWN\",\"error\":null},"
+                        + "{\"video_url\":\"https://youtube.com/shorts/b\",\"status\":\"not_found\",\"error\":null}]}}",
+                null,
+                0);
+        var response = client.analyzeVideo(List.of("a", "b"), Duration.ofSeconds(5));
+
+        assertEquals(
+                VideoAnalysisResponse.Status.UNKNOWN,
+                response.results().getFirst().status());
+        assertEquals(
+                VideoAnalysisResponse.Status.NOT_FOUND,
+                response.results().get(1).status());
+    }
+
+    @Test
+    @DisplayName("알 수 없는 가이드 유형은 영상 단위 실패로 보존한다")
+    void preservesUnknownGuideTypeForVideoLevelFailure() throws Exception {
+        serve(
+                200,
+                "{\"message\":\"analyze_success\",\"data\":{\"results\":["
+                        + "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"success\","
+                        + "\"error\":null,\"place_type\":\"OTHER\"}]}}",
+                null,
+                0);
+        var response = client.analyzeVideo(List.of("a"), Duration.ofSeconds(5));
+
+        assertEquals(
+                VideoAnalysisResponse.GuideType.UNKNOWN,
+                response.results().getFirst().guides().getFirst().type());
     }
 
     @ParameterizedTest

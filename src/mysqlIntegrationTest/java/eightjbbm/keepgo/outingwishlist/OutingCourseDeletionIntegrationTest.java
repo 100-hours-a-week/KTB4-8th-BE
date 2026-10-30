@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.outingwishlist;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import eightjbbm.keepgo.member.entity.Member;
@@ -12,8 +13,11 @@ import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlist
 import eightjbbm.keepgo.outingwishlist.application.domain.service.OutingWishlistService;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.PageTokenCodec;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
+import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.OutingCourseNotFoundException;
+import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
 import eightjbbm.keepgo.recommendation.entity.OutingCourse;
+import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.util.exception.NotFoundException;
@@ -31,6 +35,7 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
 
+@DisplayName("위시리스트 코스 삭제 통합 테스트")
 @EnabledIfEnvironmentVariable(named = "MYSQL_TEST_SERVER_URL", matches = "jdbc:mysql://[^/]+/")
 class OutingCourseDeletionIntegrationTest {
     private SessionFactory factory;
@@ -108,53 +113,52 @@ class OutingCourseDeletionIntegrationTest {
     }
 
     @Test
+    @DisplayName("삭제한 코스는 목록과 상세에서 사라지고 다시 삭제할 수 없다")
     void deletedCourseDisappearsFromListAndDetailAndCannotBeDeletedAgain() {
         var entryId = transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))
                 .addedOutingWishlistEntryId());
-        assertEquals(
-                entryId,
-                transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
+        assertThat(transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
                         .courses()
                         .getFirst()
-                        .courseId());
+                        .courseId())
+                .isEqualTo(entryId);
         transaction(() -> {
             service.removeOutingCourse(memberId, entryId);
             return null;
         });
-        assertTrue(transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
-                .courses()
-                .isEmpty());
-        assertThrows(
-                NotFoundException.class,
-                () -> transaction(
-                        () -> service.getOutingCourseDetail(new GetOutingCourseDetailCommand(memberId, entryId))));
-        assertThrows(
-                OutingCourseNotFoundException.class,
-                () -> transaction(() -> {
+        assertThat(transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
+                        .courses())
+                .isEmpty();
+        assertThatThrownBy(() -> transaction(
+                        () -> service.getOutingCourseDetail(new GetOutingCourseDetailCommand(memberId, entryId))))
+                .isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> transaction(() -> {
                     service.removeOutingCourse(memberId, entryId);
                     return null;
-                }));
+                }))
+                .isInstanceOf(OutingCourseNotFoundException.class);
         // 코스 자체는 보존되므로 다시 위시리스트에 추가할 수 있다.
-        assertNotNull(transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))));
+        assertThat(transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))))
+                .isNotNull();
     }
 
     @Test
+    @DisplayName("다른 회원은 남의 코스 항목을 삭제할 수 없다")
     void anotherMemberCannotDeleteOwnersCourse() {
         var entryId = transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))
                 .addedOutingWishlistEntryId());
-        assertThrows(
-                OutingCourseNotFoundException.class,
-                () -> transaction(() -> {
+        assertThatThrownBy(() -> transaction(() -> {
                     service.removeOutingCourse(otherMemberId, entryId);
                     return null;
-                }));
-        assertEquals(
-                entryId,
-                transaction(() -> service.getOutingCourseDetail(new GetOutingCourseDetailCommand(memberId, entryId)))
-                        .courseId());
+                }))
+                .isInstanceOf(OutingCourseNotFoundException.class);
+        assertThat(transaction(() -> service.getOutingCourseDetail(new GetOutingCourseDetailCommand(memberId, entryId)))
+                        .courseId())
+                .isEqualTo(entryId);
     }
 
     @Test
+    @DisplayName("코스 삭제 API로 장소 항목을 삭제할 수 없다")
     void courseDeletionCannotDeletePlaceEntry() {
         var entryId = transaction(() -> {
             var place = new OutingPlace("공원", "산책 공원", "설명", "", "서울특별시 종로구 세종대로 1", null, null);
@@ -163,16 +167,76 @@ class OutingCourseDeletionIntegrationTest {
             session.persist(entry);
             return entry.getId();
         });
-        assertThrows(
-                OutingCourseNotFoundException.class,
-                () -> transaction(() -> {
+        assertThatThrownBy(() -> transaction(() -> {
                     service.removeOutingCourse(memberId, entryId);
                     return null;
-                }));
-        assertEquals(
-                entryId,
-                transaction(() -> service.getPlaceDetail(new GetPlaceDetailCommand(memberId, entryId)))
-                        .placeId());
+                }))
+                .isInstanceOf(OutingCourseNotFoundException.class);
+        assertThat(transaction(() -> service.getPlaceDetail(new GetPlaceDetailCommand(memberId, entryId)))
+                        .placeId())
+                .isEqualTo(entryId);
+    }
+
+    @Test
+    @DisplayName("장소 삭제 API로 행사 항목을 삭제할 수 없다")
+    void placeDeletionCannotDeleteEventEntry() {
+        var eventEntryId = transaction(() -> {
+            var event = new OutingEvent("행사", "축제", "설명", "", "서울특별시 종로구 세종대로 1", null, null, null, null);
+            session.persist(event);
+            var entry = OutingWishlistEntry.from(session.getReference(Member.class, memberId), event);
+            session.persist(entry);
+            return entry.getId();
+        });
+        assertThatThrownBy(() -> transaction(() -> {
+                    service.removePlace(memberId, eventEntryId);
+                    return null;
+                }))
+                .isInstanceOf(PlaceNotFoundException.class);
+        assertThat(transaction(() -> service.getEventDetail(new GetEventDetailCommand(memberId, eventEntryId))
+                        .eventId()))
+                .isEqualTo(eventEntryId);
+    }
+
+    @Test
+    @DisplayName("행사 삭제 API로 장소 항목을 삭제할 수 없다")
+    void eventDeletionCannotDeletePlaceEntry() {
+        var placeEntryId = transaction(() -> {
+            var place = new OutingPlace("공원", "산책 공원", "설명", "", "서울특별시 종로구 세종대로 1", null, null);
+            session.persist(place);
+            var entry = OutingWishlistEntry.from(session.getReference(Member.class, memberId), place);
+            session.persist(entry);
+            return entry.getId();
+        });
+        assertThatThrownBy(() -> transaction(() -> {
+                    service.removeEvent(memberId, placeEntryId);
+                    return null;
+                }))
+                .isInstanceOf(EventNotFoundException.class);
+        assertThat(transaction(() -> service.getPlaceDetail(new GetPlaceDetailCommand(memberId, placeEntryId)))
+                        .placeId())
+                .isEqualTo(placeEntryId);
+    }
+
+    @Test
+    @DisplayName("없는 코스를 추가하면 404 예외가 난다")
+    void addingMissingCourseReturnsNotFound() {
+        assertThatThrownBy(() ->
+                        transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, 999_999L))))
+                .isInstanceOf(OutingCourseNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("같은 코스를 두 번 추가하면 첫 항목을 재사용한다")
+    void addingSameCourseTwiceReusesTheFirstEntry() {
+        var first = transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))
+                .addedOutingWishlistEntryId());
+        var second = transaction(() -> service.addOutingCourse(new AddOutingCourseCommand(memberId, courseId))
+                .addedOutingWishlistEntryId());
+
+        assertThat(second).isEqualTo(first);
+        assertThat(transaction(() -> service.getOutingCourseList(new GetOutingCourseListCommand(memberId, null, null)))
+                        .courses())
+                .hasSize(1);
     }
 
     private <T> T transaction(Supplier<T> action) {

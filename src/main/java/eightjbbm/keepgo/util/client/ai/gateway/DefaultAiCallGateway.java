@@ -3,6 +3,9 @@ package eightjbbm.keepgo.util.client.ai.gateway;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
+import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
@@ -39,6 +42,7 @@ import org.springframework.stereotype.Service;
 public class DefaultAiCallGateway implements AiCallGateway {
 
     private final AiServerService aiServerService;
+    private final VideoAnalysisJobClient videoAnalysisJobClient;
     private final AiCallSlotRepository slots;
     private final AiCallProperties properties;
 
@@ -65,6 +69,18 @@ public class DefaultAiCallGateway implements AiCallGateway {
         List<String> ids = List.copyOf(videoIds);
         Runnable start = beforeSend == null ? () -> {} : beforeSend;
         return enqueue("sync:" + syncId, AiCallType.ANALYSIS, () -> aiServerService.analyzeVideoV2(ids), start);
+    }
+
+    @Override
+    public CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
+            long syncId, List<String> videoIds, Runnable beforeSend) {
+        List<String> ids = List.copyOf(videoIds);
+        Runnable start = beforeSend == null ? () -> {} : beforeSend;
+        return enqueue(
+                "sync:" + syncId,
+                AiCallType.ANALYSIS,
+                () -> videoAnalysisJobClient.analyzeVideo(ids, properties.analysisTimeout()),
+                start);
     }
 
     @Override
@@ -201,7 +217,7 @@ public class DefaultAiCallGateway implements AiCallGateway {
         try {
             return sending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException error) {
-            throw new IllegalStateException("AI 호출이 전체 제한 " + timeout + "을 넘었습니다: type=" + call.type(), error);
+            throw new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, error);
         } finally {
             sending.cancel(true);
         }

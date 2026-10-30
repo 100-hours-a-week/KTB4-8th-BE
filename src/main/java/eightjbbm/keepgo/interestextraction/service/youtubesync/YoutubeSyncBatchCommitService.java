@@ -106,8 +106,11 @@ public class YoutubeSyncBatchCommitService {
         switch (video.status()) {
             case SUCCESS -> analysis.markSuccess();
             case NOT_FOUND -> analysis.markNotFound();
-            case FAILED -> analysis.markFailed();
+            case FAILED -> analysis.markFailed(video.failureCode());
             default -> throw new IllegalArgumentException("지원하지 않는 분석 상태입니다: " + video.status());
+        }
+        if (!video.excludedCandidates().isEmpty()) {
+            analysis.recordExcludedCandidates(video.excludedCandidates());
         }
         return analysis;
     }

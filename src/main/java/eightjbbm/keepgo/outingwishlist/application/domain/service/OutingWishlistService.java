@@ -9,10 +9,8 @@ import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.OutingCourseNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
-import eightjbbm.keepgo.recommendation.entity.OutingEvent;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
-import eightjbbm.keepgo.util.exception.UnprocessableContentException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,11 +39,9 @@ public class OutingWishlistService {
     @Transactional(readOnly = true)
     public GetPlaceDetailResult getPlaceDetail(GetPlaceDetailCommand command) {
         OutingWishlistEntry wishlistEntry = outingWishlist
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(command.memberId(), command.placeId())
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(
+                        command.memberId(), command.placeId(), OutingWishlistEntryType.PLACE)
                 .orElseThrow(PlaceNotFoundException::new);
-        if (!(wishlistEntry.getOutingGuide() instanceof OutingPlace)) {
-            throw new UnprocessableContentException();
-        }
         return GetPlaceDetailResult.from(wishlistEntry);
     }
 
@@ -67,11 +63,9 @@ public class OutingWishlistService {
     @Transactional(readOnly = true)
     public GetEventDetailResult getEventDetail(GetEventDetailCommand command) {
         OutingWishlistEntry wishlistEntry = outingWishlist
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(command.memberId(), command.eventId())
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(
+                        command.memberId(), command.eventId(), OutingWishlistEntryType.EVENT)
                 .orElseThrow(EventNotFoundException::new);
-        if (!(wishlistEntry.getOutingGuide() instanceof OutingEvent)) {
-            throw new UnprocessableContentException();
-        }
         return GetEventDetailResult.from(wishlistEntry);
     }
 
@@ -100,6 +94,17 @@ public class OutingWishlistService {
 
     @Transactional
     public AddOutingCourseResult addOutingCourse(AddOutingCourseCommand command) {
+        if (!outingCourseRepository.existsById(command.outingCourseId())) {
+            throw new OutingCourseNotFoundException();
+        }
+
+        // shortcut: 동시에 들어온 같은 요청은 DB 제약 없이 막지 못한다, 중복이 실제로 생기면 유니크 제약을 추가한다.
+        List<OutingWishlistEntry> existing = outingWishlist.findActiveByMemberIdAndOutingCourseId(
+                command.memberId(), command.outingCourseId(), OutingWishlistEntryType.OUTING_COURSE);
+        if (!existing.isEmpty()) {
+            return AddOutingCourseResult.from(existing.getFirst().getId());
+        }
+
         var savedOutingWishlistEntry = outingWishlist.save(OutingWishlistEntry.from(
                 memberRepository.getReferenceById(command.memberId()),
                 outingCourseRepository.getReferenceById(command.outingCourseId())));
@@ -109,7 +114,7 @@ public class OutingWishlistService {
     @Transactional
     public void removePlace(Long memberId, Long placeId) {
         var wishlistEntry = outingWishlist
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId)
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId, OutingWishlistEntryType.PLACE)
                 .orElseThrow(PlaceNotFoundException::new);
         wishlistEntry.delete();
         outingWishlist.save(wishlistEntry);
@@ -118,7 +123,7 @@ public class OutingWishlistService {
     @Transactional
     public void removeEvent(Long memberId, Long eventId) {
         var wishlistEntry = outingWishlist
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId)
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId, OutingWishlistEntryType.EVENT)
                 .orElseThrow(EventNotFoundException::new);
         wishlistEntry.delete();
         outingWishlist.save(wishlistEntry);

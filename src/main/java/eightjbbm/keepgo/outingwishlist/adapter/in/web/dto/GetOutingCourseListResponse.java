@@ -11,7 +11,7 @@ public record GetOutingCourseListResponse(@Nullable String nextCursor, List<Cour
             Long courseId,
             String name,
             String addressSg,
-            Integer durationHours,
+            Integer durationMinutes,
             LocalDate saveDate,
             List<Stop> stops) {}
 

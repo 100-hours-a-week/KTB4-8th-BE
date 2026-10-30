@@ -6,10 +6,11 @@ import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallSlotRepository;
 import eightjbbm.keepgo.util.client.ai.gateway.DefaultAiCallGateway;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,13 +38,18 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
 
     private final AiCallSlotRepository slots;
     private final AiServerService aiServerService;
+    private final VideoAnalysisJobClient videoAnalysisJobClient;
     private final JdbcTemplate jdbcTemplate;
     private final List<DefaultAiCallGateway> gateways = new ArrayList<>();
 
     AiCallGatewayIntegrationTest(
-            AiCallSlotRepository slots, AiServerService aiServerService, JdbcTemplate jdbcTemplate) {
+            AiCallSlotRepository slots,
+            AiServerService aiServerService,
+            VideoAnalysisJobClient videoAnalysisJobClient,
+            JdbcTemplate jdbcTemplate) {
         this.slots = slots;
         this.aiServerService = aiServerService;
+        this.videoAnalysisJobClient = videoAnalysisJobClient;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -69,7 +75,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
         List<CompletableFuture<?>> calls = new ArrayList<>();
         for (DefaultAiCallGateway gateway : List.of(first, second)) {
             for (int i = 0; i < 3; i++) {
-                calls.add(gateway.submitAnalysis(i, List.of("v" + i), () -> {}));
+                calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), () -> {}));
             }
         }
 
@@ -88,7 +94,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
                  WHERE slot_type = 'ANALYSIS'
                 """);
 
-        CompletableFuture<?> call = gateway().submitAnalysis(1L, List.of("v0"), () -> {});
+        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), () -> {});
 
         assertThat(call).succeedsWithin(Duration.ofSeconds(5));
     }
@@ -98,7 +104,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
     void doesNotRetryAnalysisOnServerError() {
         AI_STUB.failAnalysis(503, "{\"message\":\"unavailable\"}");
 
-        CompletableFuture<?> call = gateway().submitAnalysis(1L, List.of("v0"), () -> {});
+        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), () -> {});
         call.handle((response, error) -> null).join();
 
         assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
@@ -118,12 +124,12 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
                 Duration.ofMillis(500),
                 Duration.ofSeconds(30)));
 
-        List<CompletableFuture<AnalyzeVideoResponseV2>> calls = new ArrayList<>();
+        List<CompletableFuture<VideoAnalysisResponse>> calls = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            calls.add(gateway.submitAnalysis(i, List.of("v" + i), () -> {}));
+            calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), () -> {}));
         }
 
-        assertThat(calls.getLast().join()).isInstanceOf(AnalyzeVideoResponseV2.Success.class);
+        assertThat(calls.getLast().join().results()).hasSize(1);
     }
 
     @Test
@@ -150,7 +156,8 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     private DefaultAiCallGateway gateway(AiCallProperties properties) {
-        DefaultAiCallGateway gateway = new DefaultAiCallGateway(aiServerService, slots, properties);
+        DefaultAiCallGateway gateway =
+                new DefaultAiCallGateway(aiServerService, videoAnalysisJobClient, slots, properties);
         gateway.start();
         gateways.add(gateway);
         return gateway;

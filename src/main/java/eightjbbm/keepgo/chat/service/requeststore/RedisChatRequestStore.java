@@ -1,6 +1,5 @@
 package eightjbbm.keepgo.chat.service.requeststore;
 
-import java.time.Duration;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,11 +20,11 @@ public class RedisChatRequestStore implements ChatRequestStore {
                 """, Long.class);
 
     private final StringRedisTemplate redis;
-    private static final Duration REQUEST_TTL = Duration.ofMinutes(10);
 
     @Override
     public boolean acquire(Long memberId, String requestId) {
-        return Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key(memberId), requestId, REQUEST_TTL));
+        return Boolean.TRUE.equals(
+                redis.opsForValue().setIfAbsent(key(memberId), requestId, ChatRequestStore.REQUEST_TTL));
     }
 
     @Override

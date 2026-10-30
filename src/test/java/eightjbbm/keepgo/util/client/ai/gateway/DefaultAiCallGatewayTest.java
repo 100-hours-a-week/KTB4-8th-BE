@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -204,7 +205,8 @@ class DefaultAiCallGatewayTest {
     }
 
     private DefaultAiCallGateway startedGateway(AiCallProperties properties) {
-        DefaultAiCallGateway started = new DefaultAiCallGateway(ai, slots, properties);
+        DefaultAiCallGateway started =
+                new DefaultAiCallGateway(ai, mock(VideoAnalysisJobClient.class), slots, properties);
         started.start();
         return started;
     }

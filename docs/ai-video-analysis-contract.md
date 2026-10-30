@@ -30,12 +30,32 @@
 
 ## 응답 검증과 실패 전달
 
-- 모든 요청 영상은 응답에 있어야 하며, 미요청 URL·ID 누락·알 수 없는 상태/유형·필수 구조 위반·JSON 해석 실패는 배치 전체의 `INVALID_AI_RESPONSE`다.
+- 모든 요청 영상은 응답에 있어야 하며, 미요청 URL·ID 누락·ID 중복·필수 구조 위반·JSON 해석 실패는 배치 전체의 `INVALID_AI_RESPONSE`다.
+- 알 수 없는 status나 place_type은 구조 오류로 배치를 깨뜨리지 않고 그 영상만 `FAILED`로 만든다. 같은 영상의 성공 행은 모두 합쳐 하나의 Guide 목록이 된다.
 - 성공 행은 명시적 유형을 가진 후보 한 개를 나타낸다. 해당 영상의 성공 행들을 묶으므로 내부 SUCCESS는 Guide 1개 이상이다. NOT_FOUND/FAILED는 Guide가 없다.
-- FAILED는 비어 있지 않은 실패 문자열을 요구한다. SUCCESS/NOT_FOUND의 error는 null이다. 실패·미발견 행의 후보 값은 null이어야 한다.
+- FAILED는 비어 있지 않은 실패 문자열을 요구한다. AI는 코드 길이를 보장하지 않으므로 64자를 넘는 코드는 그 영상의 `INVALID_AI_RESPONSE`로 기록한다. SUCCESS/NOT_FOUND의 error는 null이다. 실패·미발견 행의 후보 값은 null이어야 한다.
 - 후보 이름·주소·좌표·기간 등의 누락/null은 자동 보정하거나 저장 가능하다고 간주하지 않는다. 계약상 허용된 누락은 후보별 검증에서 판단하도록 보존한다. 날짜 등 제공된 값의 타입/형식 자체가 잘못되면 구조 오류다. 이름·주소·설명·시간대 같은 문자열 필드에 숫자나 불리언이 오면 문자열로 바꾸지 않고 거부한다.
 - HTTP 200 이외의 상태는 `HTTP_ERROR`로 전달한다. JSON이 아닌 오류 본문도 HTTP status와 원문 `Retry-After`를 가리지 않는다. Retry-After의 초·HTTP 날짜 해석과 재시도 결정은 Job 계층에서 수행한다.
 - 전송 장애는 `TRANSPORT_ERROR`, 시간 초과는 `TIMEOUT`, 호출 스레드 중단은 `INTERRUPTED`로 전달하며 원인을 보존한다. 중단 플래그도 보존한다.
+
+## 후보 저장 가능성 검증 (#264)
+
+AI 응답을 받은 뒤 저장 계층은 후보별로 다음을 검사한다. 제외된 후보는 분석 이력의
+`excluded_candidates`에 `{"index": <영상별 순서>, "reason": <사유>}`로 남긴다. 일부만
+제외되면 남은 후보로 `SUCCESS`, 모두 제외되면 `FAILED(INVALID_GUIDE_DATA)`다.
+
+| 제외 사유 | 조건 |
+|---|---|
+| `NAME_MISSING` / `ADDRESS_MISSING` | 이름·주소가 null이거나 공백 |
+| `NAME_TOO_LONG` / `ADDRESS_TOO_LONG` | 이름·주소가 255자 초과 |
+| `TEXT_TOO_LONG` | 분류·설명·상세 위치가 255자 초과 |
+| `INVALID_COORDINATE` | 위도·경도가 없거나 유한하지 않거나 범위를 벗어남 |
+| `EVENT_PERIOD_INVALID` | 행사의 시작일이 종료일보다 늦음 |
+| `UNKNOWN_TYPE` | 장소/행사가 아닌 유형 |
+| `DB_CONSTRAINT_VIOLATION` | 그 밖에 저장 제약을 위반 |
+
+기간·영업시간을 모르는 것은 허용한다. 잘라서 저장하지 않으며, 이전 분석 계약으로
+되돌아가는 fallback도 두지 않는다.
 
 ## 호출 시간과 수명
 

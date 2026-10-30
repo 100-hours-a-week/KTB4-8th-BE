@@ -1,6 +1,6 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
-import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.failedFuture;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -14,8 +14,8 @@ import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
+import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,9 +33,8 @@ class YoutubeSyncBatchProcessorTest {
     @Test
     @DisplayName("재시도가 모두 실패한 배치는 FAILED로 기록한다")
     void recordsBatchFailedWhenRetriesAreExhausted() {
-        when(gateway.submitAnalysis(anyLong(), anyList(), any()))
-                .thenReturn(completedFuture(
-                        new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data())));
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any()))
+                .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
         doThrow(new CannotAcquireLockException("deadlock"))
                 .when(batchWriter)
                 .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
@@ -49,9 +48,8 @@ class YoutubeSyncBatchProcessorTest {
     @Test
     @DisplayName("sweeper가 마감해 중단되면 이미 전송한 배치의 분석 중 기록을 FAILED로 정리한다")
     void failsInProgressAnalysesWhenFenced() {
-        when(gateway.submitAnalysis(anyLong(), anyList(), any()))
-                .thenReturn(completedFuture(
-                        new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data())));
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any()))
+                .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
         doThrow(new SyncFencedException(1L))
                 .when(batchWriter)
                 .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
