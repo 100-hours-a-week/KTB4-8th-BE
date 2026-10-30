@@ -33,7 +33,7 @@ public class OutingWishlistSyncService {
         Member member = memberRepository.getReferenceById(memberId);
         outingWishlist.saveAll(analyzedGuides.stream()
                 .distinct()
-                .filter(guide -> guide.getId() == null || !previouslyWishlistedGuideIds.contains(guide.getId()))
+                .filter(guide -> !previouslyWishlistedGuideIds.contains(guide.getId()))
                 .map(guide -> OutingWishlistEntry.from(member, guide))
                 .toList());
     }
