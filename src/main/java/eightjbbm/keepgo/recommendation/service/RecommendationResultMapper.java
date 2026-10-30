@@ -31,14 +31,14 @@ public class RecommendationResultMapper {
                                 outingCourse.getName(),
                                 String.valueOf(outingCourse.getRecommendationScore()),
                                 outingCourse.getStops().size(),
-                                outingCourse.getDurationHours()))
+                                outingCourse.getDurationMinutes()))
                         .toList(),
                 outingCourses.stream()
                         .map(outingCourse -> new RecommendOutingCourseResultV2.OutingCourseDetail(
                                 outingCourse.getId(),
                                 outingCourse.getName(),
                                 String.valueOf(outingCourse.getRecommendationScore()),
-                                outingCourse.getDurationHours(),
+                                outingCourse.getDurationMinutes(),
                                 outingCourse.getStops().stream()
                                         .map(outingStop -> new RecommendOutingCourseResultV2.OutingCourseStop(
                                                 outingStop.getId().sequence(),

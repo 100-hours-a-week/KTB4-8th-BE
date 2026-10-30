@@ -21,7 +21,7 @@ public class OutingCourse {
 
     private int recommendationScore;
 
-    private int durationHours;
+    private int durationMinutes;
 
     private String location;
 
@@ -33,7 +33,7 @@ public class OutingCourse {
     public OutingCourse(
             String name, int durationMinutes, int recommendationScore, String location, List<OutingStop> stops) {
         this.name = name;
-        this.durationHours = durationMinutes;
+        this.durationMinutes = durationMinutes;
         this.recommendationScore = recommendationScore;
         this.location = location;
         this.stops = stops;
@@ -45,8 +45,12 @@ public class OutingCourse {
     }
 
     public static OutingCourse from(
-            String name, int durationHours, int recommendationScore, String location, List<OutingGuide> outingGuides) {
-        var newCourse = new OutingCourse(name, durationHours, recommendationScore, location, null);
+            String name,
+            int durationMinutes,
+            int recommendationScore,
+            String location,
+            List<OutingGuide> outingGuides) {
+        var newCourse = new OutingCourse(name, durationMinutes, recommendationScore, location, null);
         newCourse.stops = IntStream.range(0, outingGuides.size())
                 .mapToObj(index -> OutingStop.from(newCourse, 0, index + 1, outingGuides.get(index)))
                 .toList();
