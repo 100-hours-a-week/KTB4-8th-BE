@@ -167,7 +167,7 @@ class DefaultYoutubeVideoAnalyzerTest {
     }
 
     private GuideKey key(OutingGuide guide) {
-        return new GuideKey(guide.getName(), guide.getAddress());
+        return GuideKey.from(guide);
     }
 
     private AnalyzeVideoResponseV2.Success response(List<AnalyzeVideoResponseV2.Success.Result> results) {

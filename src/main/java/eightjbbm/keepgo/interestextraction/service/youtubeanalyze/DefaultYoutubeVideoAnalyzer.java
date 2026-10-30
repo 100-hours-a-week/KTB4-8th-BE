@@ -105,7 +105,7 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                     switch (result.status()) {
                         case "success" -> {
                             OutingGuide guide = OutingGuideFactory.createOutingGuide(result);
-                            GuideKey key = new GuideKey(guide.getName(), guide.getAddress());
+                            GuideKey key = GuideKey.from(guide);
 
                             analyzedResults.putIfAbsent(key, guide);
                             successfulAnalyses.put(analysisId, key);
@@ -132,16 +132,14 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                                 .toList())
                         .stream()
                         .collect(Collectors.toMap(
-                                outingGuide -> new GuideKey(outingGuide.getName(), outingGuide.getAddress()),
-                                outingGuide -> outingGuide,
-                                (existing, duplicate) -> existing));
+                                GuideKey::from, outingGuide -> outingGuide, (existing, duplicate) -> existing));
 
         Map<GuideKey, OutingGuide> uniqueGuides = new LinkedHashMap<>();
 
         List<OutingGuide> persistedGuides = new ArrayList<>();
         List<OutingGuide> unembeddedGuides = new ArrayList<>();
         for (OutingGuide guide : analyzedResults) {
-            GuideKey key = new GuideKey(guide.getName(), guide.getAddress());
+            GuideKey key = GuideKey.from(guide);
             if (!uniqueGuides.containsKey(key)) {
                 uniqueGuides.put(key, guide);
                 if (!allByAddresses.containsKey(key)) {
