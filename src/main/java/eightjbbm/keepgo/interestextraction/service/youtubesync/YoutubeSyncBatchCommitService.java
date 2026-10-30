@@ -52,8 +52,10 @@ public class YoutubeSyncBatchCommitService {
         List<OutingGuide> createdGuides = new ArrayList<>();
         Map<GuideKey, OutingGuide> guidesByKey = resolveGuides(batch.guides(), createdGuides);
 
-        List<VideoAnalysis> analyses =
-                batch.videos().stream().map(video -> analysis(video, syncId)).toList();
+        Map<String, VideoAnalysis> previous = existingAnalyses(syncId, batch.videoIds());
+        List<VideoAnalysis> analyses = batch.videos().stream()
+                .map(video -> analysis(video, syncId, previous.get(video.videoId())))
+                .toList();
         videoAnalysisRepository.saveAll(analyses);
 
         Map<String, VideoAnalysis> analysesByVideoId =
@@ -70,15 +72,25 @@ public class YoutubeSyncBatchCommitService {
     public void recordFailed(Long syncId, String instanceId, List<String> videoIds, int progress) {
         fence(syncId, instanceId, videoIds.size(), videoIds.size(), progress);
 
+        Map<String, VideoAnalysis> previous = existingAnalyses(syncId, videoIds);
         List<VideoAnalysis> analyses = videoIds.stream()
                 .distinct()
                 .map(videoId -> {
-                    VideoAnalysis analysis = new VideoAnalysis(videoId, syncId);
+                    VideoAnalysis analysis = previous.getOrDefault(videoId, new VideoAnalysis(videoId, syncId));
                     analysis.markFailed();
                     return analysis;
                 })
                 .toList();
         videoAnalysisRepository.saveAll(analyses);
+    }
+
+    /// 게이트웨이가 전송 직전에 만든 IN_PROGRESS 행을 재사용한다. 없으면 커밋하면서 만든다.
+    private Map<String, VideoAnalysis> existingAnalyses(Long syncId, List<String> videoIds) {
+        if (syncId == null || videoIds.isEmpty()) {
+            return Map.of();
+        }
+        return videoAnalysisRepository.findAllByYoutubeSyncIdAndVideoIdIn(syncId, videoIds).stream()
+                .collect(Collectors.toMap(VideoAnalysis::getVideoId, Function.identity(), (first, duplicate) -> first));
     }
 
     private void fence(Long syncId, String instanceId, int processedCount, int failedCount, int progress) {
@@ -89,8 +101,8 @@ public class YoutubeSyncBatchCommitService {
         }
     }
 
-    private VideoAnalysis analysis(BatchAnalysis.AnalyzedVideo video, Long syncId) {
-        VideoAnalysis analysis = new VideoAnalysis(video.videoId(), syncId);
+    private VideoAnalysis analysis(BatchAnalysis.AnalyzedVideo video, Long syncId, VideoAnalysis existing) {
+        VideoAnalysis analysis = existing == null ? new VideoAnalysis(video.videoId(), syncId) : existing;
         switch (video.status()) {
             case SUCCESS -> analysis.markSuccess();
             case NOT_FOUND -> analysis.markNotFound();

@@ -2,12 +2,13 @@ package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class VideoAnalysis {
     @Id
     @GeneratedValue
@@ -22,6 +23,8 @@ public class VideoAnalysis {
 
     private Instant createDatetime;
 
+    private Instant completedAt;
+
     public VideoAnalysis(String videoId) {
         this(videoId, null);
     }
@@ -34,23 +37,22 @@ public class VideoAnalysis {
     }
 
     public void markSuccess() {
-        if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
-            throw new IllegalStateException();
-        }
-        this.status = VideoAnalysisStatus.SUCCESS;
+        complete(VideoAnalysisStatus.SUCCESS);
     }
 
     public void markNotFound() {
-        if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
-            throw new IllegalStateException();
-        }
-        this.status = VideoAnalysisStatus.NOT_FOUND;
+        complete(VideoAnalysisStatus.NOT_FOUND);
     }
 
     public void markFailed() {
+        complete(VideoAnalysisStatus.FAILED);
+    }
+
+    private void complete(VideoAnalysisStatus status) {
         if (this.status != VideoAnalysisStatus.IN_PROGRESS) {
             throw new IllegalStateException();
         }
-        this.status = VideoAnalysisStatus.FAILED;
+        this.status = status;
+        this.completedAt = Instant.now();
     }
 }

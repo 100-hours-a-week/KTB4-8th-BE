@@ -5,12 +5,15 @@ import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysi
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisStatus;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
-import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
 
-    private final AiServerService aiServerApiService;
+    private static final String SHORTS_PREFIX = "https://youtube.com/shorts/";
+
+    private final AiCallGateway aiCallGateway;
     private final OutingGuideRepository outingGuideRepository;
     private final VideoAnalysisManager videoAnalysisManager;
 
@@ -45,17 +50,30 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
         Map<GuideKey, OutingGuide> analyzedResults = new ConcurrentHashMap<>();
         Map<Long, GuideKey> successfulAnalyses = new ConcurrentHashMap<>();
 
-        try (var executor = Executors.newFixedThreadPool(10)) {
-            List<CompletableFuture<Void>> tasks = new ArrayList<>();
+        long queueId = syncId == null ? -Thread.currentThread().threadId() : syncId;
+        BlockingQueue<BatchOutcome> completed = new LinkedBlockingQueue<>();
+        List<CompletableFuture<?>> submitted = new ArrayList<>();
 
-            for (int i = 0; i < validatedVideoIds.size(); i += 10) {
-                List<String> batch = validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size()));
+        for (int i = 0; i < validatedVideoIds.size(); i += 10) {
+            List<String> batch = List.copyOf(validatedVideoIds.subList(i, Math.min(i + 10, validatedVideoIds.size())));
+            AtomicReference<Map<String, Long>> analysisIds = new AtomicReference<>(Map.of());
+            CompletableFuture<?> future = aiCallGateway
+                    .submitAnalysis(queueId, batch, () -> analysisIds.set(startAnalyses(syncId, batch)))
+                    .handle((response, error) -> completed.add(processBatch(
+                            batch, analysisIds.get(), response, error, analyzedResults, successfulAnalyses, listener)));
+            submitted.add(future);
+        }
 
-                tasks.add(CompletableFuture.runAsync(
-                        () -> analyzeBatch(syncId, batch, analyzedResults, successfulAnalyses, listener), executor));
+        try {
+            Throwable failure = null;
+            for (int i = 0; i < submitted.size(); i++) {
+                failure = await(completed, failure);
             }
-
-            CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).join();
+            if (failure != null) {
+                throw new CompletionException(failure);
+            }
+        } finally {
+            submitted.forEach(future -> future.cancel(false));
         }
 
         List<OutingGuide> analyzedGuides = analyzedResults.values().stream().toList();
@@ -71,18 +89,22 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
         return persistedGuides;
     }
 
-    private void analyzeBatch(
-            Long syncId,
+    private Map<String, Long> startAnalyses(Long syncId, List<String> videoIds) {
+        Map<String, Long> analysisIds =
+                syncId == null ? videoAnalysisManager.start(videoIds) : videoAnalysisManager.start(syncId, videoIds);
+        Map<String, Long> analysisIdsByUrl = new HashMap<>();
+        analysisIds.forEach((videoId, analysisId) -> analysisIdsByUrl.put(SHORTS_PREFIX + videoId, analysisId));
+        return analysisIdsByUrl;
+    }
+
+    private BatchOutcome processBatch(
             List<String> videoIds,
+            Map<String, Long> analysisIdsByUrl,
+            AnalyzeVideoResponseV2 response,
+            Throwable error,
             Map<GuideKey, OutingGuide> analyzedResults,
             Map<Long, GuideKey> successfulAnalyses,
             BatchCompletedListener listener) {
-        Map<String, Long> analysisIdsByUrl = new HashMap<>();
-        Map<String, Long> analysisIds =
-                syncId == null ? videoAnalysisManager.start(videoIds) : videoAnalysisManager.start(syncId, videoIds);
-        analysisIds.forEach(
-                (videoId, analysisId) -> analysisIdsByUrl.put("https://youtube.com/shorts/" + videoId, analysisId));
-
         Map<Long, VideoAnalysisStatus> unsuccessfulAnalyses = new HashMap<>();
         Set<Long> processedIds = new HashSet<>();
 
@@ -92,9 +114,14 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                 .forEach(analysisId -> unsuccessfulAnalyses.put(analysisId, VideoAnalysisStatus.FAILED));
 
         try {
-            var response = aiServerApiService.analyzeVideoV2(videoIds);
+            if (error != null) {
+                log.error("AI 배치 분석 실패: videoCount={}", videoIds.size(), error);
+                return new BatchOutcome(error);
+            }
 
-            if (response instanceof AnalyzeVideoResponseV2.Success success) {
+            if (response instanceof AnalyzeVideoResponseV2.Success success
+                    && success.data() != null
+                    && success.data().results() != null) {
                 for (var result : success.data().results()) {
                     Long analysisId = analysisIdsByUrl.get(result.videoUrl());
 
@@ -117,9 +144,22 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
                     }
                 }
             }
+            return new BatchOutcome(null);
+        } catch (RuntimeException processingError) {
+            return new BatchOutcome(processingError);
         } finally {
             videoAnalysisManager.completeUnsuccessful(unsuccessfulAnalyses);
             listener.batchCompleted(videoIds.size(), unsuccessfulAnalyses.size());
+        }
+    }
+
+    private Throwable await(BlockingQueue<BatchOutcome> completed, Throwable previous) {
+        try {
+            BatchOutcome outcome = completed.take();
+            return previous == null ? outcome.error() : previous;
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("YouTube 동기화 배치 대기가 중단되었습니다", error);
         }
     }
 
@@ -153,9 +193,13 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
         }
 
         for (int i = 0; i < unembeddedGuides.size(); i += 100) {
-            aiServerApiService.embedPlaces(unembeddedGuides.subList(i, Math.min(i + 100, unembeddedGuides.size())));
+            aiCallGateway
+                    .submitEmbedding(unembeddedGuides.subList(i, Math.min(i + 100, unembeddedGuides.size())))
+                    .join();
         }
 
         return persistedGuides;
     }
+
+    private record BatchOutcome(Throwable error) {}
 }

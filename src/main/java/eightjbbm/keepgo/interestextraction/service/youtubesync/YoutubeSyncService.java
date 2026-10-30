@@ -42,7 +42,7 @@ public class YoutubeSyncService {
             return 0;
         }
 
-        videoAnalysisRepository.markFailedBySyncIds(expiredIds);
+        videoAnalysisRepository.markFailedBySyncIds(expiredIds, Instant.now());
         return repository.failExpired(expiredIds, YoutubeSyncError.INTERNAL_ERROR.code());
     }
 

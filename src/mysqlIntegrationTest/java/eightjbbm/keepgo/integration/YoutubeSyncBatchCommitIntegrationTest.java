@@ -304,7 +304,7 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
 
         runToSuccess(token(member));
 
-        assertThat(analysisCreatedAt("v10")).isBefore(analysisCreatedAt("v0"));
+        assertThat(analysisCompletedAt("v10")).isBefore(analysisCompletedAt("v0"));
     }
 
     @Test
@@ -421,9 +421,9 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM video_analysis_result", Integer.class);
     }
 
-    private Timestamp analysisCreatedAt(String videoId) {
+    private Timestamp analysisCompletedAt(String videoId) {
         return jdbcTemplate.queryForObject(
-                "SELECT create_datetime FROM video_analysis WHERE video_id = ?", Timestamp.class, videoId);
+                "SELECT completed_at FROM video_analysis WHERE video_id = ?", Timestamp.class, videoId);
     }
 
     /// DB 유일성 제약은 별도 이관 티켓이 적용한다. 이 테스트는 같은 제약을 임시로 걸어 충돌을 재현한다.

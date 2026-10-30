@@ -18,7 +18,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.util.Coordinate;
-import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -64,7 +64,7 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
     private final OutingGuideRepository outingGuideRepository;
     private final EmbeddingOutboxPoller poller;
     private final EmbeddingOutboxProperties properties;
-    private final AiServerService aiServerService;
+    private final AiCallGateway aiCallGateway;
     private final MeterRegistry meterRegistry;
     private final JdbcTemplate jdbcTemplate;
     private final Map<String, TaskScheduler> taskSchedulers;
@@ -77,7 +77,7 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
             OutingGuideRepository outingGuideRepository,
             EmbeddingOutboxPoller poller,
             EmbeddingOutboxProperties properties,
-            AiServerService aiServerService,
+            AiCallGateway aiCallGateway,
             MeterRegistry meterRegistry,
             JdbcTemplate jdbcTemplate,
             Map<String, TaskScheduler> taskSchedulers) {
@@ -88,7 +88,7 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
         this.outingGuideRepository = outingGuideRepository;
         this.poller = poller;
         this.properties = properties;
-        this.aiServerService = aiServerService;
+        this.aiCallGateway = aiCallGateway;
         this.meterRegistry = meterRegistry;
         this.jdbcTemplate = jdbcTemplate;
         this.taskSchedulers = taskSchedulers;
@@ -268,7 +268,7 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
 
     private EmbeddingOutboxPoller otherPoller() {
         return new EmbeddingOutboxPoller(
-                outboxService, outingGuideRepository, aiServerService, properties, meterRegistry);
+                outboxService, outingGuideRepository, aiCallGateway, properties, meterRegistry);
     }
 
     private Member newMember() {

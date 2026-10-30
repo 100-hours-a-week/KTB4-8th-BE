@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
+import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -11,8 +12,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
-import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,15 +23,18 @@ import org.springframework.dao.CannotAcquireLockException;
 @DisplayName("YouTube 동기화 배치 처리")
 class YoutubeSyncBatchProcessorTest {
 
-    private final AiServerService aiServerService = mock(AiServerService.class);
+    private final AiCallGateway gateway = mock(AiCallGateway.class);
     private final YoutubeSyncBatchWriter batchWriter = mock(YoutubeSyncBatchWriter.class);
-    private final YoutubeSyncBatchProcessor processor = new YoutubeSyncBatchProcessor(aiServerService, batchWriter);
+    private final VideoAnalysisManager videoAnalysisManager = mock(VideoAnalysisManager.class);
+    private final YoutubeSyncBatchProcessor processor =
+            new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager);
 
     @Test
     @DisplayName("재시도가 모두 실패한 배치는 FAILED로 기록한다")
     void recordsBatchFailedWhenRetriesAreExhausted() {
-        when(aiServerService.analyzeVideoV2(anyList()))
-                .thenReturn(new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data()));
+        when(gateway.submitAnalysis(anyLong(), anyList(), any()))
+                .thenReturn(completedFuture(
+                        new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data())));
         doThrow(new CannotAcquireLockException("deadlock"))
                 .when(batchWriter)
                 .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
