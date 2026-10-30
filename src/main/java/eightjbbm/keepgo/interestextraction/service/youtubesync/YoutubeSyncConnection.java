@@ -56,13 +56,21 @@ final class YoutubeSyncConnection {
     }
 
     /// 동기화 행이 종료 상태일 때 성공 또는 오류 이벤트를 보내고 연결을 닫는다.
+    ///
+    /// 폴링이 마지막 배치 커밋을 놓쳤더라도, 종료 직전의 진척도를 먼저 보내 최종 개수를 잃지 않게 한다.
     synchronized void finish(YoutubeSyncSnapshot snapshot) {
-        finish(snapshot, snapshot.eventSeq());
+        if (closed) {
+            return;
+        }
+        if (snapshot.status() == YoutubeSyncStatus.SUCCEEDED) {
+            progressIfChanged(snapshot);
+        }
+        finish(snapshot, lastEventSeq + 1);
     }
 
     /// 이미 종료된 동기화에 새로 붙었을 때 accepted 다음에 보낼 종료 이벤트.
     synchronized void finishAfterAccept(YoutubeSyncSnapshot snapshot) {
-        finish(snapshot, lastEventSeq + 1);
+        finish(snapshot);
     }
 
     /// 동기화 행 없이 요청 자체가 거절될 때의 오류 이벤트.

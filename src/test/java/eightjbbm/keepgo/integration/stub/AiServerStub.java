@@ -6,7 +6,11 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +45,9 @@ public final class AiServerStub implements AutoCloseable {
     private final AtomicReference<Duration> embeddingDelay = new AtomicReference<>(Duration.ZERO);
     private final AtomicReference<StubResponse> analysisResponse = new AtomicReference<>();
     private final AtomicReference<StubResponse> embeddingResponse = new AtomicReference<>();
+    private final Map<String, StubResponse> analysisFailuresByVideo = new ConcurrentHashMap<>();
+    private final Map<String, Duration> analysisDelaysByVideo = new ConcurrentHashMap<>();
+    private final AtomicReference<GuideTemplate> analysisGuide = new AtomicReference<>();
     private volatile HttpServer server;
 
     public synchronized AiServerStub start() {
@@ -91,6 +98,9 @@ public final class AiServerStub implements AutoCloseable {
         embeddingDelay.set(Duration.ZERO);
         analysisResponse.set(null);
         embeddingResponse.set(null);
+        analysisFailuresByVideo.clear();
+        analysisDelaysByVideo.clear();
+        analysisGuide.set(null);
     }
 
     public void setAnalysisDelay(Duration delay) {
@@ -103,6 +113,21 @@ public final class AiServerStub implements AutoCloseable {
 
     public void failAnalysis(int status, String body) {
         analysisResponse.set(new StubResponse(status, body, false));
+    }
+
+    /// 특정 영상이 포함된 분석 배치만 5xx·타임아웃 응답으로 만든다.
+    public void failAnalysisForVideo(String videoId, int status, String body) {
+        analysisFailuresByVideo.put(videoId, new StubResponse(status, body, false));
+    }
+
+    /// 특정 영상이 포함된 분석 배치에만 지연을 준다.
+    public void setAnalysisDelayForVideo(String videoId, Duration delay) {
+        analysisDelaysByVideo.put(videoId, delay);
+    }
+
+    /// 모든 영상에 같은 이름·주소의 가이드를 돌려줘 배치 간 가이드 중복을 재현한다.
+    public void useSharedGuide(String name, String address) {
+        analysisGuide.set(new GuideTemplate(name, address));
     }
 
     public void failEmbedding(int status, String body) {
@@ -172,9 +197,10 @@ public final class AiServerStub implements AutoCloseable {
                 embeddingRequestBodies.add(requestBody);
             }
 
-            sleep(analysis ? analysisDelay.get() : embeddingDelay.get());
+            String targetVideoId = analysis ? targetVideoId(requestBody) : null;
+            sleep(analysis ? delayFor(targetVideoId) : embeddingDelay.get());
 
-            StubResponse response = analysis ? analysisResponse.get() : embeddingResponse.get();
+            StubResponse response = analysis ? responseFor(targetVideoId) : embeddingResponse.get();
             if (response != null && response.closeConnection()) {
                 exchange.close();
                 return;
@@ -182,7 +208,7 @@ public final class AiServerStub implements AutoCloseable {
 
             if (response == null) {
                 response = analysis
-                        ? new StubResponse(200, successfulAnalysis(requestBody), false)
+                        ? new StubResponse(200, successfulAnalysis(requestBody, analysisGuide.get()), false)
                         : new StubResponse(200, "{\"message\":\"ok\"}", false);
             }
 
@@ -201,7 +227,34 @@ public final class AiServerStub implements AutoCloseable {
         }
     }
 
-    private static String successfulAnalysis(String requestBody) {
+    /// 주입한 영상이 이 요청에 들어 있으면 그 영상 ID를 돌려준다.
+    private String targetVideoId(String requestBody) {
+        Set<String> videoIds = new HashSet<>();
+        videoIds.addAll(analysisFailuresByVideo.keySet());
+        videoIds.addAll(analysisDelaysByVideo.keySet());
+        for (String videoId : videoIds) {
+            if (requestBody.contains("shorts/" + videoId + "\"")) {
+                return videoId;
+            }
+        }
+        return null;
+    }
+
+    private Duration delayFor(String videoId) {
+        if (videoId == null) {
+            return analysisDelay.get();
+        }
+        return analysisDelaysByVideo.getOrDefault(videoId, analysisDelay.get());
+    }
+
+    private StubResponse responseFor(String videoId) {
+        if (videoId == null) {
+            return analysisResponse.get();
+        }
+        return analysisFailuresByVideo.getOrDefault(videoId, analysisResponse.get());
+    }
+
+    private static String successfulAnalysis(String requestBody, GuideTemplate template) {
         List<String> urls = VIDEO_URL
                 .matcher(requestBody)
                 .results()
@@ -211,9 +264,11 @@ public final class AiServerStub implements AutoCloseable {
                 .map(url -> {
                     Matcher idMatcher = VIDEO_ID.matcher(url);
                     String id = idMatcher.find() ? idMatcher.group(1) : url;
+                    String name = template == null ? "스텁 가이드 " + id : template.name();
+                    String address = template == null ? "서울특별시 종로구 스텁로 " + id : template.address();
                     return """
-                            {"video_url":"%s","status":"success","error":null,"place_name":"스텁 가이드 %s","address":"서울특별시 종로구 스텁로 %s","location_detail":"스텁 상세","category":"장소","business_hours":null,"event_start_date":null,"event_end_date":null,"event_period_unresolved":false,"lat":37.5,"lng":127.0,"confidence":0.9,"summary":"스텁 설명"}
-                            """.formatted(url, id, id);
+                            {"video_url":"%s","status":"success","error":null,"place_name":"%s","address":"%s","location_detail":"스텁 상세","category":"장소","business_hours":null,"event_start_date":null,"event_end_date":null,"event_period_unresolved":false,"lat":37.5,"lng":127.0,"confidence":0.9,"summary":"스텁 설명"}
+                            """.formatted(url, name, address);
                 })
                 .toList();
         return "{\"message\":\"ok\",\"data\":{\"results\":[" + String.join(",", results) + "]}}";
@@ -254,4 +309,6 @@ public final class AiServerStub implements AutoCloseable {
     }
 
     private record StubResponse(int status, String body, boolean closeConnection) {}
+
+    private record GuideTemplate(String name, String address) {}
 }
