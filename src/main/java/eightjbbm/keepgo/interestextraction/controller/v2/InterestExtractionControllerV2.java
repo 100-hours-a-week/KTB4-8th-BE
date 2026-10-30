@@ -4,6 +4,7 @@ import eightjbbm.keepgo.interestextraction.service.GetConnectedServiceListComman
 import eightjbbm.keepgo.interestextraction.service.GetYoutubeConnectionCommand;
 import eightjbbm.keepgo.interestextraction.service.UnlinkYoutubeAccountCommand;
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.InterestExtractionServiceV2;
+import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncCoordinator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class InterestExtractionControllerV2 {
     private final InterestExtractionServiceV2 interestExtractionServiceV2;
+    private final YoutubeSyncCoordinator youtubeSyncCoordinator;
 
     @PostMapping("/api/v2/member/youtube-sync")
     public ResponseEntity<Void> syncWishlistFromYoutube(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        interestExtractionServiceV2.syncWishlistFromYoutube(memberId);
+        youtubeSyncCoordinator.syncAndWait(memberId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 

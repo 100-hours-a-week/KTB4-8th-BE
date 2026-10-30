@@ -26,4 +26,16 @@ public enum YoutubeSyncError {
     public String code() {
         return name();
     }
+
+    /// 저장된 코드를 읽는다. 알 수 없거나 비어 있으면 내부 오류로 본다.
+    public static YoutubeSyncError fromCode(String code) {
+        if (code == null) {
+            return INTERNAL_ERROR;
+        }
+        try {
+            return valueOf(code);
+        } catch (IllegalArgumentException error) {
+            return INTERNAL_ERROR;
+        }
+    }
 }
