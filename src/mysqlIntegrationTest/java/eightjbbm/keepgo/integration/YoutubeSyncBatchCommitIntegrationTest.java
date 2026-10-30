@@ -364,7 +364,7 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("알 수 없는 가이드 유형은 그 영상만 실패시키고 같은 배치의 다른 영상은 저장한다")
+    @DisplayName("알 수 없는 가이드 유형이 섞인 영상은 정상 가이드까지 실패시키고 같은 배치의 다른 영상은 저장한다")
     void failsOnlyUnknownGuideTypeVideo() throws Exception {
         YOUTUBE.addPage(videos("v0", "v1"));
         AI_STUB.failAnalysisForVideo(
@@ -372,8 +372,11 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                 200,
                 "{\"message\":\"analyze_success\",\"data\":{\"results\":["
                         + "{\"video_url\":\"https://youtube.com/shorts/v0\",\"status\":\"success\",\"error\":null,"
+                        + "\"place_type\":\"장소\",\"place_name\":\"같은 영상의 정상 장소\","
+                        + "\"address\":\"서울특별시 종로구 같은로 1\",\"lat\":37.6,\"lng\":127.1},"
+                        + "{\"video_url\":\"https://youtube.com/shorts/v0\",\"status\":\"success\",\"error\":null,"
                         + "\"place_type\":\"OTHER\",\"place_name\":\"알 수 없는 유형\","
-                        + "\"address\":\"서울특별시 종로구 기타로 1\"},"
+                        + "\"address\":\"서울특별시 종로구 기타로 1\",\"lat\":37.7,\"lng\":127.2},"
                         + "{\"video_url\":\"https://youtube.com/shorts/v1\",\"status\":\"success\",\"error\":null,"
                         + "\"place_type\":\"장소\",\"place_name\":\"정상 장소\","
                         + "\"address\":\"서울특별시 종로구 정상로 1\",\"lat\":37.5,\"lng\":127.0}]}}");
