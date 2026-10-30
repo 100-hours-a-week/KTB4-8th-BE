@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
 import com.google.api.services.youtube.model.Video;
-import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,26 +73,13 @@ public class YoutubeSyncBatchProcessor {
 
     private void commit(Long syncId, String instanceId, Long memberId, BatchAnalysis analysis, int progress) {
         try {
-            List<OutingGuide> createdGuides = batchWriter.commit(syncId, instanceId, memberId, analysis, progress);
-            embed(createdGuides);
+            batchWriter.commit(syncId, instanceId, memberId, analysis, progress);
         } catch (SyncFencedException fenced) {
             // sweeper가 이미 실패로 마감한 동기화다. 남은 배치를 더 쓰지 않는다.
             throw fenced;
         } catch (RuntimeException error) {
             log.error("YouTube 동기화 배치 커밋 실패: syncId={}, videoCount={}", syncId, analysis.processedCount(), error);
             batchWriter.recordFailed(syncId, instanceId, analysis.videoIds(), progress);
-        }
-    }
-
-    /// 임베딩은 배치 커밋 뒤 트랜잭션 밖에서 호출한다. 실패해도 분석 결과에는 영향을 주지 않는다.
-    private void embed(List<OutingGuide> createdGuides) {
-        if (createdGuides.isEmpty()) {
-            return;
-        }
-        try {
-            aiServerService.embedPlaces(createdGuides);
-        } catch (RuntimeException error) {
-            log.warn("YouTube 동기화 임베딩 호출 실패(무시): guideCount={}", createdGuides.size(), error);
         }
     }
 

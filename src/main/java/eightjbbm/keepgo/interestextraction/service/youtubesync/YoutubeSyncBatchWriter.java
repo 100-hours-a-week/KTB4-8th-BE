@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
+import eightjbbm.keepgo.embedding.service.EmbeddingOutboxService;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysis;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisRepository;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisResult;
@@ -39,10 +40,11 @@ public class YoutubeSyncBatchWriter {
     private final VideoAnalysisResultRepository videoAnalysisResultRepository;
     private final OutingGuideRepository outingGuideRepository;
     private final OutingWishlistSyncService outingWishlistSyncService;
+    private final EmbeddingOutboxService embeddingOutboxService;
 
-    /// 배치 결과를 저장하고, 새로 만든 가이드를 돌려준다. 새 가이드만 임베딩 대상이다.
+    /// 배치 결과를 저장한다. 새로 만든 가이드의 임베딩 작업도 같은 트랜잭션에 기록한다.
     @Transactional
-    public List<OutingGuide> commit(Long syncId, String instanceId, Long memberId, BatchAnalysis batch, int progress) {
+    public void commit(Long syncId, String instanceId, Long memberId, BatchAnalysis batch, int progress) {
         fence(syncId, instanceId, batch.processedCount(), batch.failedCount(), progress);
 
         List<OutingGuide> createdGuides = new ArrayList<>();
@@ -58,7 +60,7 @@ public class YoutubeSyncBatchWriter {
         videoAnalysisResultRepository.saveAll(mappings);
 
         outingWishlistSyncService.sync(memberId, List.copyOf(guidesByKey.values()));
-        return List.copyOf(createdGuides);
+        embeddingOutboxService.enqueue(createdGuides);
     }
 
     /// 커밋에 실패한 배치를 실패 영상으로만 기록한다. 이미 커밋된 배치는 건드리지 않는다.
