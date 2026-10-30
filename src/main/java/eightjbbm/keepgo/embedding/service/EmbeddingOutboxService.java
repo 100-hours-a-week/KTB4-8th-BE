@@ -6,6 +6,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /// 임베딩 아웃박스 행을 기록하고 상태를 전이하는 트랜잭션 경계.
@@ -19,7 +20,8 @@ public class EmbeddingOutboxService {
 
     /// 신규 가이드의 임베딩 작업을 호출자의 트랜잭션에 함께 기록한다.
     ///
-    /// 배치 커밋이 롤백되면 아웃박스 행도 함께 사라진다.
+    /// 배치 커밋이 롤백되면 아웃박스 행도 함께 사라진다. 호출자 트랜잭션이 없으면 실패한다.
+    @Transactional(propagation = Propagation.MANDATORY)
     public void enqueue(List<OutingGuide> createdGuides) {
         for (OutingGuide guide : createdGuides) {
             outboxRepository.insertPending(guide.getId());
