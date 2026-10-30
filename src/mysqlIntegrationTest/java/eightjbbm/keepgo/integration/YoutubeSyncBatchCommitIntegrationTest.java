@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.integration.sse.SseEvent;
 import eightjbbm.keepgo.integration.sse.SseTestClient;
+import eightjbbm.keepgo.integration.stub.AiServerStub;
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.BatchAnalysis;
@@ -159,6 +160,143 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
+    @DisplayName("영상 하나의 여러 가이드를 모두 저장하고 위시리스트와 분석 이력에 연결한다")
+    void storesMultipleGuidesFromOneVideo() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useGuidesForVideo(
+                "video-a",
+                new AiServerStub.GuideTemplate("장소 후보", "서울특별시 종로구 다중로 1", "장소"),
+                new AiServerStub.GuideTemplate("행사 후보", "서울특별시 종로구 다중로 2", "이벤트"));
+        Member member = newMember();
+
+        runToSuccess(token(member));
+
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+        assertThat(videoAnalysisResultCount()).isEqualTo(2);
+        assertThat(analysisStatusCount("SUCCESS")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("이름과 주소가 같아도 유형이 다르면 서로 다른 가이드로 저장한다")
+    void storesSameNameAndAddressWithDifferentGuideTypes() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useGuidesForVideo(
+                "video-a",
+                new AiServerStub.GuideTemplate("같은 이름", "같은 주소", "장소"),
+                new AiServerStub.GuideTemplate("같은 이름", "같은 주소", "이벤트"));
+        Member member = newMember();
+
+        runToSuccess(token(member));
+
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(guideTypeCount("place")).isEqualTo(1);
+        assertThat(guideTypeCount("event")).isEqualTo(1);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("저장할 수 없는 후보는 제외하고 유효한 후보와 제외 사유를 남긴다")
+    void excludesInvalidCandidatesAndRecordsReasons() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useGuidesForVideo(
+                "video-a",
+                new AiServerStub.GuideTemplate("정상 장소", "서울특별시 종로구 정상로 1", "장소"),
+                new AiServerStub.GuideTemplate(" ", "서울특별시 종로구 공백로 2", "장소"));
+        Member member = newMember();
+
+        runToSuccess(token(member));
+
+        assertThat(guideCount()).isEqualTo(1);
+        assertThat(wishlistCount(member)).isEqualTo(1);
+        assertThat(analysisStatus("video-a")).isEqualTo("SUCCESS");
+        JsonNode excluded = excludedCandidates("video-a");
+        assertThat(excluded).hasSize(1);
+        assertThat(excluded.get(0).get("index").asInt()).isEqualTo(1);
+        assertThat(excluded.get(0).get("reason").asText()).isEqualTo("NAME_MISSING");
+    }
+
+    @Test
+    @DisplayName("모든 후보가 제외된 영상은 INVALID_GUIDE_DATA로 기록하고 동기화는 성공한다")
+    void marksInvalidGuideDataWhenAllCandidatesAreExcluded() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useGuidesForVideo("video-a", new AiServerStub.GuideTemplate("", "주소", "장소"));
+        Member member = newMember();
+
+        List<SseEvent> events = runToSuccess(token(member));
+
+        assertThat(syncStatus(member)).isEqualTo("SUCCEEDED");
+        assertThat(analysisStatus("video-a")).isEqualTo("FAILED");
+        assertThat(failureCode("video-a")).isEqualTo("INVALID_GUIDE_DATA");
+        JsonNode excluded = excludedCandidates("video-a");
+        assertThat(excluded).hasSize(1);
+        assertThat(excluded.get(0).get("reason").asText()).isEqualTo("NAME_MISSING");
+        assertThat(guideCount()).isZero();
+        assertThat(wishlistCount(member)).isZero();
+        assertThat(data(events.getLast()).get("video_failed_count").asInt()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("구조 오류가 난 배치만 INVALID_AI_RESPONSE로 실패하고 다른 배치는 유지된다")
+    void failsOnlyBatchWithInvalidAiResponse() throws Exception {
+        YOUTUBE.addPage(videos(ids(0, 20)));
+        AI_STUB.failAnalysisForVideo("v10", 200, "{\"message\":\"analyze_success\",\"data\":{\"results\":[]}}");
+        Member member = newMember();
+
+        List<SseEvent> events = runToSuccess(token(member));
+
+        assertThat(guideCount()).isEqualTo(10);
+        assertThat(wishlistCount(member)).isEqualTo(10);
+        assertThat(analysisStatusCount("FAILED")).isEqualTo(10);
+        assertThat(failureCode("v10")).isEqualTo("INVALID_AI_RESPONSE");
+        assertThat(data(events.getLast()).get("video_analyzed_count").asInt()).isEqualTo(20);
+        assertThat(data(events.getLast()).get("video_failed_count").asInt()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("알 수 없는 상태는 그 영상만 실패시키고 같은 배치의 다른 영상은 저장한다")
+    void failsOnlyUnknownStatusVideo() throws Exception {
+        YOUTUBE.addPage(videos("v0", "v1"));
+        AI_STUB.failAnalysisForVideo(
+                "v0",
+                200,
+                "{\"message\":\"analyze_success\",\"data\":{\"results\":["
+                        + "{\"video_url\":\"https://youtube.com/shorts/v0\",\"status\":\"UNKNOWN\",\"error\":null},"
+                        + "{\"video_url\":\"https://youtube.com/shorts/v1\",\"status\":\"success\",\"error\":null,"
+                        + "\"place_type\":\"장소\",\"place_name\":\"정상 장소\",\"address\":\"서울특별시 종로구 정상로 1\","
+                        + "\"lat\":37.5,\"lng\":127.0}]}}");
+        Member member = newMember();
+
+        runToSuccess(token(member));
+
+        assertThat(analysisStatus("v0")).isEqualTo("FAILED");
+        assertThat(failureCode("v0")).isEqualTo("INVALID_AI_RESPONSE");
+        assertThat(analysisStatus("v1")).isEqualTo("SUCCESS");
+        assertThat(guideCount()).isEqualTo(1);
+        assertThat(wishlistCount(member)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("이전 AI 계약 응답은 fallback 없이 그 배치를 실패시킨다")
+    void doesNotFallbackToLegacyContract() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.failAnalysisForVideo(
+                "video-a",
+                200,
+                "{\"message\":\"ok\",\"data\":{\"results\":[{\"video_url\":\"https://youtube.com/shorts/video-a\","
+                        + "\"status\":\"success\",\"error\":null,\"place_name\":\"구 계약\",\"address\":\"주소\","
+                        + "\"category\":\"장소\",\"lat\":37.5,\"lng\":127.0}]}}");
+        Member member = newMember();
+
+        runToSuccess(token(member));
+
+        assertThat(analysisStatus("video-a")).isEqualTo("FAILED");
+        assertThat(failureCode("video-a")).isEqualTo("INVALID_AI_RESPONSE");
+        assertThat(guideCount()).isZero();
+        assertThat(wishlistCount(member)).isZero();
+    }
+
+    @Test
     @DisplayName("임베딩 호출이 실패해도 동기화는 성공한다")
     void ignoresEmbeddingFailure() throws Exception {
         YOUTUBE.addPage(videos("video-a", "video-b"));
@@ -270,6 +408,29 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
 
     private int guideCount() {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide", Integer.class);
+    }
+
+    private int guideTypeCount(String type) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outing_guide WHERE type = ?", Integer.class, type);
+    }
+
+    private String analysisStatus(String videoId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM video_analysis WHERE video_id = ? ORDER BY id DESC LIMIT 1", String.class, videoId);
+    }
+
+    private String failureCode(String videoId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT failure_code FROM video_analysis WHERE video_id = ? ORDER BY id DESC LIMIT 1",
+                String.class,
+                videoId);
+    }
+
+    private JsonNode excludedCandidates(String videoId) throws Exception {
+        return objectMapper.readTree(jdbcTemplate.queryForObject(
+                "SELECT excluded_candidates FROM video_analysis WHERE video_id = ? ORDER BY id DESC LIMIT 1",
+                String.class,
+                videoId));
     }
 
     private int analysisCount() {

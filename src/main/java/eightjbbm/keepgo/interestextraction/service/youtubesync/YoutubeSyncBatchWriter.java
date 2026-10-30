@@ -90,8 +90,17 @@ public class YoutubeSyncBatchWriter {
         switch (video.status()) {
             case SUCCESS -> analysis.markSuccess();
             case NOT_FOUND -> analysis.markNotFound();
-            case FAILED -> analysis.markFailed();
+            case FAILED -> {
+                if (video.failureCode() == null) {
+                    analysis.markFailed();
+                } else {
+                    analysis.markFailed(video.failureCode());
+                }
+            }
             default -> throw new IllegalArgumentException("지원하지 않는 분석 상태입니다: " + video.status());
+        }
+        if (!video.excludedCandidates().isEmpty()) {
+            analysis.recordExcludedCandidates(video.excludedCandidates());
         }
         return analysis;
     }
@@ -150,7 +159,8 @@ public class YoutubeSyncBatchWriter {
 
     private static List<GuideKey> sorted(Set<GuideKey> keys) {
         return keys.stream()
-                .sorted(Comparator.comparing(GuideKey::name, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .sorted(Comparator.comparing(GuideKey::type, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(GuideKey::name, Comparator.nullsFirst(Comparator.naturalOrder()))
                         .thenComparing(
                                 key -> key.address() == null
                                         ? null
@@ -160,6 +170,6 @@ public class YoutubeSyncBatchWriter {
     }
 
     private static GuideKey keyOf(OutingGuide guide) {
-        return new GuideKey(guide.getName(), guide.getAddress());
+        return GuideKey.from(guide);
     }
 }

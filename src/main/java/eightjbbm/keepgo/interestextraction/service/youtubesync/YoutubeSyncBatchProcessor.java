@@ -3,6 +3,9 @@ package eightjbbm.keepgo.interestextraction.service.youtubesync;
 import com.google.api.services.youtube.model.Video;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -23,7 +26,9 @@ public class YoutubeSyncBatchProcessor {
 
     private static final int BATCH_SIZE = 10;
     private static final int MAX_PARALLEL_AI_CALLS = 10;
+    private static final Duration ANALYSIS_TIMEOUT = Duration.ofSeconds(130);
 
+    private final VideoAnalysisJobClient videoAnalysisJobClient;
     private final AiServerService aiServerService;
     private final YoutubeSyncBatchWriter batchWriter;
 
@@ -52,9 +57,15 @@ public class YoutubeSyncBatchProcessor {
     }
 
     /// AI 호출 실패는 배치 전체를 FAILED로 만들고 예외를 밖으로 던지지 않는다.
+    ///
+    /// 구조 오류는 `INVALID_AI_RESPONSE`, 그 밖의 전송·HTTP·시간 초과는 해당 오류 종류를
+    /// 분석 이력의 실패 코드로 남긴다. 이전 분석 계약으로 되돌아가는 fallback은 없다.
     private BatchAnalysis analyze(List<String> videoIds) {
         try {
-            return BatchAnalysis.from(videoIds, aiServerService.analyzeVideoV2(videoIds));
+            return BatchAnalysis.from(videoIds, videoAnalysisJobClient.analyzeVideo(videoIds, ANALYSIS_TIMEOUT));
+        } catch (AiRequestException error) {
+            log.error("AI 배치 분석 실패: videoCount={}, kind={}", videoIds.size(), error.kind(), error);
+            return BatchAnalysis.failed(videoIds, error.kind().name());
         } catch (RuntimeException error) {
             log.error("AI 배치 분석 실패: videoCount={}", videoIds.size(), error);
             return BatchAnalysis.failed(videoIds);

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ public final class AiServerStub implements AutoCloseable {
     private final AtomicReference<StubResponse> embeddingResponse = new AtomicReference<>();
     private final Map<String, StubResponse> analysisFailuresByVideo = new ConcurrentHashMap<>();
     private final Map<String, Duration> analysisDelaysByVideo = new ConcurrentHashMap<>();
+    private final Map<String, List<GuideTemplate>> analysisGuidesByVideo = new ConcurrentHashMap<>();
     private final AtomicReference<GuideTemplate> analysisGuide = new AtomicReference<>();
     private volatile HttpServer server;
 
@@ -100,6 +102,7 @@ public final class AiServerStub implements AutoCloseable {
         embeddingResponse.set(null);
         analysisFailuresByVideo.clear();
         analysisDelaysByVideo.clear();
+        analysisGuidesByVideo.clear();
         analysisGuide.set(null);
     }
 
@@ -127,7 +130,16 @@ public final class AiServerStub implements AutoCloseable {
 
     /// 모든 영상에 같은 이름·주소의 가이드를 돌려줘 배치 간 가이드 중복을 재현한다.
     public void useSharedGuide(String name, String address) {
-        analysisGuide.set(new GuideTemplate(name, address));
+        useSharedGuide(name, address, "장소");
+    }
+
+    public void useSharedGuide(String name, String address, String type) {
+        analysisGuide.set(new GuideTemplate(name, address, type));
+    }
+
+    /// 특정 영상의 응답에 여러 가이드를 돌려준다.
+    public void useGuidesForVideo(String videoId, GuideTemplate... guides) {
+        analysisGuidesByVideo.put(videoId, List.of(guides));
     }
 
     public void failEmbedding(int status, String body) {
@@ -254,24 +266,35 @@ public final class AiServerStub implements AutoCloseable {
         return analysisFailuresByVideo.getOrDefault(videoId, analysisResponse.get());
     }
 
-    private static String successfulAnalysis(String requestBody, GuideTemplate template) {
+    private String successfulAnalysis(String requestBody, GuideTemplate template) {
         List<String> urls = VIDEO_URL
                 .matcher(requestBody)
                 .results()
                 .map(result -> result.group())
                 .toList();
-        List<String> results = urls.stream()
-                .map(url -> {
-                    Matcher idMatcher = VIDEO_ID.matcher(url);
-                    String id = idMatcher.find() ? idMatcher.group(1) : url;
-                    String name = template == null ? "스텁 가이드 " + id : template.name();
-                    String address = template == null ? "서울특별시 종로구 스텁로 " + id : template.address();
-                    return """
-                            {"video_url":"%s","status":"success","error":null,"place_name":"%s","address":"%s","location_detail":"스텁 상세","category":"장소","business_hours":null,"event_start_date":null,"event_end_date":null,"event_period_unresolved":false,"lat":37.5,"lng":127.0,"confidence":0.9,"summary":"스텁 설명"}
-                            """.formatted(url, name, address);
-                })
-                .toList();
-        return "{\"message\":\"ok\",\"data\":{\"results\":[" + String.join(",", results) + "]}}";
+        List<String> results = new ArrayList<>();
+        for (String url : urls) {
+            Matcher idMatcher = VIDEO_ID.matcher(url);
+            String id = idMatcher.find() ? idMatcher.group(1) : url;
+            List<GuideTemplate> guides = analysisGuidesByVideo.get(id);
+            if (guides == null) {
+                guides = List.of(
+                        template == null ? new GuideTemplate("스텁 가이드 " + id, "서울특별시 종로구 스텁로 " + id, "장소") : template);
+            }
+            for (GuideTemplate guide : guides) {
+                results.add(row(url, guide));
+            }
+        }
+        return "{\"message\":\"analyze_success\",\"data\":{\"results\":[" + String.join(",", results) + "]}}";
+    }
+
+    private static String row(String url, GuideTemplate guide) {
+        String category = "이벤트".equals(guide.type()) ? "전시" : "장소";
+        String startDate = "이벤트".equals(guide.type()) ? "\"2026-10-01\"" : null;
+        String endDate = "이벤트".equals(guide.type()) ? "\"2026-10-31\"" : null;
+        return """
+                {"video_url":"%s","status":"success","error":null,"place_type":"%s","place_name":"%s","address":"%s","location_detail":"스텁 상세","category":"%s","business_hours":null,"event_start_date":%s,"event_end_date":%s,"event_period_unresolved":false,"lat":37.5,"lng":127.0,"confidence":0.9,"summary":"스텁 설명"}
+                """.formatted(url, guide.type(), guide.name(), guide.address(), category, startDate, endDate);
     }
 
     private static void sleep(Duration delay) {
@@ -310,5 +333,6 @@ public final class AiServerStub implements AutoCloseable {
 
     private record StubResponse(int status, String body, boolean closeConnection) {}
 
-    private record GuideTemplate(String name, String address) {}
+    /// type은 AI 계약의 `place_type` 값인 "장소" 또는 "이벤트"다.
+    public record GuideTemplate(String name, String address, String type) {}
 }
