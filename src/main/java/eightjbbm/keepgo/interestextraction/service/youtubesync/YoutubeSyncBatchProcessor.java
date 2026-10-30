@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 public class YoutubeSyncBatchProcessor {
 
     private static final int BATCH_SIZE = 10;
+    private static final int MAX_PARALLEL_AI_CALLS = 10;
 
     private final AiServerService aiServerService;
     private final YoutubeSyncBatchWriter batchWriter;
@@ -32,7 +33,8 @@ public class YoutubeSyncBatchProcessor {
             return;
         }
 
-        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        // 전역 동시 호출 상한은 AI 호출 게이트웨이 티켓에서 다룬다. 지금은 동기화마다 병렬 호출을 제한한다.
+        var executor = Executors.newFixedThreadPool(MAX_PARALLEL_AI_CALLS);
         try {
             var completion = new ExecutorCompletionService<BatchAnalysis>(executor);
             for (List<String> batch : batches) {
