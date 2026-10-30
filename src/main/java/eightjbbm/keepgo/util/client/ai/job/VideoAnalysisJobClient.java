@@ -135,11 +135,19 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
                     case "success" -> VideoAnalysisResponse.Status.SUCCESS;
                     case "not_found" -> VideoAnalysisResponse.Status.NOT_FOUND;
                     case "failed" -> VideoAnalysisResponse.Status.FAILED;
-                    default -> throw new IllegalArgumentException("알 수 없는 분석 상태");
+                    // 알 수 없는 상태는 그 영상만 실패로 처리하고 배치의 다른 영상은 살린다.
+                    default -> VideoAnalysisResponse.Status.UNKNOWN;
                 };
                 var previous = results.get(id);
                 require(previous == null
                         || (previous.status() == status && status == VideoAnalysisResponse.Status.SUCCESS));
+                if (status == VideoAnalysisResponse.Status.UNKNOWN) {
+                    results.put(
+                            id,
+                            new VideoAnalysisResponse.Result(
+                                    id, VideoAnalysisResponse.Status.UNKNOWN, null, List.of()));
+                    continue;
+                }
                 var error = row.get("error");
                 require(
                         status == VideoAnalysisResponse.Status.FAILED
@@ -153,29 +161,35 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
                     var type = switch (row.get("place_type").asString()) {
                         case "장소" -> VideoAnalysisResponse.GuideType.PLACE;
                         case "이벤트" -> VideoAnalysisResponse.GuideType.EVENT;
-                        default -> throw new IllegalArgumentException("알 수 없는 가이드 유형");
+                        // 알 수 없는 유형은 그 영상만 실패로 처리하고 후보 구조는 검사하지 않는다.
+                        default -> VideoAnalysisResponse.GuideType.UNKNOWN;
                     };
-                    for (String field : List.of("event_start_date", "event_end_date")) {
-                        if (row.hasNonNull(field)) {
-                            require(row.get(field).isString());
-                            LocalDate.parse(row.get(field).asString());
+                    if (type == VideoAnalysisResponse.GuideType.UNKNOWN) {
+                        guides.add(new VideoAnalysisResponse.Guide(
+                                type, null, null, null, null, null, null, null, null, null, null, null, null));
+                    } else {
+                        for (String field : List.of("event_start_date", "event_end_date")) {
+                            if (row.hasNonNull(field)) {
+                                require(row.get(field).isString());
+                                LocalDate.parse(row.get(field).asString());
+                            }
                         }
+                        var candidate = mapper.treeToValue(row, WireCandidate.class);
+                        guides.add(new VideoAnalysisResponse.Guide(
+                                type,
+                                candidate.placeName(),
+                                candidate.address(),
+                                candidate.lat(),
+                                candidate.lng(),
+                                candidate.summary(),
+                                candidate.locationDetail(),
+                                candidate.category(),
+                                candidate.businessHours(),
+                                candidate.eventStartDate(),
+                                candidate.eventEndDate(),
+                                candidate.eventPeriodUnresolved(),
+                                candidate.confidence()));
                     }
-                    var candidate = mapper.treeToValue(row, WireCandidate.class);
-                    guides.add(new VideoAnalysisResponse.Guide(
-                            type,
-                            candidate.placeName(),
-                            candidate.address(),
-                            candidate.lat(),
-                            candidate.lng(),
-                            candidate.summary(),
-                            candidate.locationDetail(),
-                            candidate.category(),
-                            candidate.businessHours(),
-                            candidate.eventStartDate(),
-                            candidate.eventEndDate(),
-                            candidate.eventPeriodUnresolved(),
-                            candidate.confidence()));
                 } else {
                     // 실패/미발견 행에 후보 데이터가 섞이면 성공 결과로 조용히 처리하지 않는다.
                     for (String field : List.of(

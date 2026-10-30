@@ -11,8 +11,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
-import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
+import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,15 +22,16 @@ import org.springframework.dao.CannotAcquireLockException;
 @DisplayName("YouTube 동기화 배치 처리")
 class YoutubeSyncBatchProcessorTest {
 
-    private final AiServerService aiServerService = mock(AiServerService.class);
+    private final VideoAnalysisJobClient videoAnalysisJobClient = mock(VideoAnalysisJobClient.class);
     private final YoutubeSyncBatchWriter batchWriter = mock(YoutubeSyncBatchWriter.class);
-    private final YoutubeSyncBatchProcessor processor = new YoutubeSyncBatchProcessor(aiServerService, batchWriter);
+    private final YoutubeSyncBatchProcessor processor =
+            new YoutubeSyncBatchProcessor(videoAnalysisJobClient, batchWriter);
 
     @Test
     @DisplayName("재시도가 모두 실패한 배치는 FAILED로 기록한다")
     void recordsBatchFailedWhenRetriesAreExhausted() {
-        when(aiServerService.analyzeVideoV2(anyList()))
-                .thenReturn(new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data()));
+        when(videoAnalysisJobClient.analyzeVideo(anyList(), any(Duration.class)))
+                .thenThrow(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null));
         doThrow(new CannotAcquireLockException("deadlock"))
                 .when(batchWriter)
                 .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
