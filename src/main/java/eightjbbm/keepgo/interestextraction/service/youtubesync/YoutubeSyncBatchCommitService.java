@@ -124,7 +124,10 @@ public class YoutubeSyncBatchCommitService {
         for (GuideKey key : sorted(unique.keySet())) {
             OutingGuide guide = existing.get(key);
             if (guide == null) {
-                guide = outingGuideRepository.save(unique.get(key));
+                OutingGuide candidate = unique.get(key);
+                // 충돌 재시도면 앞선 시도가 남긴 식별자 때문에 merge가 되어 저장에 실패한다.
+                candidate.clearUnsavedId();
+                guide = outingGuideRepository.save(candidate);
                 createdGuides.add(guide);
             }
             resolved.put(key, guide);

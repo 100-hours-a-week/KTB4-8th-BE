@@ -61,6 +61,11 @@ public abstract class OutingGuide {
 
     public abstract boolean isAvailable(Instant instant);
 
+    /// 롤백된 저장 시도에서 받은 식별자를 지운다. 다시 저장하면 merge가 아니라 새 행 삽입이 된다.
+    public void clearUnsavedId() {
+        this.id = null;
+    }
+
     /// 나들이 가이드의 유형. 같은 이름·주소라도 장소와 행사는 서로 다른 가이드다.
     public abstract GuideType guideType();
 

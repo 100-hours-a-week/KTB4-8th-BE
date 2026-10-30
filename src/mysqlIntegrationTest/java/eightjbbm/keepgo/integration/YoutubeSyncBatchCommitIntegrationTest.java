@@ -168,6 +168,40 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
+    @DisplayName("충돌 재시도 때 앞선 시도에서 저장하려던 다른 새 가이드도 함께 저장한다")
+    void retrySavesOtherNewGuidesOfRolledBackAttempt() throws Exception {
+        createGuideIdentityIndex();
+        Member first = newMember();
+        Member second = newMember();
+        YoutubeSyncSnapshot firstSync = syncService.create(first.getId(), "instance-a", "trace-a");
+        YoutubeSyncSnapshot secondSync = syncService.create(second.getId(), "instance-b", "trace-b");
+        syncService.start(firstSync.id(), "instance-a", 1, 1, 10);
+        syncService.start(secondSync.id(), "instance-b", 1, 1, 10);
+        BatchAnalysis firstBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "v0", VideoAnalysisStatus.SUCCESS, List.of(place("충돌 가이드", "서울특별시 종로구 충돌로 1")))));
+        BatchAnalysis secondBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "v1",
+                VideoAnalysisStatus.SUCCESS,
+                List.of(place("충돌 가이드", "서울특별시 종로구 충돌로 1"), place("새 가이드", "서울특별시 종로구 새로 1")))));
+        WISHLIST_BARRIER.set(new CountDownLatch(2));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> firstRun = executor.submit(
+                    () -> batchWriter.commit(firstSync.id(), "instance-a", first.getId(), firstBatch, 100));
+            Future<?> secondRun = executor.submit(
+                    () -> batchWriter.commit(secondSync.id(), "instance-b", second.getId(), secondBatch, 100));
+            firstRun.get(30, TimeUnit.SECONDS);
+            secondRun.get(30, TimeUnit.SECONDS);
+        } finally {
+            WISHLIST_BARRIER.set(null);
+        }
+
+        assertThat(guideCount()).isEqualTo(2);
+        assertThat(wishlistCount(first)).isEqualTo(1);
+        assertThat(wishlistCount(second)).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("배치 하나의 AI 호출이 실패해도 나머지 배치는 위시리스트에 남고 실패 수에 반영된다")
     void isolatesAiFailureToBatch() throws Exception {
         YOUTUBE.addPage(videos(ids(0, 20)));
