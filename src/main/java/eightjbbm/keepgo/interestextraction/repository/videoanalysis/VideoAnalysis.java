@@ -4,6 +4,7 @@ import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.List;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -11,7 +12,7 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class VideoAnalysis {
     public static final int MAX_FAILURE_CODE_LENGTH = 64;
 
@@ -38,6 +39,8 @@ public class VideoAnalysis {
     private List<ExcludedCandidate> excludedCandidates;
 
     private Instant createDatetime;
+
+    private Instant completedAt;
 
     public VideoAnalysis(String videoId) {
         this(videoId, null);
@@ -76,5 +79,6 @@ public class VideoAnalysis {
             throw new IllegalStateException();
         }
         this.status = status;
+        this.completedAt = Instant.now();
     }
 }

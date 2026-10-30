@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.failedFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -10,6 +12,7 @@ import eightjbbm.keepgo.interestextraction.repository.videoanalysis.*;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.util.client.ai.analysis.*;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.IntStream;
@@ -18,8 +21,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @Timeout(15)
+@DisplayName("기본 YouTube 영상 분석기")
 class DefaultYoutubeVideoAnalyzerTest {
-    private AiServerService ai;
+    private AiCallGateway gateway;
     private OutingGuideRepository guides;
     private VideoAnalysisManager manager;
     private DefaultYoutubeVideoAnalyzer analyzer;
@@ -27,10 +31,10 @@ class DefaultYoutubeVideoAnalyzerTest {
 
     @BeforeEach
     void setUp() {
-        ai = mock(AiServerService.class);
+        gateway = mock(AiCallGateway.class);
         guides = mock(OutingGuideRepository.class);
         manager = mock(VideoAnalysisManager.class);
-        analyzer = new DefaultYoutubeVideoAnalyzer(ai, guides, manager);
+        analyzer = new DefaultYoutubeVideoAnalyzer(gateway, guides, manager);
         stored = new HashMap<>();
         when(manager.start(anyList())).thenAnswer(call -> {
             List<String> ids = call.getArgument(0);
@@ -53,25 +57,15 @@ class DefaultYoutubeVideoAnalyzerTest {
     }
 
     @Test
-    void splitsIntoTenAndCallsConcurrentlyOnPlatformThreads() {
-        CountDownLatch entered = new CountDownLatch(3);
-        Set<Long> threads = ConcurrentHashMap.newKeySet();
-        long caller = Thread.currentThread().threadId();
-        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
-            List<String> batch = call.getArgument(0);
-            assertFalse(Thread.currentThread().isVirtual());
-            assertNotEquals(caller, Thread.currentThread().threadId());
-            threads.add(Thread.currentThread().threadId());
-            verify(manager).start(batch);
-            entered.countDown();
-            assertTrue(entered.await(5, TimeUnit.SECONDS), "All batches must enter concurrently");
-            return response(List.of());
-        });
+    @DisplayName("영상을 10개 단위 배치로 게이트웨이에 제출한다")
+    void splitsIntoTenAndSubmitsThroughGateway() {
+        givenAnalysis(response(List.of()));
+
         assertTrue(analyzer.analyze(videos(21)).isEmpty());
+
         ArgumentCaptor<List<String>> batches = ArgumentCaptor.captor();
-        verify(ai, times(3)).analyzeVideoV2(batches.capture());
+        verify(gateway, times(3)).submitAnalysis(anyLong(), batches.capture(), any(Runnable.class));
         assertEquals(Set.of(ids(0, 10), ids(10, 20), ids(20, 21)), new HashSet<>(batches.getAllValues()));
-        assertEquals(3, threads.size());
         verify(manager, never()).start(anyLong(), anyList());
     }
 
@@ -85,7 +79,7 @@ class DefaultYoutubeVideoAnalyzerTest {
             ids.forEach(id -> result.put(id, analysisId(id)));
             return result;
         });
-        when(ai.analyzeVideoV2(anyList())).thenReturn(response(List.of()));
+        givenAnalysis(response(List.of()));
 
         analyzer.analyze(syncId, videos(2), (processedCount, failedCount) -> {});
 
@@ -94,57 +88,81 @@ class DefaultYoutubeVideoAnalyzerTest {
     }
 
     @Test
+    @DisplayName("실패 응답은 배치 전체를 FAILED로 기록한다")
     void failureResponseMarksWholeBatchFailed() {
-        when(ai.analyzeVideoV2(anyList()))
-                .thenReturn(new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data()));
+        givenAnalysis(new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data()));
+
         assertTrue(analyzer.analyze(videos(2)).isEmpty());
+
         verify(manager).completeUnsuccessful(Map.of(1L, VideoAnalysisStatus.FAILED, 2L, VideoAnalysisStatus.FAILED));
         verify(manager, never()).completeSuccessful(anyMap(), anyCollection());
     }
 
     @Test
+    @DisplayName("AI 요청 예외는 배치를 FAILED로 기록하고 밖으로 던진다")
     void requestExceptionMarksBatchFailedAndPropagates() {
         RuntimeException failure = new IllegalStateException("AI unavailable");
-        when(ai.analyzeVideoV2(anyList())).thenThrow(failure);
+        givenAnalysisFailure(failure);
+
         CompletionException thrown = assertThrows(CompletionException.class, () -> analyzer.analyze(videos(2)));
+
         assertSame(failure, thrown.getCause());
         verify(manager).completeUnsuccessful(Map.of(1L, VideoAnalysisStatus.FAILED, 2L, VideoAnalysisStatus.FAILED));
     }
 
     @Test
+    @DisplayName("유효하지 않은 영상은 요청 전에 제외한다")
     void invalidVideosAreExcludedBeforeRequests() {
         Video privateVideo = video("v1");
         privateVideo.getStatus().setPrivacyStatus("private");
         Video longVideo = video("v2");
         longVideo.getContentDetails().setDuration("PT4M");
-        when(ai.analyzeVideoV2(anyList())).thenReturn(response(List.of()));
+        givenAnalysis(response(List.of()));
+
         analyzer.analyze(List.of(video("v0"), privateVideo, longVideo, new Video()));
-        verify(ai).analyzeVideoV2(List.of("v0"));
+
+        verify(gateway).submitAnalysis(anyLong(), eq(List.of("v0")), any(Runnable.class));
         verify(manager).start(List.of("v0"));
     }
 
     @Test
+    @DisplayName("입력이 비면 분석을 시작하지 않는다")
     void emptyInputDoesNotStartAnalysis() {
         assertTrue(analyzer.analyze(List.of()).isEmpty());
-        verifyNoInteractions(manager, ai);
+        verifyNoInteractions(manager, gateway);
         verify(guides, never()).save(any(OutingGuide.class));
     }
 
     @Test
     @DisplayName("성공한 분석 결과는 한 번만 저장하고 분석 이력과 연결한다")
     void persistsSuccessfulAnalysisOnce() {
-        when(ai.analyzeVideoV2(anyList())).thenReturn(response(List.of(result("v0", "success", "장소", "도로명주소"))));
+        givenAnalysis(response(List.of(result("v0", "success", "장소", "도로명주소"))));
+        when(gateway.submitEmbedding(anyList())).thenReturn(completedFuture(null));
 
         List<OutingGuide> persisted = analyzer.analyze(videos(1));
 
         assertThat(persisted).hasSize(1);
         verify(guides, times(1)).findAllByAddresses(anyList());
         verify(guides, times(1)).save(any(OutingGuide.class));
-        verify(ai, times(1)).embedPlaces(anyList());
+        verify(gateway, times(1)).submitEmbedding(anyList());
         verify(manager)
                 .completeSuccessful(
                         argThat(analyses -> analyses.containsKey(1L)),
                         argThat(persistedGuides -> persistedGuides.size() == 1));
+    }
+
+    private void givenAnalysis(AnalyzeVideoResponseV2 response) {
+        when(gateway.submitAnalysis(anyLong(), anyList(), any(Runnable.class))).thenAnswer(call -> {
+            call.getArgument(2, Runnable.class).run();
+            return completedFuture(response);
+        });
+    }
+
+    private void givenAnalysisFailure(RuntimeException failure) {
+        when(gateway.submitAnalysis(anyLong(), anyList(), any(Runnable.class))).thenAnswer(call -> {
+            call.getArgument(2, Runnable.class).run();
+            return failedFuture(failure);
+        });
     }
 
     private List<String> ids(int from, int to) {

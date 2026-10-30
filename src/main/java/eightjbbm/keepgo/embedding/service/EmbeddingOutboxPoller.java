@@ -4,12 +4,13 @@ import eightjbbm.keepgo.embedding.EmbeddingOutboxProperties;
 import eightjbbm.keepgo.embedding.entity.EmbeddingOutboxEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
-import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,7 +28,7 @@ public class EmbeddingOutboxPoller {
 
     private final EmbeddingOutboxService outboxService;
     private final OutingGuideRepository outingGuideRepository;
-    private final AiServerService aiServerService;
+    private final AiCallGateway aiCallGateway;
     private final EmbeddingOutboxProperties properties;
     private final Counter embedded;
     private final Counter retried;
@@ -37,12 +38,12 @@ public class EmbeddingOutboxPoller {
     public EmbeddingOutboxPoller(
             EmbeddingOutboxService outboxService,
             OutingGuideRepository outingGuideRepository,
-            AiServerService aiServerService,
+            AiCallGateway aiCallGateway,
             EmbeddingOutboxProperties properties,
             MeterRegistry meterRegistry) {
         this.outboxService = outboxService;
         this.outingGuideRepository = outingGuideRepository;
-        this.aiServerService = aiServerService;
+        this.aiCallGateway = aiCallGateway;
         this.properties = properties;
         this.embedded = Counter.builder("keepgo.embedding.outbox.processed")
                 .tag("result", "success")
@@ -100,9 +101,14 @@ public class EmbeddingOutboxPoller {
                 return true;
             }
 
-            aiServerService.embedPlaces(List.of(guide.get()));
+            aiCallGateway.submitEmbedding(List.of(guide.get())).join();
             outboxService.complete(entry.getGuideId(), attempt);
             embedded.increment();
+            return true;
+        } catch (CompletionException error) {
+            // last_error에 CompletionException이 아닌 실제 AI 호출 실패를 남긴다.
+            RuntimeException cause = error.getCause() instanceof RuntimeException runtime ? runtime : error;
+            handleFailure(entry.getGuideId(), attempt, cause);
             return true;
         } catch (RuntimeException error) {
             handleFailure(entry.getGuideId(), attempt, error);

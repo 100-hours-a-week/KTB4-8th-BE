@@ -1,19 +1,20 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
 import com.google.api.services.youtube.model.Video;
+import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
-import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
-import java.time.Duration;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-/// 동기화 하나의 배치들을 병렬로 분석하고, 응답이 온 배치부터 하나씩 커밋한다.
+/// 동기화 하나의 배치들을 AI 호출 게이트웨이에 모두 제출하고, 응답이 온 배치부터 하나씩 커밋한다.
 ///
 /// YouTube 조회와 AI 호출은 트랜잭션 밖에서 하고, 커밋만 배치 단위 트랜잭션으로 수행한다.
 /// 배치 하나의 AI 호출이 실패해도 그 영상만 FAILED로 기록하고 다음 배치를 계속 처리한다.
@@ -23,11 +24,10 @@ import org.springframework.stereotype.Service;
 public class YoutubeSyncBatchProcessor {
 
     private static final int BATCH_SIZE = 10;
-    private static final int MAX_PARALLEL_AI_CALLS = 10;
-    private static final Duration ANALYSIS_TIMEOUT = Duration.ofSeconds(130);
 
-    private final VideoAnalysisJobClient videoAnalysisJobClient;
+    private final AiCallGateway aiCallGateway;
     private final YoutubeSyncBatchWriter batchWriter;
+    private final VideoAnalysisManager videoAnalysisManager;
 
     public void process(Long syncId, String instanceId, Long memberId, List<Video> targets, int fetchWeight) {
         List<List<String>> batches = batches(targets);
@@ -35,21 +35,34 @@ public class YoutubeSyncBatchProcessor {
             return;
         }
 
-        // 전역 동시 호출 상한은 AI 호출 게이트웨이 티켓에서 다룬다. 지금은 동기화마다 병렬 호출을 제한한다.
-        var executor = Executors.newFixedThreadPool(MAX_PARALLEL_AI_CALLS);
-        try {
-            var completion = new ExecutorCompletionService<BatchAnalysis>(executor);
-            for (List<String> batch : batches) {
-                completion.submit(() -> analyze(batch));
-            }
+        BlockingQueue<BatchAnalysis> completed = new LinkedBlockingQueue<>();
+        List<CompletableFuture<VideoAnalysisResponse>> submitted = new ArrayList<>();
+        for (List<String> batch : batches) {
+            CompletableFuture<VideoAnalysisResponse> future =
+                    aiCallGateway.submitVideoAnalysis(syncId, batch, () -> videoAnalysisManager.start(syncId, batch));
+            submitted.add(future);
+            future.handle((response, error) -> completed.add(analyze(batch, response, error)));
+        }
 
-            for (int completed = 1; completed <= batches.size(); completed++) {
-                BatchAnalysis analysis = await(completion);
-                int progress = YoutubeSyncProgress.afterBatch(completed, batches.size(), fetchWeight);
+        try {
+            for (int count = 1; count <= batches.size(); count++) {
+                BatchAnalysis analysis = await(completed);
+                int progress = YoutubeSyncProgress.afterBatch(count, batches.size(), fetchWeight);
                 commit(syncId, instanceId, memberId, analysis, progress);
             }
         } finally {
-            executor.shutdownNow();
+            // sweeper가 이미 마감한 동기화라면 아직 전송되지 않은 배치를 시작하지 않는다.
+            submitted.forEach(future -> future.cancel(false));
+            // 중간에 끝나면 이미 전송한 배치의 IN_PROGRESS 행을 커밋할 곳이 없다. 정상 종료면 바뀌는 행이 없다.
+            failInProgress(syncId);
+        }
+    }
+
+    private void failInProgress(Long syncId) {
+        try {
+            videoAnalysisManager.failInProgress(syncId);
+        } catch (RuntimeException error) {
+            log.error("남은 분석 중 기록 정리 실패: syncId={}", syncId, error);
         }
     }
 
@@ -57,26 +70,29 @@ public class YoutubeSyncBatchProcessor {
     ///
     /// 구조 오류는 `INVALID_AI_RESPONSE`, 그 밖의 전송·HTTP·시간 초과는 해당 오류 종류를
     /// 분석 이력의 실패 코드로 남긴다. 이전 분석 계약으로 되돌아가는 fallback은 없다.
-    private BatchAnalysis analyze(List<String> videoIds) {
-        try {
-            return BatchAnalysis.from(videoIds, videoAnalysisJobClient.analyzeVideo(videoIds, ANALYSIS_TIMEOUT));
-        } catch (AiRequestException error) {
-            log.error("AI 배치 분석 실패: videoCount={}, kind={}", videoIds.size(), error.kind(), error);
-            return BatchAnalysis.failed(videoIds, error.kind().name());
-        } catch (RuntimeException error) {
+    private BatchAnalysis analyze(List<String> videoIds, VideoAnalysisResponse response, Throwable error) {
+        if (error instanceof AiRequestException failure) {
+            log.error("AI 배치 분석 실패: videoCount={}, kind={}", videoIds.size(), failure.kind(), failure);
+            return BatchAnalysis.failed(videoIds, failure.kind().name());
+        }
+        if (error != null) {
             log.error("AI 배치 분석 실패: videoCount={}", videoIds.size(), error);
+            return BatchAnalysis.failed(videoIds);
+        }
+        try {
+            return BatchAnalysis.from(videoIds, response);
+        } catch (RuntimeException failure) {
+            log.error("AI 배치 분석 실패: videoCount={}", videoIds.size(), failure);
             return BatchAnalysis.failed(videoIds);
         }
     }
 
-    private BatchAnalysis await(ExecutorCompletionService<BatchAnalysis> completion) {
+    private BatchAnalysis await(BlockingQueue<BatchAnalysis> completed) {
         try {
-            return completion.take().get();
+            return completed.take();
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("YouTube 동기화 배치 대기가 중단되었습니다", error);
-        } catch (ExecutionException error) {
-            throw new IllegalStateException("YouTube 동기화 배치 처리에 실패했습니다", error.getCause());
         }
     }
 

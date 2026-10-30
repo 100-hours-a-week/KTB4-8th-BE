@@ -1,8 +1,8 @@
 package eightjbbm.keepgo.util.client.ai;
 
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -18,20 +18,22 @@ import org.springframework.web.client.RestClient;
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(AiServerApiClientProperties.class)
+@EnableConfigurationProperties({AiServerApiClientProperties.class, AiCallProperties.class})
 public class AiServerApiClientConfig {
 
     private final AiServerApiClientProperties properties;
+    private final AiCallProperties callProperties;
 
     @Bean
     RestClient aiServerRestClient(RestClient.Builder builder) {
+        // JDK HttpClient는 자동 재시도를 하지 않는다. 분석 실패는 호출자가 한 번만 시도한다.
         var httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(60))
+                .connectTimeout(callProperties.connectTimeout())
                 .build();
 
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofSeconds(130));
+        requestFactory.setReadTimeout(callProperties.analysisTimeout());
 
         return builder.requestFactory(new BufferingClientHttpRequestFactory(requestFactory))
                 .baseUrl(properties.address())

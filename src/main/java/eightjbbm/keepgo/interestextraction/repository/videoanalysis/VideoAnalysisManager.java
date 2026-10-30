@@ -2,6 +2,7 @@ package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.GuideKey;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,11 @@ public class VideoAnalysisManager {
                         .toList())
                 .stream()
                 .collect(Collectors.toMap(VideoAnalysis::getVideoId, VideoAnalysis::getId));
+    }
+
+    @Transactional
+    public void failInProgress(Long youtubeSyncId) {
+        videoAnalysisRepository.markFailedBySyncIds(List.of(youtubeSyncId), Instant.now());
     }
 
     @Transactional
