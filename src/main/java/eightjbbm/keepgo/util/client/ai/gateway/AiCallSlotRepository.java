@@ -44,6 +44,8 @@ public class AiCallSlotRepository {
             jdbcTemplate.update(
                     "insert ignore into ai_call_slot (slot_type, slot_no) values (?, ?)", type.name(), slotNo);
         }
-        jdbcTemplate.update("delete from ai_call_slot where slot_type = ? and slot_no > ?", type.name(), limit);
+        // 사용 중인 슬롯을 지우면 그 호출이 끝날 때까지 상한을 넘으므로 빈 슬롯만 지운다.
+        jdbcTemplate.update(
+                "delete from ai_call_slot where slot_type = ? and slot_no > ? and holder is null", type.name(), limit);
     }
 }

@@ -50,6 +50,7 @@ public class DefaultYoutubeVideoAnalyzer implements YoutubeVideoAnalyzer {
         Map<GuideKey, OutingGuide> analyzedResults = new ConcurrentHashMap<>();
         Map<Long, GuideKey> successfulAnalyses = new ConcurrentHashMap<>();
 
+        // V2 호출은 syncId가 없어 호출 스레드별로 대기열을 나눈다. 음수라 실제 syncId와 겹치지 않는다. #263에서 사라진다.
         long queueId = syncId == null ? -Thread.currentThread().threadId() : syncId;
         BlockingQueue<BatchOutcome> completed = new LinkedBlockingQueue<>();
         List<CompletableFuture<?>> submitted = new ArrayList<>();

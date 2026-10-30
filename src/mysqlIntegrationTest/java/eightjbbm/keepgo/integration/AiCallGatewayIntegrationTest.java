@@ -1,8 +1,12 @@
 package eightjbbm.keepgo.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallSlotRepository;
 import eightjbbm.keepgo.util.client.ai.gateway.DefaultAiCallGateway;
@@ -16,9 +20,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestConstructor;
+import org.springframework.test.context.TestPropertySource;
 
 /// 같은 MySQL 슬롯 테이블을 쓰는 게이트웨이 두 개로 인스턴스 간 전역 상한과 임대 만료 회수를 검증한다.
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@TestPropertySource(properties = "keepgo.ai-call.analysis-timeout=1s")
 @DisplayName("AI 호출 게이트웨이 MySQL 통합 테스트")
 class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
 
@@ -83,8 +89,59 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
         assertThat(call).succeedsWithin(Duration.ofSeconds(5));
     }
 
+    @Test
+    @DisplayName("5xx가 나도 같은 배치를 다시 보내지 않는다")
+    void doesNotRetryAnalysisOnServerError() {
+        AI_STUB.failAnalysis(503, "{\"message\":\"unavailable\"}");
+
+        CompletableFuture<?> call = gateway().submitAnalysis(1L, List.of("v0"), () -> {});
+        call.handle((response, error) -> null).join();
+
+        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("대기열에서 오래 기다린 배치도 전송 후 타임아웃 안에 응답하면 성공한다")
+    void waitingTimeIsNotPartOfHttpTimeout() {
+        // 이 클래스의 읽기 타임아웃은 1초다. 대기(앞 배치 0.7초 x 2)가 더 길어도 마지막 배치는 성공해야 한다.
+        AI_STUB.setAnalysisDelay(Duration.ofMillis(700));
+        DefaultAiCallGateway gateway = gateway(new AiCallProperties(
+                1, 1, Duration.ofSeconds(150), Duration.ofMillis(50), Duration.ofSeconds(130), Duration.ofSeconds(5)));
+
+        List<CompletableFuture<AnalyzeVideoResponseV2>> calls = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            calls.add(gateway.submitAnalysis(i, List.of("v" + i), () -> {}));
+        }
+
+        assertThat(calls.getLast().join()).isInstanceOf(AnalyzeVideoResponseV2.Success.class);
+    }
+
+    @Test
+    @DisplayName("임베딩 호출은 인스턴스가 여러 개여도 동시에 1건만 보낸다")
+    void sharesGlobalEmbeddingLimitAcrossInstances() {
+        AI_STUB.setEmbeddingDelay(Duration.ofMillis(300));
+        OutingGuide guide = mock(OutingGuide.class);
+        when(guide.getId()).thenReturn(1L);
+
+        List<CompletableFuture<?>> calls = new ArrayList<>();
+        for (DefaultAiCallGateway gateway : List.of(gateway(), gateway())) {
+            for (int i = 0; i < 2; i++) {
+                calls.add(gateway.submitEmbedding(List.of(guide)));
+            }
+        }
+        CompletableFuture.allOf(calls.toArray(CompletableFuture[]::new)).join();
+
+        assertThat(AI_STUB.embeddingRequestCount()).isEqualTo(4);
+        assertThat(AI_STUB.maxConcurrentRequests()).isEqualTo(1);
+    }
+
     private DefaultAiCallGateway gateway() {
-        DefaultAiCallGateway gateway = new DefaultAiCallGateway(aiServerService, slots, PROPERTIES);
+        return gateway(PROPERTIES);
+    }
+
+    private DefaultAiCallGateway gateway(AiCallProperties properties) {
+        DefaultAiCallGateway gateway = new DefaultAiCallGateway(aiServerService, slots, properties);
+        gateway.start();
         gateways.add(gateway);
         return gateway;
     }

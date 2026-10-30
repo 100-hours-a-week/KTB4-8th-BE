@@ -320,6 +320,27 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
+    @DisplayName("여러 회원이 동시에 동기화해도 동시 분석 요청은 3건을 넘지 않는다")
+    void concurrentSyncsShareGlobalAnalysisLimit() throws Exception {
+        YOUTUBE.addPage(videos(ids(0, 30)));
+        AI_STUB.setAnalysisDelay(Duration.ofMillis(300));
+        List<Member> members = List.of(newMember(), newMember(), newMember());
+
+        try (var executor = Executors.newFixedThreadPool(members.size())) {
+            List<Future<List<SseEvent>>> runs = new ArrayList<>();
+            for (Member member : members) {
+                runs.add(executor.submit(() -> runToSuccess(token(member))));
+            }
+            for (Future<List<SseEvent>> run : runs) {
+                run.get(30, TimeUnit.SECONDS);
+            }
+        }
+
+        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(9);
+        assertThat(AI_STUB.maxConcurrentRequests()).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("heartbeat가 만료된 동기화의 이전 실행자는 시작도 배치 커밋도 하지 못한다")
     void rejectsWritesAfterHeartbeatExpiry() {
         Member member = newMember();

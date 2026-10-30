@@ -3,6 +3,7 @@ package eightjbbm.keepgo.util.client.ai.gateway;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 /// 시도하며, 대기 시간은 HTTP 타임아웃에 포함되지 않는다. 슬롯은 실제 전송이 끝나면 반납한다.
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DefaultAiCallGateway implements AiCallGateway {
 
     private final AiServerService aiServerService;
@@ -47,12 +50,8 @@ public class DefaultAiCallGateway implements AiCallGateway {
         return thread;
     });
 
-    public DefaultAiCallGateway(
-            AiServerService aiServerService, AiCallSlotRepository slots, AiCallProperties properties) {
-        this.aiServerService = aiServerService;
-        this.slots = slots;
-        this.properties = properties;
-
+    @PostConstruct
+    public void start() {
         long intervalMillis = Math.max(1L, properties.retryInterval().toMillis());
         dispatcher.scheduleWithFixedDelay(this::dispatchSafely, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
     }
@@ -81,6 +80,9 @@ public class DefaultAiCallGateway implements AiCallGateway {
     private <T> CompletableFuture<T> enqueue(String queueKey, AiCallType type, Supplier<T> call, Runnable beforeSend) {
         CompletableFuture<T> future = new CompletableFuture<>();
         synchronized (lock) {
+            if (dispatcher.isShutdown()) {
+                return CompletableFuture.failedFuture(closed());
+            }
             boolean newQueue = !queues.containsKey(queueKey);
             queues.computeIfAbsent(queueKey, key -> new ArrayDeque<>())
                     .addLast(new QueuedCall<>(type, call, beforeSend, future));
@@ -198,8 +200,21 @@ public class DefaultAiCallGateway implements AiCallGateway {
 
     @PreDestroy
     public void shutdown() {
-        dispatcher.shutdownNow();
+        List<QueuedCall<?>> pending;
+        synchronized (lock) {
+            dispatcher.shutdownNow();
+            pending = queues.values().stream()
+                    .<QueuedCall<?>>flatMap(Deque::stream)
+                    .toList();
+            queues.clear();
+        }
         callers.shutdownNow();
+        // 대기 중인 호출자가 Future를 영원히 기다리지 않게 전송하지 않은 호출을 실패로 끝낸다.
+        pending.forEach(call -> call.future().completeExceptionally(closed()));
+    }
+
+    private static IllegalStateException closed() {
+        return new IllegalStateException("AI 호출 게이트웨이가 종료되어 호출을 보내지 않았습니다");
     }
 
     private record QueuedCall<T>(AiCallType type, Supplier<T> call, Runnable beforeSend, CompletableFuture<T> future) {}

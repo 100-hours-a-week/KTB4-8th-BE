@@ -57,7 +57,7 @@ class DefaultAiCallGatewayTest {
             }
             return failure();
         });
-        gateway = new DefaultAiCallGateway(ai, slots, PROPERTIES);
+        gateway = startedGateway();
 
         List<CompletableFuture<AnalyzeVideoResponseV2>> calls = List.of(
                 gateway.submitAnalysis(1, List.of("a"), () -> {}),
@@ -87,7 +87,7 @@ class DefaultAiCallGatewayTest {
             }
             return failure();
         });
-        gateway = new DefaultAiCallGateway(ai, slots, PROPERTIES);
+        gateway = startedGateway();
 
         CompletableFuture<AnalyzeVideoResponseV2> first = gateway.submitAnalysis(1, List.of("a1"), () -> {});
         CompletableFuture<AnalyzeVideoResponseV2> second = gateway.submitAnalysis(1, List.of("a2"), () -> {});
@@ -115,7 +115,7 @@ class DefaultAiCallGatewayTest {
             }
             return failure();
         });
-        gateway = new DefaultAiCallGateway(ai, slots, PROPERTIES);
+        gateway = startedGateway();
 
         CompletableFuture<AnalyzeVideoResponseV2> first =
                 gateway.submitAnalysis(1, List.of("a1"), beforeSendCalls::incrementAndGet);
@@ -128,6 +128,25 @@ class DefaultAiCallGatewayTest {
         CompletableFuture.allOf(first, second).join();
 
         assertThat(beforeSendCalls.get()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("종료하면 아직 보내지 않은 호출을 실패로 끝낸다")
+    void failsPendingCallsOnShutdown() {
+        when(slots.acquire(any(AiCallType.class), any(Duration.class))).thenReturn(Optional.empty());
+        gateway = startedGateway();
+
+        CompletableFuture<AnalyzeVideoResponseV2> pending = gateway.submitAnalysis(1, List.of("a"), () -> {});
+        gateway.shutdown();
+
+        assertThat(pending).failsWithin(Duration.ofSeconds(1));
+        assertThat(gateway.submitAnalysis(2, List.of("b"), () -> {})).isCompletedExceptionally();
+    }
+
+    private DefaultAiCallGateway startedGateway() {
+        DefaultAiCallGateway started = new DefaultAiCallGateway(ai, slots, PROPERTIES);
+        started.start();
+        return started;
     }
 
     private void givenSlots(int limit) {
