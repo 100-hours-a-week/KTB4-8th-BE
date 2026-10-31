@@ -6,6 +6,8 @@ import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysi
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisResult;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisResultRepository;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisStatus;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -34,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class SharedVideoAnalysisService {
 
     private static final long POLL_INTERVAL_MILLIS = 200;
+    private static final Duration WAIT_MARGIN = Duration.ofSeconds(30);
+    private static final String IN_PROGRESS_UNIQUE_KEY = "uk_video_analysis_in_progress_video";
 
     private static final Comparator<VideoAnalysis> NEWEST_COMPLETED = Comparator.comparing(
                     VideoAnalysis::getCompletedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
@@ -42,6 +46,7 @@ public class SharedVideoAnalysisService {
     private final VideoAnalysisRepository videoAnalysisRepository;
     private final VideoAnalysisResultRepository videoAnalysisResultRepository;
     private final VideoAnalysisManager videoAnalysisManager;
+    private final AiCallProperties aiCallProperties;
 
     /// 분석 소유권 경쟁의 결과. 소유하면 호출자가 AI에 보내고, 아니면 재사용하거나 진행 중인 분석에 합류한다.
     public record Claim(boolean owned, SharedVideoResult reused) {
@@ -81,14 +86,18 @@ public class SharedVideoAnalysisService {
 
     /// 영상의 분석 소유권을 얻는다. AI에 보내기 직전에 호출한다.
     ///
-    /// 진행 중 행 삽입이 유일 제약에 막히면 다른 곳이 분석 중이므로 합류한다. 삽입에 성공해도 그 사이
-    /// 다른 동기화가 유효한 결과를 끝냈다면 소유권을 내려놓고 그 결과를 재사용한다. 삽입이 실패하는 경우를
-    /// 잡아야 하므로 이 메서드는 트랜잭션 없이 저장소 호출마다 커밋한다.
+    /// 진행 중 행 삽입이 진행 중 분석의 유일 제약에 막히면 다른 곳이 분석 중이므로 합류한다. 다른 무결성
+    /// 위반은 합류로 가리지 않고 그대로 던진다. 삽입에 성공해도 그 사이 다른 동기화가 유효한 결과를
+    /// 끝냈다면 소유권을 내려놓고 그 결과를 재사용한다. 삽입이 실패하는 경우를 잡아야 하므로 이 메서드는
+    /// 트랜잭션 없이 저장소 호출마다 커밋한다.
     public Claim claim(Long syncId, String videoId) {
         VideoAnalysis claimed;
         try {
             claimed = videoAnalysisRepository.saveAndFlush(new VideoAnalysis(videoId, syncId));
-        } catch (DataIntegrityViolationException inProgress) {
+        } catch (DataIntegrityViolationException violation) {
+            if (!violatesInProgressUniqueKey(violation)) {
+                throw violation;
+            }
             return Claim.joining();
         }
 
@@ -100,11 +109,34 @@ public class SharedVideoAnalysisService {
         return Claim.won();
     }
 
+    private static boolean violatesInProgressUniqueKey(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && cause.getMessage().contains(IN_PROGRESS_UNIQUE_KEY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// 합류한 영상의 분석이 끝날 때까지 기다린다. 끝난 분석이 실패했거나 다시 분석할 상태면 FAILED로 돌려준다.
     ///
     /// 소유한 동기화가 이미 끝났는데 진행 중으로 남은 분석은 실패로 마감해 기다림이 끝나게 한다. 실행 인스턴스가
-    /// 죽은 경우는 동기화 heartbeat 만료로 sweeper가 분석을 FAILED로 마감한다.
+    /// 죽은 경우는 동기화 heartbeat 만료로 sweeper가 분석을 FAILED로 마감한다. 소유자는 살아 있는데 분석이
+    /// 끝나지 않는 경우를 위해 전송 제한 시간과 슬롯 임대 시간을 합한 만큼만 기다리고, 넘으면 남은 영상을
+    /// FAILED로 돌려준다.
     public Map<String, SharedVideoResult> awaitResolved(Collection<String> videoIds) throws InterruptedException {
+        return awaitResolved(
+                videoIds,
+                aiCallProperties
+                        .analysisTimeout()
+                        .plus(aiCallProperties.leaseDuration())
+                        .plus(WAIT_MARGIN));
+    }
+
+    /// 최대 `maxWait`까지만 기다린다. 넘으면 아직 진행 중인 영상은 이 분석 이력을 바꾸지 않고 FAILED로 돌려준다.
+    public Map<String, SharedVideoResult> awaitResolved(Collection<String> videoIds, Duration maxWait)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + maxWait.toNanos();
         Map<String, SharedVideoResult> resolved = new LinkedHashMap<>();
         List<String> waiting = new ArrayList<>(videoIds);
         while (true) {
@@ -122,6 +154,11 @@ public class SharedVideoAnalysisService {
                 }
             }
             if (waiting.isEmpty()) {
+                return resolved;
+            }
+            if (System.nanoTime() - deadline >= 0) {
+                log.warn("합류한 분석이 제한 시간 안에 끝나지 않아 실패로 처리합니다: videoCount={}", waiting.size());
+                waiting.forEach(videoId -> resolved.put(videoId, SharedVideoResult.failed(videoId)));
                 return resolved;
             }
             Thread.sleep(POLL_INTERVAL_MILLIS);

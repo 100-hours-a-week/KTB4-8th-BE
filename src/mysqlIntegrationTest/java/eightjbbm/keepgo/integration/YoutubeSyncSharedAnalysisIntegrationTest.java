@@ -38,6 +38,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.TestPropertySource;
@@ -324,6 +325,30 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
 
         assertThat(resolved.get("video-a").status()).isEqualTo(VideoAnalysisStatus.FAILED);
         assertThat(analysisStatus("video-a")).isEqualTo("FAILED");
+    }
+
+    @Test
+    @DisplayName("소유자가 살아 있어도 합류한 분석이 제한 시간 안에 끝나지 않으면 대기자는 실패로 끝나고 이력은 그대로 둔다")
+    void givesUpWaitingWhenOwnerNeverFinishes() throws Exception {
+        Member owner = newMember();
+        YoutubeSyncSnapshot ownerSync = syncService.create(owner.getId(), "instance-a", "trace-owner");
+        syncService.start(ownerSync.id(), "instance-a", 1, 1, 10);
+        assertThat(sharedAnalysis.claim(ownerSync.id(), "video-a").owned()).isTrue();
+
+        Map<String, SharedVideoResult> resolved =
+                sharedAnalysis.awaitResolved(List.of("video-a"), Duration.ofSeconds(1));
+
+        assertThat(resolved.get("video-a").status()).isEqualTo(VideoAnalysisStatus.FAILED);
+        assertThat(analysisStatus("video-a")).isEqualTo("IN_PROGRESS");
+        assertThat(analysisCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("진행 중 분석의 유일 제약이 아닌 무결성 위반은 합류로 가리지 않고 던진다")
+    void rethrowsOtherIntegrityViolationsOnClaim() {
+        assertThatThrownBy(() -> sharedAnalysis.claim(1L, "x".repeat(300)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(inProgressCount()).isZero();
     }
 
     @Test
