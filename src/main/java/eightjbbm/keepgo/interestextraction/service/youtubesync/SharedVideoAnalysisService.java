@@ -49,18 +49,18 @@ public class SharedVideoAnalysisService {
     private final AiCallProperties aiCallProperties;
 
     /// 분석 소유권 경쟁의 결과. 소유하면 호출자가 AI에 보내고, 아니면 재사용하거나 진행 중인 분석에 합류한다.
-    public record Claim(boolean owned, SharedVideoResult reused) {
+    public record AnalysisOwnership(boolean owned, SharedVideoResult reused) {
 
-        static Claim won() {
-            return new Claim(true, null);
+        static AnalysisOwnership won() {
+            return new AnalysisOwnership(true, null);
         }
 
-        static Claim reusing(SharedVideoResult result) {
-            return new Claim(false, result);
+        static AnalysisOwnership reusing(SharedVideoResult result) {
+            return new AnalysisOwnership(false, result);
         }
 
-        static Claim joining() {
-            return new Claim(false, null);
+        static AnalysisOwnership joining() {
+            return new AnalysisOwnership(false, null);
         }
     }
 
@@ -90,23 +90,23 @@ public class SharedVideoAnalysisService {
     /// 위반은 합류로 가리지 않고 그대로 던진다. 삽입에 성공해도 그 사이 다른 동기화가 유효한 결과를
     /// 끝냈다면 소유권을 내려놓고 그 결과를 재사용한다. 삽입이 실패하는 경우를 잡아야 하므로 이 메서드는
     /// 트랜잭션 없이 저장소 호출마다 커밋한다.
-    public Claim claim(Long syncId, String videoId) {
-        VideoAnalysis claimed;
+    public AnalysisOwnership acquireOwnership(Long syncId, String videoId) {
+        VideoAnalysis inProgressRow;
         try {
-            claimed = videoAnalysisRepository.saveAndFlush(new VideoAnalysis(videoId, syncId));
+            inProgressRow = videoAnalysisRepository.saveAndFlush(new VideoAnalysis(videoId, syncId));
         } catch (DataIntegrityViolationException violation) {
             if (!violatesInProgressUniqueKey(violation)) {
                 throw violation;
             }
-            return Claim.joining();
+            return AnalysisOwnership.joining();
         }
 
-        Resolution resolution = resolve(List.of(videoId), claimed.getId()).get(videoId);
+        Resolution resolution = resolve(List.of(videoId), inProgressRow.getId()).get(videoId);
         if (resolution.state() == State.REUSABLE) {
-            videoAnalysisRepository.delete(claimed);
-            return Claim.reusing(resolution.result());
+            videoAnalysisRepository.delete(inProgressRow);
+            return AnalysisOwnership.reusing(resolution.result());
         }
-        return Claim.won();
+        return AnalysisOwnership.won();
     }
 
     private static boolean violatesInProgressUniqueKey(Throwable error) {

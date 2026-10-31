@@ -70,9 +70,9 @@ class YoutubeSyncBatchProcessorTest {
 
     @Test
     @DisplayName("소유권 판정 중 오류가 나면 배치 전체를 FAILED로 한 번에 커밋한다")
-    void failsWholeBatchWhenClaimThrows() {
-        when(sharedAnalysis.claim(1L, "v0")).thenReturn(SharedVideoAnalysisService.Claim.won());
-        when(sharedAnalysis.claim(1L, "v1")).thenThrow(new IllegalStateException("claim failed"));
+    void failsWholeBatchWhenAcquireOwnershipThrows() {
+        when(sharedAnalysis.acquireOwnership(1L, "v0")).thenReturn(SharedVideoAnalysisService.AnalysisOwnership.won());
+        when(sharedAnalysis.acquireOwnership(1L, "v1")).thenThrow(new IllegalStateException("acquire failed"));
         givenGatewayRunsBeforeSend();
 
         processor.process(1L, "instance-a", 2L, YoutubeStub.videos("v0", "v1"), 10);
@@ -93,9 +93,11 @@ class YoutubeSyncBatchProcessorTest {
     @DisplayName("AI 호출이 실패해도 재사용·합류한 영상은 FAILED 이력을 만들지 않는다")
     void doesNotRecordFailedHistoryForReusedOrJoinedVideos() throws InterruptedException {
         SharedVideoResult reused = new SharedVideoResult("v1", VideoAnalysisStatus.NOT_FOUND, List.of());
-        when(sharedAnalysis.claim(1L, "v0")).thenReturn(SharedVideoAnalysisService.Claim.won());
-        when(sharedAnalysis.claim(1L, "v1")).thenReturn(SharedVideoAnalysisService.Claim.reusing(reused));
-        when(sharedAnalysis.claim(1L, "v2")).thenReturn(SharedVideoAnalysisService.Claim.joining());
+        when(sharedAnalysis.acquireOwnership(1L, "v0")).thenReturn(SharedVideoAnalysisService.AnalysisOwnership.won());
+        when(sharedAnalysis.acquireOwnership(1L, "v1"))
+                .thenReturn(SharedVideoAnalysisService.AnalysisOwnership.reusing(reused));
+        when(sharedAnalysis.acquireOwnership(1L, "v2"))
+                .thenReturn(SharedVideoAnalysisService.AnalysisOwnership.joining());
         when(sharedAnalysis.awaitResolved(List.of("v2"))).thenReturn(Map.of("v2", SharedVideoResult.failed("v2")));
         givenGatewayRunsBeforeSend();
 

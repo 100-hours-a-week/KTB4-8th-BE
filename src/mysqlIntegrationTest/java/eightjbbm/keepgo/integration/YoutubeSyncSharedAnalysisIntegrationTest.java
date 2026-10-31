@@ -223,17 +223,18 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
 
     @Test
     @DisplayName("같은 영상의 분석 소유권 경쟁은 하나만 이기고 나머지는 합류한다")
-    void onlyOneClaimWinsRace() throws Exception {
+    void onlyOneOwnerWinsRace() throws Exception {
         int contenders = 8;
         List<Boolean> owned;
         try (var executor = Executors.newFixedThreadPool(contenders)) {
-            List<Future<Boolean>> claims = IntStream.range(0, contenders)
-                    .mapToObj(index -> executor.submit(() ->
-                            sharedAnalysis.claim(1000L + index, "race-video").owned()))
+            List<Future<Boolean>> attempts = IntStream.range(0, contenders)
+                    .mapToObj(index -> executor.submit(() -> sharedAnalysis
+                            .acquireOwnership(1000L + index, "race-video")
+                            .owned()))
                     .toList();
             owned = new ArrayList<>();
-            for (Future<Boolean> claim : claims) {
-                owned.add(claim.get(30, TimeUnit.SECONDS));
+            for (Future<Boolean> attempt : attempts) {
+                owned.add(attempt.get(30, TimeUnit.SECONDS));
             }
         }
 
@@ -279,7 +280,8 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         Member next = newMember();
         YoutubeSyncSnapshot ownerSync = syncService.create(owner.getId(), "instance-a", "trace-owner");
         syncService.start(ownerSync.id(), "instance-a", 1, 1, 10);
-        assertThat(sharedAnalysis.claim(ownerSync.id(), "video-a").owned()).isTrue();
+        assertThat(sharedAnalysis.acquireOwnership(ownerSync.id(), "video-a").owned())
+                .isTrue();
 
         try (var executor = Executors.newFixedThreadPool(1)) {
             Future<Long> waiting = executor.submit(() -> runSync(processor, waiter, "instance-b", "video-a"));
@@ -333,7 +335,8 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         Member owner = newMember();
         YoutubeSyncSnapshot ownerSync = syncService.create(owner.getId(), "instance-a", "trace-owner");
         syncService.start(ownerSync.id(), "instance-a", 1, 1, 10);
-        assertThat(sharedAnalysis.claim(ownerSync.id(), "video-a").owned()).isTrue();
+        assertThat(sharedAnalysis.acquireOwnership(ownerSync.id(), "video-a").owned())
+                .isTrue();
 
         Map<String, SharedVideoResult> resolved =
                 sharedAnalysis.awaitResolved(List.of("video-a"), Duration.ofSeconds(1));
@@ -345,8 +348,8 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
 
     @Test
     @DisplayName("진행 중 분석의 유일 제약이 아닌 무결성 위반은 합류로 가리지 않고 던진다")
-    void rethrowsOtherIntegrityViolationsOnClaim() {
-        assertThatThrownBy(() -> sharedAnalysis.claim(1L, "x".repeat(300)))
+    void rethrowsOtherIntegrityViolationsOnAcquire() {
+        assertThatThrownBy(() -> sharedAnalysis.acquireOwnership(1L, "x".repeat(300)))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(inProgressCount()).isZero();
     }
