@@ -58,3 +58,41 @@ JOIN (
    AND d.address_key = CAST(g.address AS BINARY)
 WHERE g.image_id IS NOT NULL AND g.id <> d.representative_id
 ORDER BY g.id;
+
+-- 이관 뒤 한 코스에 같은 가이드가 여러 정류장으로 남는 코스 수와 정류장 수. 순서는 유지하며 허용한다.
+SELECT COUNT(*) AS course_count, COALESCE(SUM(stop_count), 0) AS stop_count
+FROM (
+    SELECT s.outing_course_id, COUNT(*) AS stop_count
+    FROM outing_stop s
+    JOIN outing_guide g ON g.id = s.outing_guide_id
+    JOIN (
+        SELECT CAST(type AS BINARY) AS type_key, CAST(name AS BINARY) AS name_key,
+               CAST(address AS BINARY) AS address_key
+        FROM outing_guide
+        GROUP BY type_key, name_key, address_key
+    ) d ON d.type_key = CAST(g.type AS BINARY)
+       AND d.name_key = CAST(g.name AS BINARY)
+       AND d.address_key = CAST(g.address AS BINARY)
+    GROUP BY s.outing_course_id, d.type_key, d.name_key, d.address_key
+    HAVING COUNT(*) > 1
+) repeated_stops;
+
+-- 대표가 아닌 가이드에 걸린 임베딩 outbox 행 수. 삭제 시 on delete cascade로 함께 사라진다.
+SELECT COUNT(*) AS removable_outbox_count
+FROM outing_guide_embedding_outbox o
+JOIN outing_guide g ON g.id = o.guide_id
+JOIN (
+    SELECT CAST(type AS BINARY) AS type_key, CAST(name AS BINARY) AS name_key,
+           CAST(address AS BINARY) AS address_key, MIN(id) AS representative_id
+    FROM outing_guide
+    GROUP BY type_key, name_key, address_key
+) d ON d.type_key = CAST(g.type AS BINARY)
+   AND d.name_key = CAST(g.name AS BINARY)
+   AND d.address_key = CAST(g.address AS BINARY)
+WHERE g.id <> d.representative_id;
+
+-- type 값이 소문자 event·place가 아닌 행. 있으면 V8의 collation 변경 뒤 CHECK가 실패할 수 있다.
+SELECT id AS guide_id, type
+FROM outing_guide
+WHERE CAST(type AS BINARY) NOT IN (CAST('event' AS BINARY), CAST('place' AS BINARY))
+ORDER BY id;

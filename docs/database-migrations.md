@@ -77,6 +77,11 @@ GitHub의 브랜치 보호/ruleset에서도 `MySQL migrations`를 필수 검사�
 - 대표가 아닌 가이드를 삭제하면 `outing_guide_embedding_outbox`의 해당 행(PENDING·FAILED 포함)도 `on delete cascade`로 함께 삭제된다. 대표 가이드의 임베딩 작업은 그대로 남는다.
 - 대표 ID로 바꾼 뒤 같은 회원의 활성 위시리스트가 겹치면, 이관 전부터 있던 중복이라도 최소 ID만 남기고 나머지에 `deleted_at`을 기록한다.
 - `type`·`name`·`address` 컬럼의 collation은 모두 `utf8mb4_0900_bin`으로 바뀐다.
+- "공백" 판정은 MySQL `TRIM()` 기준이라 일반 공백(U+0020)만 해당한다. 탭·개행·전각 공백만 있는 값은 가드를 통과하므로 사전 보고서로 실제 데이터를 확인한다.
+- 길이 초과 검사는 현재 `varchar(255)`에서는 도달하지 않지만, 운영 baseline 스키마가 V1과 같다고 보장할 수 없어 유지한다.
+- 대표 ID로 바꾼 뒤 한 코스에 같은 가이드가 여러 정류장으로 남을 수 있다. 정류장 순서는 유지하며 병합하지 않는다. 건수는 사전 보고서에서 확인한다.
+- `outing_guide_dedup_map`·`outing_guide_dedup_invalid`는 자동으로 지우지 않는다. AI 팀의 Chroma 벡터 삭제가 끝난 뒤 별도로 삭제하며, 시점은 #309에 기록한다.
+- `type`이 소문자 `event`·`place`가 아닌 행이 있으면 collation 변경 뒤 CHECK가 가드 이후에 실패할 수 있다. 사전 보고서의 마지막 조회가 비어 있어야 한다.
 
 ## 기존 DB의 스키마 비교와 baseline 절차
 
