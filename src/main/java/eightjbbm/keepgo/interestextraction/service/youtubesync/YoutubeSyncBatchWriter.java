@@ -28,12 +28,28 @@ public class YoutubeSyncBatchWriter {
 
     /// 배치 결과를 저장한다. 새로 만든 가이드의 임베딩 작업도 같은 트랜잭션에 기록한다.
     public void commit(Long syncId, String instanceId, Long memberId, BatchAnalysis batch, int progress) {
-        withRetry("commit", () -> commitService.commit(syncId, instanceId, memberId, batch, progress));
+        commit(syncId, instanceId, memberId, batch, List.of(), progress);
+    }
+
+    /// 배치 결과에 다른 동기화가 끝낸 공유 결과를 함께 반영한다. 공유 결과는 분석 이력을 새로 만들지 않는다.
+    public void commit(
+            Long syncId,
+            String instanceId,
+            Long memberId,
+            BatchAnalysis batch,
+            List<SharedVideoResult> shared,
+            int progress) {
+        withRetry("commit", () -> commitService.commit(syncId, instanceId, memberId, batch, shared, progress));
     }
 
     /// 커밋에 실패한 배치를 실패 영상으로만 기록한다. 이미 커밋된 배치는 건드리지 않는다.
     public void recordFailed(Long syncId, String instanceId, List<String> videoIds, int progress) {
         commitService.recordFailed(syncId, instanceId, videoIds, progress);
+    }
+
+    /// 공유 결과만 반영하려던 커밋이 실패하면 분석 이력은 건드리지 않고 처리·실패 수만 남긴다.
+    public void recordSharedFailed(Long syncId, String instanceId, int videoCount, int progress) {
+        commitService.recordSharedFailed(syncId, instanceId, videoCount, progress);
     }
 
     private void withRetry(String action, Runnable attempt) {
