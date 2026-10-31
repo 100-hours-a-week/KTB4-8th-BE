@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 public class OutingWishlistPageReader {
 
     private static final int PAGE_SIZE = 10;
-
     private final OutingWishlistQueryRepository outingWishlistQueryRepository;
     private final PageTokenCodec pageTokenCodec;
 
