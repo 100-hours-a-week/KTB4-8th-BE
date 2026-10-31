@@ -364,6 +364,34 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
+    @DisplayName("알 수 없는 가이드 유형이 섞인 영상은 정상 가이드까지 실패시키고 같은 배치의 다른 영상은 저장한다")
+    void failsOnlyUnknownGuideTypeVideo() throws Exception {
+        YOUTUBE.addPage(videos("v0", "v1"));
+        AI_STUB.failAnalysisForVideo(
+                "v0",
+                200,
+                "{\"message\":\"analyze_success\",\"data\":{\"results\":["
+                        + "{\"video_url\":\"https://youtube.com/shorts/v0\",\"status\":\"success\",\"error\":null,"
+                        + "\"place_type\":\"장소\",\"place_name\":\"같은 영상의 정상 장소\","
+                        + "\"address\":\"서울특별시 종로구 같은로 1\",\"lat\":37.6,\"lng\":127.1},"
+                        + "{\"video_url\":\"https://youtube.com/shorts/v0\",\"status\":\"success\",\"error\":null,"
+                        + "\"place_type\":\"OTHER\",\"place_name\":\"알 수 없는 유형\","
+                        + "\"address\":\"서울특별시 종로구 기타로 1\",\"lat\":37.7,\"lng\":127.2},"
+                        + "{\"video_url\":\"https://youtube.com/shorts/v1\",\"status\":\"success\",\"error\":null,"
+                        + "\"place_type\":\"장소\",\"place_name\":\"정상 장소\","
+                        + "\"address\":\"서울특별시 종로구 정상로 1\",\"lat\":37.5,\"lng\":127.0}]}}");
+        Member member = newMember();
+
+        runToSuccess(token(member));
+
+        assertThat(analysisStatus("v0")).isEqualTo("FAILED");
+        assertThat(failureCode("v0")).isEqualTo("INVALID_AI_RESPONSE");
+        assertThat(analysisStatus("v1")).isEqualTo("SUCCESS");
+        assertThat(guideCount()).isEqualTo(1);
+        assertThat(wishlistCount(member)).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("이전 AI 계약 응답은 fallback 없이 그 배치를 실패시킨다")
     void doesNotFallbackToLegacyContract() throws Exception {
         YOUTUBE.addPage(videos("video-a"));
