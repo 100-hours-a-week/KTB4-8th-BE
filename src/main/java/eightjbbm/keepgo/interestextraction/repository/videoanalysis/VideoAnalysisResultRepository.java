@@ -1,6 +1,8 @@
 package eightjbbm.keepgo.interestextraction.repository.videoanalysis;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,4 +18,6 @@ public interface VideoAnalysisResultRepository extends JpaRepository<VideoAnalys
         where v.videoAnalysis.id in :videoAnalysisIds
     """)
     Set<OutingGuide> findOutingGuidesByVideoAnalysisIdIn(@Param("videoAnalysisIds") Set<Long> videoAnalysisIds);
+
+    List<VideoAnalysisResult> findAllByIdVideoAnalysisIdIn(Collection<Long> videoAnalysisIds);
 }

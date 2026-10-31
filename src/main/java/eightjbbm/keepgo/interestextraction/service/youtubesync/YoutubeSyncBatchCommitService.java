@@ -12,6 +12,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,9 +46,26 @@ public class YoutubeSyncBatchCommitService {
     private final EmbeddingOutboxService embeddingOutboxService;
 
     /// 배치 결과를 저장한다. 새로 만든 가이드의 임베딩 작업도 같은 트랜잭션에 기록한다.
+    ///
+    /// `shared`는 다른 동기화가 끝낸 영상의 분석 결과다. 분석 이력은 새로 만들지 않고 처리·실패 수와
+    /// 이 회원의 위시리스트 반영에만 쓴다.
     @Transactional
-    public void commit(Long syncId, String instanceId, Long memberId, BatchAnalysis batch, int progress) {
-        fence(syncId, instanceId, batch.processedCount(), batch.failedCount(), progress);
+    public void commit(
+            Long syncId,
+            String instanceId,
+            Long memberId,
+            BatchAnalysis batch,
+            List<SharedVideoResult> shared,
+            int progress) {
+        fence(
+                syncId,
+                instanceId,
+                batch.processedCount() + shared.size(),
+                batch.failedCount()
+                        + (int) shared.stream()
+                                .filter(result -> !result.succeeded())
+                                .count(),
+                progress);
 
         List<OutingGuide> createdGuides = new ArrayList<>();
         Map<GuideKey, OutingGuide> guidesByKey = resolveGuides(batch.guides(), createdGuides);
@@ -63,8 +81,14 @@ public class YoutubeSyncBatchCommitService {
         List<VideoAnalysisResult> mappings = mappings(batch, analysesByVideoId, guidesByKey);
         videoAnalysisResultRepository.saveAll(mappings);
 
-        outingWishlistSyncService.sync(memberId, List.copyOf(guidesByKey.values()));
+        outingWishlistSyncService.sync(memberId, wishlistGuides(guidesByKey.values(), shared));
         embeddingOutboxService.enqueue(createdGuides);
+    }
+
+    /// 공유 결과만 반영한 배치가 커밋에 실패해도 분석 이력은 건드리지 않고 처리·실패 수만 남긴다.
+    @Transactional
+    public void recordSharedFailed(Long syncId, String instanceId, int videoCount, int progress) {
+        fence(syncId, instanceId, videoCount, videoCount, progress);
     }
 
     /// 커밋에 실패한 배치를 실패 영상으로만 기록한다. 이미 커밋된 배치는 건드리지 않는다.
@@ -91,6 +115,21 @@ public class YoutubeSyncBatchCommitService {
         }
         return videoAnalysisRepository.findAllByYoutubeSyncIdAndVideoIdIn(syncId, videoIds).stream()
                 .collect(Collectors.toMap(VideoAnalysis::getVideoId, Function.identity(), (first, duplicate) -> first));
+    }
+
+    /// 이번 분석으로 저장한 가이드와 공유 결과의 가이드를 합친다. 같은 가이드는 ID로 한 번만 담는다.
+    private List<OutingGuide> wishlistGuides(Collection<OutingGuide> analyzed, List<SharedVideoResult> shared) {
+        Map<Long, OutingGuide> guides = new LinkedHashMap<>();
+        analyzed.forEach(guide -> guides.put(guide.getId(), guide));
+        List<Long> sharedGuideIds = shared.stream()
+                .flatMap(result -> result.guideIds().stream())
+                .filter(guideId -> !guides.containsKey(guideId))
+                .distinct()
+                .toList();
+        if (!sharedGuideIds.isEmpty()) {
+            outingGuideRepository.findAllById(sharedGuideIds).forEach(guide -> guides.put(guide.getId(), guide));
+        }
+        return List.copyOf(guides.values());
     }
 
     private void fence(Long syncId, String instanceId, int processedCount, int failedCount, int progress) {

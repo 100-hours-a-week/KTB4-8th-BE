@@ -27,8 +27,9 @@ class YoutubeSyncBatchProcessorTest {
     private final AiCallGateway gateway = mock(AiCallGateway.class);
     private final YoutubeSyncBatchWriter batchWriter = mock(YoutubeSyncBatchWriter.class);
     private final VideoAnalysisManager videoAnalysisManager = mock(VideoAnalysisManager.class);
+    private final SharedVideoAnalysisService sharedAnalysis = mock(SharedVideoAnalysisService.class);
     private final YoutubeSyncBatchProcessor processor =
-            new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager);
+            new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager, sharedAnalysis);
 
     @Test
     @DisplayName("재시도가 모두 실패한 배치는 FAILED로 기록한다")
@@ -37,11 +38,11 @@ class YoutubeSyncBatchProcessorTest {
                 .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
         doThrow(new CannotAcquireLockException("deadlock"))
                 .when(batchWriter)
-                .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
+                .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyList(), anyInt());
 
         processor.process(1L, "instance-a", 2L, YoutubeStub.videos("v0"), 10);
 
-        verify(batchWriter).commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
+        verify(batchWriter).commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyList(), anyInt());
         verify(batchWriter).recordFailed(1L, "instance-a", List.of("v0"), 100);
     }
 
@@ -52,7 +53,7 @@ class YoutubeSyncBatchProcessorTest {
                 .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
         doThrow(new SyncFencedException(1L))
                 .when(batchWriter)
-                .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyInt());
+                .commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyList(), anyInt());
 
         assertThatThrownBy(() -> processor.process(1L, "instance-a", 2L, YoutubeStub.videos("v0"), 10))
                 .isInstanceOf(SyncFencedException.class);

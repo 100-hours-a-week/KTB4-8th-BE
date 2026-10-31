@@ -27,7 +27,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -73,14 +75,16 @@ public class DefaultAiCallGateway implements AiCallGateway {
 
     @Override
     public CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
-            long syncId, List<String> videoIds, Runnable beforeSend) {
-        List<String> ids = List.copyOf(videoIds);
-        Runnable start = beforeSend == null ? () -> {} : beforeSend;
+            long syncId, List<String> videoIds, UnaryOperator<List<String>> beforeSend) {
+        List<String> requested = List.copyOf(videoIds);
+        AtomicReference<List<String>> toSend = new AtomicReference<>(requested);
         return enqueue(
                 "sync:" + syncId,
                 AiCallType.ANALYSIS,
-                () -> videoAnalysisJobClient.analyzeVideo(ids, properties.analysisTimeout()),
-                start);
+                () -> toSend.get().isEmpty()
+                        ? new VideoAnalysisResponse(List.of())
+                        : videoAnalysisJobClient.analyzeVideo(toSend.get(), properties.analysisTimeout()),
+                () -> toSend.set(List.copyOf(beforeSend.apply(requested))));
     }
 
     @Override

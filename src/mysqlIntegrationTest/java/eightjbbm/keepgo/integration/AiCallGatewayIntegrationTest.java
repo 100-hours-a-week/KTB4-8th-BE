@@ -75,7 +75,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
         List<CompletableFuture<?>> calls = new ArrayList<>();
         for (DefaultAiCallGateway gateway : List.of(first, second)) {
             for (int i = 0; i < 3; i++) {
-                calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), () -> {}));
+                calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), ids -> ids));
             }
         }
 
@@ -94,7 +94,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
                  WHERE slot_type = 'ANALYSIS'
                 """);
 
-        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), () -> {});
+        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), ids -> ids);
 
         assertThat(call).succeedsWithin(Duration.ofSeconds(5));
     }
@@ -104,7 +104,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
     void doesNotRetryAnalysisOnServerError() {
         AI_STUB.failAnalysis(503, "{\"message\":\"unavailable\"}");
 
-        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), () -> {});
+        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), ids -> ids);
         call.handle((response, error) -> null).join();
 
         assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
@@ -126,7 +126,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
 
         List<CompletableFuture<VideoAnalysisResponse>> calls = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), () -> {}));
+            calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), ids -> ids));
         }
 
         assertThat(calls.getLast().join().results()).hasSize(1);
