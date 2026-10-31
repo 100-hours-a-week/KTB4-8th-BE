@@ -1,6 +1,6 @@
 # MySQL·Flyway 검증과 명시적 baseline
 
-#223의 범위는 검증 기반이다. 운영 DB 접속·정정·baseline·migration은 이 작업에서 수행하지 않는다. Guide 중복 정리, 이름·주소의 전역 NOT NULL/유일성 적용 및 실제 전환은 #234·#237에서 수행한다.
+#223의 범위는 검증 기반이다. 운영 DB 접속·정정·baseline·migration은 이 작업에서 수행하지 않는다. Guide 중복 정리와 이름·주소의 전역 NOT NULL/유일성 적용은 개발 DB에서 V8로 수행하고, 운영 적용은 #309에서 한다.
 
 ## 기본 실행과 opt-in 프로필
 
@@ -61,6 +61,14 @@ CI와 동일하게 `MYSQL_TEST_SERVER_URL` 환경 변수를 사용해도 된다.
 PR과 main/develop push에서 `MySQL migrations` 작업을 실행한다. MySQL 8.4.8 서비스에 Flyway 통합 검사를 수행하고 실패 시 보고서를 보관한다. 이미지 빌드·ECR 발행 작업은 이 작업을 `needs`로 요구한다. PR은 이미지 발행을 수행하지 않는다.
 
 GitHub의 브랜치 보호/ruleset에서도 `MySQL migrations`를 필수 검사로 선택해야 병합 자체를 차단할 수 있다. 저장소 규칙 변경은 이 코드 작업에 포함하지 않는다. 기존 전체 애플리케이션/인증 테스트 환경 준비와는 별개다.
+
+## 가이드 중복 이관 (V8, 개발 DB)
+
+`V8__outing_guide_unique_key.sql`은 개발 DB 범위의 이관이며 운영 DB에는 #309에서 적용한다.
+
+1. `scripts/guide-dedup-preflight.sql`을 읽기 전용 계정으로 실행해 중복 그룹·참조 수·이상 데이터를 이슈에 기록한다.
+2. null·공백·길이 초과 데이터가 하나라도 있으면 migration이 `chk_outing_guide_dedup_guard` 위반으로 중단되고 `outing_guide_dedup_invalid`에 대상 ID와 참조 수가 남는다. 자동 보정하지 않는다. 데이터를 고친 뒤에는 실패한 Flyway 이력을 `flyway repair`로 정리하고 다시 실행한다.
+3. 이관 뒤 대표가 아닌 ID와 이미지는 `outing_guide_dedup_map`에 남는다. `scripts/guide-dedup-export.sql`로 내보내 AI 벡터 삭제에 사용한다. 이미지 행은 삭제하지 않는다.
 
 ## 기존 DB의 스키마 비교와 baseline 절차
 
