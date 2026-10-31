@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live in `100-hours-a-week/KTB4-8th-BE` on GitHub. Use the `gh` CLI for all operations. If `gh` is not on PATH, use `/home/user/.local/bin/gh`.
+Issues and specs for this repo live in `100-hours-a-week/KTB4-8th-BE` on GitHub. Use the `gh` CLI for all operations. On Windows, `gh` installs to `C:\Program Files\GitHub CLI\gh.exe`; use the full path if it is not on PATH yet (a new terminal picks it up). Run `gh auth login` once before the first use.
 
 ## Conventions
 
