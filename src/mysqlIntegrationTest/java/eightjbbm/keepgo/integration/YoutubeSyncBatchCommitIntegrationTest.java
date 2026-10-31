@@ -590,7 +590,7 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     @Test
     @DisplayName("여러 회원이 같은 영상들을 동시에 동기화해도 영상별 분석 전송은 중복되지 않고 동시 요청은 3건을 넘지 않는다")
     void concurrentSyncsDoNotSubmitSameVideoTwice() throws Exception {
-        YOUTUBE.addPage(videos(ids(0, 30)));
+        YOUTUBE.addPage(videos(ids(0, 90)));
         AI_STUB.setAnalysisDelay(Duration.ofMillis(300));
         List<Member> members = List.of(newMember(), newMember(), newMember());
 
@@ -601,14 +601,15 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
             }
             for (Future<List<SseEvent>> run : runs) {
                 JsonNode success = data(run.get(30, TimeUnit.SECONDS).getLast());
-                assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(30);
+                assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(90);
                 assertThat(success.get("video_failed_count").asInt()).isZero();
             }
         }
 
-        assertThat(submittedVideoIds()).hasSize(30).doesNotHaveDuplicates();
-        assertThat(AI_STUB.maxConcurrentRequests()).isLessThanOrEqualTo(3);
-        members.forEach(member -> assertThat(wishlistCount(member)).isEqualTo(30));
+        assertThat(submittedVideoIds()).hasSize(90).doesNotHaveDuplicates();
+        assertThat(AI_STUB.analysisRequestCount()).isGreaterThanOrEqualTo(9);
+        assertThat(AI_STUB.maxConcurrentRequests()).isEqualTo(3);
+        members.forEach(member -> assertThat(wishlistCount(member)).isEqualTo(90));
     }
 
     @Test
