@@ -8,6 +8,9 @@ application-local.yml
 application-test.yml
 .env
 
+### Agent skills ###
+.agents/skills/
+
 ### STS ###
 .apt_generated
 .classpath
