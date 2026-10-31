@@ -56,14 +56,19 @@ create table outing_guide_dedup_map (
 ) engine=InnoDB;
 
 insert into outing_guide_dedup_map (guide_id, representative_id, image_id)
-select g.id,
-       (select min(r.id)
-        from outing_guide r
-        where cast(r.type as binary) = cast(g.type as binary)
-          and cast(r.name as binary) = cast(g.name as binary)
-          and cast(r.address as binary) = cast(g.address as binary)),
-       g.image_id
-from outing_guide g;
+select g.id, r.representative_id, g.image_id
+from outing_guide g
+join (
+    select cast(type as binary) as type_key,
+           cast(name as binary) as name_key,
+           cast(address as binary) as address_key,
+           min(id) as representative_id
+    from outing_guide
+    group by type_key, name_key, address_key
+) r
+    on r.type_key = cast(g.type as binary)
+   and r.name_key = cast(g.name as binary)
+   and r.address_key = cast(g.address as binary);
 
 update outing_stop s
 join outing_guide_dedup_map m on m.guide_id = s.outing_guide_id
