@@ -36,7 +36,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -109,24 +108,9 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         jdbcTemplate.update("DELETE FROM member");
     }
 
-    @AfterEach
-    void dropTemporaryConstraint() {
-        Integer exists = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM information_schema.statistics
-                WHERE table_schema = DATABASE()
-                  AND table_name = 'outing_guide'
-                  AND index_name = 'uk_guide_identity'
-                """, Integer.class);
-        if (exists != null && exists > 0) {
-            jdbcTemplate.execute("ALTER TABLE outing_guide DROP INDEX uk_guide_identity");
-        }
-    }
-
     @Test
     @DisplayName("이름과 주소가 같은 장소와 행사는 서로 다른 가이드로 저장한다")
     void storesPlaceAndEventSeparately() {
-        createGuideIdentityIndex();
         Member member = newMember();
         YoutubeSyncSnapshot sync = syncService.create(member.getId(), "instance-a", "trace-id");
         syncService.start(sync.id(), "instance-a", 2, 2, 10);
@@ -146,7 +130,6 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     @Test
     @DisplayName("두 동기화가 같은 새 가이드를 동시에 저장해도 한 가이드로 수렴하고 AI 호출은 늘지 않는다")
     void concurrentSyncsReuseGuideWithoutExtraAiCalls() throws Exception {
-        createGuideIdentityIndex();
         YOUTUBE.addPage(videos("video-a"));
         AI_STUB.useSharedGuide("동시 가이드", "서울특별시 종로구 동시로 1");
         Member first = newMember();
@@ -171,7 +154,6 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     @Test
     @DisplayName("충돌 재시도 때 앞선 시도에서 저장하려던 다른 새 가이드도 함께 저장한다")
     void retrySavesOtherNewGuidesOfRolledBackAttempt() throws Exception {
-        createGuideIdentityIndex();
         Member first = newMember();
         Member second = newMember();
         YoutubeSyncSnapshot firstSync = syncService.create(first.getId(), "instance-a", "trace-a");
@@ -611,11 +593,6 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     private Timestamp analysisCompletedAt(String videoId) {
         return jdbcTemplate.queryForObject(
                 "SELECT completed_at FROM video_analysis WHERE video_id = ?", Timestamp.class, videoId);
-    }
-
-    /// DB 유일성 제약은 별도 이관 티켓이 적용한다. 이 테스트는 같은 제약을 임시로 걸어 충돌을 재현한다.
-    private void createGuideIdentityIndex() {
-        jdbcTemplate.execute("ALTER TABLE outing_guide ADD UNIQUE KEY uk_guide_identity (type, name, address)");
     }
 
     private static OutingPlace place(String name, String address) {

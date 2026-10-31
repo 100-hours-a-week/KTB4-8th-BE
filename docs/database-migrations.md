@@ -1,6 +1,6 @@
 # MySQL·Flyway 검증과 명시적 baseline
 
-#223의 범위는 검증 기반이다. 운영 DB 접속·정정·baseline·migration은 이 작업에서 수행하지 않는다. Guide 중복 정리, 이름·주소의 전역 NOT NULL/유일성 적용 및 실제 전환은 #234·#237에서 수행한다.
+#223의 범위는 검증 기반이다. 운영 DB 접속·정정·baseline·migration은 이 작업에서 수행하지 않는다. Guide 중복 정리와 이름·주소의 전역 NOT NULL/유일성 적용은 개발 DB에서 V8로 수행하고, 운영 적용은 #309에서 한다.
 
 ## 기본 실행과 opt-in 프로필
 
@@ -61,6 +61,27 @@ CI와 동일하게 `MYSQL_TEST_SERVER_URL` 환경 변수를 사용해도 된다.
 PR과 main/develop push에서 `MySQL migrations` 작업을 실행한다. MySQL 8.4.8 서비스에 Flyway 통합 검사를 수행하고 실패 시 보고서를 보관한다. 이미지 빌드·ECR 발행 작업은 이 작업을 `needs`로 요구한다. PR은 이미지 발행을 수행하지 않는다.
 
 GitHub의 브랜치 보호/ruleset에서도 `MySQL migrations`를 필수 검사로 선택해야 병합 자체를 차단할 수 있다. 저장소 규칙 변경은 이 코드 작업에 포함하지 않는다. 기존 전체 애플리케이션/인증 테스트 환경 준비와는 별개다.
+
+## 가이드 중복 이관 (V8, 개발 DB)
+
+`V8__outing_guide_unique_key.sql`은 개발 DB 범위의 이관이며 운영 DB에는 #309에서 적용한다.
+
+1. `scripts/guide-dedup-preflight.sql`을 읽기 전용 계정으로 실행해 중복 그룹·참조 수·이상 데이터를 이슈에 기록한다.
+2. 실행 전 DB를 백업하고 migration이 끝날 때까지 다른 서버의 쓰기를 멈춘다. MySQL DDL은 암묵적으로 커밋하므로 V8은 하나의 트랜잭션으로 되돌려지지 않는다.
+3. null·공백·길이 초과 데이터가 하나라도 있으면 migration이 `chk_outing_guide_dedup_guard` 위반으로 중단되고 `outing_guide_dedup_invalid`에 대상 ID와 참조 수가 남는다. 자동 보정하지 않는다. 이 중단은 이관 대상 데이터를 바꾸기 전이므로, 데이터를 고친 뒤 실패한 Flyway 이력을 `flyway repair`로 정리하고 다시 실행한다.
+4. 가드 이후 단계(`outing_guide_dedup_map` 생성부터 제약 추가까지)에서 실패하면 그대로 다시 실행하지 않는다. 일부 참조가 이미 바뀌었을 수 있으므로 2의 백업으로 복원한 뒤 원인을 고치고 다시 실행한다.
+5. 이관 뒤 대표가 아닌 ID와 이미지는 `outing_guide_dedup_map`에 남는다. `scripts/guide-dedup-export.sql`로 내보내 AI 벡터 삭제에 사용한다. 이미지 행은 삭제하지 않는다.
+
+주의할 결과:
+
+- 대표가 아닌 가이드를 삭제하면 `outing_guide_embedding_outbox`의 해당 행(PENDING·FAILED 포함)도 `on delete cascade`로 함께 삭제된다. 대표 가이드의 임베딩 작업은 그대로 남는다.
+- 대표 ID로 바꾼 뒤 같은 회원의 활성 위시리스트가 겹치면, 이관 전부터 있던 중복이라도 최소 ID만 남기고 나머지에 `deleted_at`을 기록한다.
+- `type`·`name`·`address` 컬럼의 collation은 모두 `utf8mb4_0900_bin`으로 바뀐다.
+- "공백" 판정은 MySQL `TRIM()` 기준이라 일반 공백(U+0020)만 해당한다. 탭·개행·전각 공백만 있는 값은 가드를 통과하므로 사전 보고서로 실제 데이터를 확인한다.
+- 길이 초과 검사는 현재 `varchar(255)`에서는 도달하지 않지만, 운영 baseline 스키마가 V1과 같다고 보장할 수 없어 유지한다.
+- 대표 ID로 바꾼 뒤 한 코스에 같은 가이드가 여러 정류장으로 남을 수 있다. 정류장 순서는 유지하며 병합하지 않는다. 건수는 사전 보고서에서 확인한다.
+- `outing_guide_dedup_map`·`outing_guide_dedup_invalid`는 자동으로 지우지 않는다. AI 팀의 Chroma 벡터 삭제가 끝난 뒤 별도로 삭제하며, 시점은 #309에 기록한다.
+- `type`이 소문자 `event`·`place`가 아닌 행이 있으면 collation 변경 뒤 CHECK가 가드 이후에 실패할 수 있다. 사전 보고서의 마지막 조회가 비어 있어야 한다.
 
 ## 기존 DB의 스키마 비교와 baseline 절차
 
