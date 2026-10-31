@@ -1,0 +1,45 @@
+﻿{
+    "scenario":  "concurrent",
+    "conditions":  {
+                       "youtube_delay_ms":  200,
+                       "video_page_size":  50,
+                       "video_count":  30,
+                       "member_count":  40
+                   },
+    "generated_at":  "2026-10-31T13:39:25.163Z",
+    "metrics":  {
+                    "accepted_to_success_ms":  {
+                                                   "p50":  5712,
+                                                   "p95":  5741.4,
+                                                   "max":  5747,
+                                                   "count":  5
+                                               },
+                    "success_rate":  1,
+                    "failed_syncs":  0,
+                    "ai_analysis_calls_total":  15,
+                    "ai_embedding_calls_total":  16,
+                    "db_connections_active":  {
+                                                  "max":  3,
+                                                  "value":  0
+                                              },
+                    "db_connections_pending":  {
+                                                   "max":  0,
+                                                   "value":  0
+                                               },
+                    "http_req_failed":  0,
+                    "http_reqs":  42,
+                    "http_reqs_rate":  2.099286588942047,
+                    "iterations":  34,
+                    "iteration_duration_ms":  {
+                                                  "p50":  631.7519,
+                                                  "p95":  7093.698934999999
+                                              }
+                },
+    "extra":  {
+                  "concurrent_users":  5,
+                  "ai_calls_per_sync":  {
+                                            "analysis":  3,
+                                            "embedding":  3.2
+                                        }
+              }
+}
