@@ -67,8 +67,16 @@ GitHub의 브랜치 보호/ruleset에서도 `MySQL migrations`를 필수 검사�
 `V8__outing_guide_unique_key.sql`은 개발 DB 범위의 이관이며 운영 DB에는 #309에서 적용한다.
 
 1. `scripts/guide-dedup-preflight.sql`을 읽기 전용 계정으로 실행해 중복 그룹·참조 수·이상 데이터를 이슈에 기록한다.
-2. null·공백·길이 초과 데이터가 하나라도 있으면 migration이 `chk_outing_guide_dedup_guard` 위반으로 중단되고 `outing_guide_dedup_invalid`에 대상 ID와 참조 수가 남는다. 자동 보정하지 않는다. 데이터를 고친 뒤에는 실패한 Flyway 이력을 `flyway repair`로 정리하고 다시 실행한다.
-3. 이관 뒤 대표가 아닌 ID와 이미지는 `outing_guide_dedup_map`에 남는다. `scripts/guide-dedup-export.sql`로 내보내 AI 벡터 삭제에 사용한다. 이미지 행은 삭제하지 않는다.
+2. 실행 전 DB를 백업하고 migration이 끝날 때까지 다른 서버의 쓰기를 멈춘다. MySQL DDL은 암묵적으로 커밋하므로 V8은 하나의 트랜잭션으로 되돌려지지 않는다.
+3. null·공백·길이 초과 데이터가 하나라도 있으면 migration이 `chk_outing_guide_dedup_guard` 위반으로 중단되고 `outing_guide_dedup_invalid`에 대상 ID와 참조 수가 남는다. 자동 보정하지 않는다. 이 중단은 이관 대상 데이터를 바꾸기 전이므로, 데이터를 고친 뒤 실패한 Flyway 이력을 `flyway repair`로 정리하고 다시 실행한다.
+4. 가드 이후 단계(`outing_guide_dedup_map` 생성부터 제약 추가까지)에서 실패하면 그대로 다시 실행하지 않는다. 일부 참조가 이미 바뀌었을 수 있으므로 2의 백업으로 복원한 뒤 원인을 고치고 다시 실행한다.
+5. 이관 뒤 대표가 아닌 ID와 이미지는 `outing_guide_dedup_map`에 남는다. `scripts/guide-dedup-export.sql`로 내보내 AI 벡터 삭제에 사용한다. 이미지 행은 삭제하지 않는다.
+
+주의할 결과:
+
+- 대표가 아닌 가이드를 삭제하면 `outing_guide_embedding_outbox`의 해당 행(PENDING·FAILED 포함)도 `on delete cascade`로 함께 삭제된다. 대표 가이드의 임베딩 작업은 그대로 남는다.
+- 대표 ID로 바꾼 뒤 같은 회원의 활성 위시리스트가 겹치면, 이관 전부터 있던 중복이라도 최소 ID만 남기고 나머지에 `deleted_at`을 기록한다.
+- `type`·`name`·`address` 컬럼의 collation은 모두 `utf8mb4_0900_bin`으로 바뀐다.
 
 ## 기존 DB의 스키마 비교와 baseline 절차
 
