@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 /// 동기화 하나의 배치들을 AI 호출 게이트웨이에 모두 제출하고, 결과가 나온 배치부터 하나씩 커밋한다.
 ///
 /// 영상 분석 결과는 시스템 전체에서 공유한다. 이미 끝난 결과가 있는 영상은 AI에 보내지 않고 재사용하며,
-/// 전송 직전에 영상별 분석 소유권을 얻지 못한 영상은 진행 중인 분석의 결과를 기다려 공유한다.
+/// 전송 직전에 영상별 분석 실행권을 얻지 못한 영상은 진행 중인 분석의 결과를 기다려 공유한다.
 ///
 /// YouTube 조회와 AI 호출은 트랜잭션 밖에서 하고, 커밋만 배치 단위 트랜잭션으로 수행한다.
 /// 배치 하나의 AI 호출이 실패해도 그 영상만 FAILED로 기록하고 다음 배치를 계속 처리한다.
@@ -32,7 +32,7 @@ public class YoutubeSyncBatchProcessor {
 
     private static final int BATCH_SIZE = 10;
 
-    /// 합류한 분석을 기다리는 스레드. 기다리는 동안에도 소유한 분석의 결과 커밋은 막히지 않아야 한다.
+    /// 합류한 분석을 기다리는 스레드. 기다리는 동안에도 실행권을 얻은 분석의 결과 커밋은 막히지 않아야 한다.
     private static final Executor WAITERS = Executors.newVirtualThreadPerTaskExecutor();
 
     private final AiCallGateway aiCallGateway;
@@ -44,8 +44,8 @@ public class YoutubeSyncBatchProcessor {
     private record Completion(BatchAnalysis analysis, List<SharedVideoResult> shared, boolean last) {}
 
     /// 배치 하나가 전송 직전에 영상별로 나뉜 결과. 게이트웨이 스레드가 쓰고 결과 Future가 끝난 뒤 읽는다.
-    private static final class BatchOwnership {
-        private final List<String> owned = new CopyOnWriteArrayList<>();
+    private static final class BatchExecutionRights {
+        private final List<String> granted = new CopyOnWriteArrayList<>();
         private final List<SharedVideoResult> reused = new CopyOnWriteArrayList<>();
         private final List<String> joined = new CopyOnWriteArrayList<>();
     }
@@ -88,78 +88,79 @@ public class YoutubeSyncBatchProcessor {
 
     private CompletableFuture<VideoAnalysisResponse> submit(
             Long syncId, List<String> batch, BlockingQueue<Completion> completed) {
-        BatchOwnership ownership = new BatchOwnership();
+        BatchExecutionRights rights = new BatchExecutionRights();
         CompletableFuture<VideoAnalysisResponse> future = aiCallGateway.submitVideoAnalysis(
-                syncId, batch, requested -> acquireOwnership(syncId, requested, ownership));
+                syncId, batch, requested -> acquireExecutionRight(syncId, requested, rights));
         future.handleAsync(
                 (response, error) -> {
-                    finish(batch, ownership, response, error, completed);
+                    finish(batch, rights, response, error, completed);
                     return null;
                 },
                 WAITERS);
         return future;
     }
 
-    /// 전송 직전에 영상별로 분석 소유권을 얻고, 얻은 영상만 AI에 보낸다.
-    private List<String> acquireOwnership(Long syncId, List<String> requested, BatchOwnership ownership) {
+    /// 전송 직전에 영상별로 분석 실행권을 얻고, 얻은 영상만 AI에 보낸다.
+    private List<String> acquireExecutionRight(Long syncId, List<String> requested, BatchExecutionRights rights) {
         for (String videoId : requested) {
-            SharedVideoAnalysisService.AnalysisOwnership outcome = sharedAnalysis.acquireOwnership(syncId, videoId);
-            if (outcome.owned()) {
-                ownership.owned.add(videoId);
+            SharedVideoAnalysisService.AnalysisExecutionRight outcome =
+                    sharedAnalysis.acquireExecutionRight(syncId, videoId);
+            if (outcome.granted()) {
+                rights.granted.add(videoId);
             } else if (outcome.reused() != null) {
-                ownership.reused.add(outcome.reused());
+                rights.reused.add(outcome.reused());
             } else {
-                ownership.joined.add(videoId);
+                rights.joined.add(videoId);
             }
         }
-        return List.copyOf(ownership.owned);
+        return List.copyOf(rights.granted);
     }
 
-    /// 소유한 영상의 결과를 먼저 커밋하게 넘기고, 합류한 영상은 그 뒤에 기다려 넘긴다.
+    /// 실행권을 얻은 영상의 결과를 먼저 커밋하게 넘기고, 합류한 영상은 그 뒤에 기다려 넘긴다.
     ///
-    /// 합류 대기가 소유한 영상의 커밋을 막으면, 서로의 영상을 기다리는 두 동기화가 교착한다.
+    /// 합류 대기가 실행권을 얻은 영상의 커밋을 막으면, 서로의 영상을 기다리는 두 동기화가 교착한다.
     private void finish(
             List<String> batch,
-            BatchOwnership ownership,
+            BatchExecutionRights rights,
             VideoAnalysisResponse response,
             Throwable error,
             BlockingQueue<Completion> completed) {
-        boolean waiting = !ownership.joined.isEmpty();
+        boolean waiting = !rights.joined.isEmpty();
         try {
-            publishOwned(batch, ownership, response, error, waiting, completed);
+            publishGranted(batch, rights, response, error, waiting, completed);
         } catch (RuntimeException unexpected) {
-            // 결과를 넘기지 못하면 커밋 루프가 영원히 기다리므로 이 동기화가 소유한 영상만 실패로 넘긴다.
+            // 결과를 넘기지 못하면 커밋 루프가 영원히 기다리므로 이 동기화가 실행권을 얻은 영상만 실패로 넘긴다.
             // 재사용·합류한 영상은 다른 동기화의 이력이므로 새 FAILED 이력을 만들지 않는다.
             log.error("YouTube 동기화 배치 결과 정리 실패: videoCount={}", batch.size(), unexpected);
             completed.add(new Completion(
-                    BatchAnalysis.failed(undecidedOrOwned(batch, ownership)), List.copyOf(ownership.reused), !waiting));
+                    BatchAnalysis.failed(undecidedOrGranted(batch, rights)), List.copyOf(rights.reused), !waiting));
         }
 
         if (waiting) {
-            completed.add(new Completion(null, awaitJoined(ownership.joined), true));
+            completed.add(new Completion(null, awaitJoined(rights.joined), true));
         }
     }
 
-    private void publishOwned(
+    private void publishGranted(
             List<String> batch,
-            BatchOwnership ownership,
+            BatchExecutionRights rights,
             VideoAnalysisResponse response,
             Throwable error,
             boolean waiting,
             BlockingQueue<Completion> completed) {
-        // 소유권 판정을 마치지 못한 영상도 이 배치와 함께 실패한다.
-        List<String> owned = error == null ? List.copyOf(ownership.owned) : undecidedOrOwned(batch, ownership);
-        BatchAnalysis analysis = owned.isEmpty() ? null : analyze(owned, response, error);
-        if (analysis != null || !ownership.reused.isEmpty() || !waiting) {
-            completed.add(new Completion(analysis, List.copyOf(ownership.reused), !waiting));
+        // 실행권 판정을 마치지 못한 영상도 이 배치와 함께 실패한다.
+        List<String> granted = error == null ? List.copyOf(rights.granted) : undecidedOrGranted(batch, rights);
+        BatchAnalysis analysis = granted.isEmpty() ? null : analyze(granted, response, error);
+        if (analysis != null || !rights.reused.isEmpty() || !waiting) {
+            completed.add(new Completion(analysis, List.copyOf(rights.reused), !waiting));
         }
     }
 
-    /// 재사용·합류로 판정된 영상을 뺀, 이 동기화가 분석을 소유했거나 아직 판정받지 못한 영상.
-    private static List<String> undecidedOrOwned(List<String> batch, BatchOwnership ownership) {
+    /// 재사용·합류로 판정된 영상을 뺀, 이 동기화가 분석 실행권을 얻었거나 아직 판정받지 못한 영상.
+    private static List<String> undecidedOrGranted(List<String> batch, BatchExecutionRights rights) {
         return batch.stream()
-                .filter(id -> !ownership.joined.contains(id)
-                        && ownership.reused.stream()
+                .filter(id -> !rights.joined.contains(id)
+                        && rights.reused.stream()
                                 .noneMatch(result -> result.videoId().equals(id)))
                 .toList();
     }
