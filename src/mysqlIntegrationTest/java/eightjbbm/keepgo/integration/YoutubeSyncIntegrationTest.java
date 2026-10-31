@@ -11,6 +11,7 @@ import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
 import eightjbbm.keepgo.integration.sse.SseEvent;
 import eightjbbm.keepgo.integration.sse.SseOpenException;
 import eightjbbm.keepgo.integration.sse.SseTestClient;
+import eightjbbm.keepgo.integration.stub.AiServerStub;
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
 import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeConnectionChecker;
@@ -253,6 +254,48 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
                         .get("video_analyzed_count")
                         .asInt())
                 .isEqualTo(3);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+        assertThat(deletedWishlistCount(member)).isEqualTo(1);
+        assertThat(wishlistHistoryCount(member)).isEqualTo(3);
+        assertThat(syncCount(member)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("복수 가이드 중 하나를 삭제한 뒤 재동기화해도 나머지와 삭제 이력이 보존된다")
+    void preservesDeletedEntryAmongMultipleGuidesOnResync() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useGuidesForVideo(
+                "video-a",
+                new AiServerStub.GuideTemplate("삭제할 장소", "서울특별시 종로구 다중로 1", "장소"),
+                new AiServerStub.GuideTemplate("남길 행사", "서울특별시 종로구 다중로 2", "이벤트"));
+        Member member = newMember();
+        String token = token(member);
+        runToSuccess(token);
+        Long deletedEntryId = jdbcTemplate.queryForObject("""
+                SELECT w.id FROM outing_collection_private w
+                JOIN outing_guide g ON g.id = w.guide_id
+                WHERE w.member_id = ? AND g.name = '삭제할 장소' AND w.deleted_at IS NULL
+                """, Long.class, member.getId());
+        outingWishlistService.removePlace(member.getId(), deletedEntryId);
+        var history = jdbcTemplate.queryForList("""
+                SELECT id, guide_id, deleted_at FROM outing_collection_private WHERE member_id = ? ORDER BY id
+                """, member.getId());
+
+        YOUTUBE.reset();
+        YOUTUBE.addPage(videos("video-a", "video-b"));
+        jdbcTemplate.update("""
+                UPDATE youtube_sync SET finished_at = TIMESTAMPADD(SECOND, -10, UTC_TIMESTAMP(6))
+                WHERE member_id = ? AND status = 'SUCCEEDED'
+                """, member.getId());
+        List<SseEvent> events = runToSuccess(token);
+
+        JsonNode success = data(events.getLast());
+        assertThat(success.get("video_target_count").asInt()).isEqualTo(2);
+        assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(2);
+        assertThat(success.get("video_failed_count").asInt()).isZero();
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT id, guide_id, deleted_at FROM outing_collection_private WHERE member_id = ? ORDER BY id
+                """, member.getId())).containsAll(history);
         assertThat(wishlistCount(member)).isEqualTo(2);
         assertThat(deletedWishlistCount(member)).isEqualTo(1);
         assertThat(wishlistHistoryCount(member)).isEqualTo(3);

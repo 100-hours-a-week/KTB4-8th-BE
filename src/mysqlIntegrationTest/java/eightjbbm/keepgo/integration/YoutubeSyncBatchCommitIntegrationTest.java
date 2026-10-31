@@ -128,8 +128,40 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("두 동기화가 같은 새 가이드를 동시에 저장해도 한 가이드로 수렴하고 AI 호출은 늘지 않는다")
-    void concurrentSyncsReuseGuideWithoutExtraAiCalls() throws Exception {
+    @DisplayName("배치 저장 충돌을 재시도해도 한 가이드로 수렴하고 AI는 호출하지 않는다")
+    void concurrentCommitsDoNotRepeatAnalysis() throws Exception {
+        Member first = newMember();
+        Member second = newMember();
+        YoutubeSyncSnapshot firstSync = syncService.create(first.getId(), "instance-a", "trace-a");
+        YoutubeSyncSnapshot secondSync = syncService.create(second.getId(), "instance-b", "trace-b");
+        syncService.start(firstSync.id(), "instance-a", 1, 1, 10);
+        syncService.start(secondSync.id(), "instance-b", 1, 1, 10);
+        BatchAnalysis firstBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "video-a", VideoAnalysisStatus.SUCCESS, List.of(place("동시 가이드", "서울특별시 종로구 동시로 1")))));
+        BatchAnalysis secondBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "video-a", VideoAnalysisStatus.SUCCESS, List.of(place("동시 가이드", "서울특별시 종로구 동시로 1")))));
+        WISHLIST_BARRIER.set(new CountDownLatch(2));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> firstRun = executor.submit(
+                    () -> batchWriter.commit(firstSync.id(), "instance-a", first.getId(), firstBatch, 100));
+            Future<?> secondRun = executor.submit(
+                    () -> batchWriter.commit(secondSync.id(), "instance-b", second.getId(), secondBatch, 100));
+            firstRun.get(30, TimeUnit.SECONDS);
+            secondRun.get(30, TimeUnit.SECONDS);
+        } finally {
+            WISHLIST_BARRIER.set(null);
+        }
+
+        assertThat(guideCount()).isEqualTo(1);
+        assertThat(AI_STUB.analysisRequestCount()).isZero();
+        assertThat(wishlistCount(first)).isEqualTo(1);
+        assertThat(wishlistCount(second)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("두 회원이 같은 영상을 동시에 동기화해도 각 위시리스트와 분석 결과를 보존한다")
+    void concurrentSyncsKeepBothMembersResults() throws Exception {
         YOUTUBE.addPage(videos("video-a"));
         AI_STUB.useSharedGuide("동시 가이드", "서울특별시 종로구 동시로 1");
         Member first = newMember();
@@ -139,16 +171,22 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         try (var executor = Executors.newFixedThreadPool(2)) {
             Future<List<SseEvent>> firstRun = executor.submit(() -> runToSuccess(token(first)));
             Future<List<SseEvent>> secondRun = executor.submit(() -> runToSuccess(token(second)));
-            firstRun.get(30, TimeUnit.SECONDS);
-            secondRun.get(30, TimeUnit.SECONDS);
+            assertThat(data(firstRun.get(30, TimeUnit.SECONDS).getLast())
+                            .get("video_failed_count")
+                            .asInt())
+                    .isZero();
+            assertThat(data(secondRun.get(30, TimeUnit.SECONDS).getLast())
+                            .get("video_failed_count")
+                            .asInt())
+                    .isZero();
         } finally {
             WISHLIST_BARRIER.set(null);
         }
 
         assertThat(guideCount()).isEqualTo(1);
-        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(2);
         assertThat(wishlistCount(first)).isEqualTo(1);
         assertThat(wishlistCount(second)).isEqualTo(1);
+        assertThat(videoAnalysisResultCount()).isEqualTo(2);
     }
 
     @Test
@@ -263,6 +301,104 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         assertThat(wishlistCount(member)).isEqualTo(2);
         assertThat(videoAnalysisResultCount()).isEqualTo(2);
         assertThat(analysisStatusCount("SUCCESS")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("NOT_FOUND는 재동기화에서도 처리 수와 실패 수에 포함되고 가이드를 만들지 않는다")
+    void preservesNotFoundCountsAcrossSyncs() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.failAnalysisForVideo("video-a", 200, """
+                {"message":"analyze_success","data":{"results":[
+                  {"video_url":"https://youtube.com/shorts/video-a","status":"not_found","error":null}
+                ]}}
+                """);
+        Member member = newMember();
+
+        for (int run = 0; run < 2; run++) {
+            List<SseEvent> events = runToSuccess(token(member));
+
+            JsonNode success = data(events.getLast());
+            assertThat(success.get("video_target_count").asInt()).isEqualTo(1);
+            assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(1);
+            assertThat(success.get("video_failed_count").asInt()).isEqualTo(1);
+            assertThat(success.get("progress").asInt()).isEqualTo(100);
+            assertThat(analysisStatus("video-a")).isEqualTo("NOT_FOUND");
+            assertThat(syncStatus(member)).isEqualTo("SUCCEEDED");
+            assertThat(guideCount()).isZero();
+            assertThat(wishlistCount(member)).isZero();
+            assertThat(videoAnalysisResultCount()).isZero();
+            assertThat(outboxCount()).isZero();
+            expireRecentResult(member);
+        }
+        assertThat(syncIds(member)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("실패한 영상은 다음 동기화에서 다시 분석되어 정상 결과로 저장된다")
+    void retriesFailedVideoOnNextSync() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.failAnalysisForVideo("video-a", 500, "{\"message\":\"failure\"}");
+        Member member = newMember();
+
+        List<SseEvent> failed = runToSuccess(token(member));
+        assertThat(data(failed.getLast()).get("video_failed_count").asInt()).isEqualTo(1);
+        assertThat(analysisStatus("video-a")).isEqualTo("FAILED");
+        assertThat(wishlistCount(member)).isZero();
+
+        expireRecentResult(member);
+        AI_STUB.reset();
+        List<SseEvent> recovered = runToSuccess(token(member));
+
+        JsonNode success = data(recovered.getLast());
+        assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(1);
+        assertThat(success.get("video_failed_count").asInt()).isZero();
+        assertThat(analysisStatus("video-a")).isEqualTo("SUCCESS");
+        assertThat(analysisStatusCount("FAILED")).isEqualTo(1);
+        assertThat(guideCount()).isEqualTo(1);
+        assertThat(wishlistCount(member)).isEqualTo(1);
+        assertThat(videoAnalysisResultCount()).isEqualTo(1);
+        assertThat(syncIds(member)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("재동기화는 복수 가이드의 기존 ID와 필드 및 분석 매핑을 보존한다")
+    void preservesExistingGuidesOnResync() throws Exception {
+        YOUTUBE.addPage(videos("video-a"));
+        AI_STUB.useGuidesForVideo(
+                "video-a",
+                new AiServerStub.GuideTemplate("장소 후보", "서울특별시 종로구 다중로 1", "장소"),
+                new AiServerStub.GuideTemplate("행사 후보", "서울특별시 종로구 다중로 2", "이벤트"));
+        Member member = newMember();
+        runToSuccess(token(member));
+
+        // 같은 키의 AI 응답과 다른 필드를 저장해 재분석 여부와 무관하게 기존 값 보존을 확인한다.
+        jdbcTemplate.update("""
+                UPDATE outing_guide SET description = '기존 설명', location_detail = '기존 상세',
+                    category = '기존 분류', lat = 35.0, lng = 129.0
+                """);
+        jdbcTemplate.update("""
+                UPDATE outing_guide SET start_datetime = '2026-01-01', end_datetime = '2026-01-02'
+                WHERE type = 'event'
+                """);
+        var before = jdbcTemplate.queryForList("SELECT * FROM outing_guide ORDER BY id");
+        List<Long> guideIds = jdbcTemplate.queryForList("SELECT id FROM outing_guide ORDER BY id", Long.class);
+
+        expireRecentResult(member);
+        List<SseEvent> events = runToSuccess(token(member));
+
+        assertThat(data(events.getLast()).get("video_analyzed_count").asInt()).isEqualTo(1);
+        assertThat(data(events.getLast()).get("video_failed_count").asInt()).isZero();
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM outing_guide ORDER BY id"))
+                .isEqualTo(before);
+        assertThat(wishlistCount(member)).isEqualTo(2);
+        assertThat(syncIds(member)).hasSize(2);
+        for (Long syncId : syncIds(member)) {
+            assertThat(jdbcTemplate.queryForList("""
+                    SELECT r.outing_guide_id FROM video_analysis_result r
+                    JOIN video_analysis a ON a.id = r.video_analysis_id
+                    WHERE a.youtube_sync_id = ? ORDER BY r.outing_guide_id
+                    """, Long.class, syncId)).containsExactlyElementsOf(guideIds);
+        }
     }
 
     @Test
@@ -484,10 +620,17 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
         assertThatThrownBy(() -> batchWriter.commit(
                         sync.id(), "instance-a", member.getId(), BatchAnalysis.failed(List.of("v0")), 100))
                 .isInstanceOf(SyncFencedException.class);
+        BatchAnalysis successfulBatch = new BatchAnalysis(List.of(new BatchAnalysis.AnalyzedVideo(
+                "v0", VideoAnalysisStatus.SUCCESS, List.of(place("늦은 가이드", "서울특별시 종로구 지연로 1")))));
+        assertThatThrownBy(() -> batchWriter.commit(sync.id(), "instance-a", member.getId(), successfulBatch, 100))
+                .isInstanceOf(SyncFencedException.class);
 
         assertThat(syncStatusById(sync.id())).isEqualTo("FAILED");
         assertThat(analysisCount()).isZero();
         assertThat(wishlistCount(member)).isZero();
+        assertThat(guideCount()).isZero();
+        assertThat(videoAnalysisResultCount()).isZero();
+        assertThat(outboxCount()).isZero();
     }
 
     private SseTestClient open(String token) throws Exception {
@@ -528,6 +671,18 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                 "SELECT status FROM youtube_sync WHERE member_id = ? ORDER BY id DESC LIMIT 1",
                 String.class,
                 member.getId());
+    }
+
+    private void expireRecentResult(Member member) {
+        jdbcTemplate.update("""
+                UPDATE youtube_sync SET finished_at = TIMESTAMPADD(SECOND, -10, UTC_TIMESTAMP(6))
+                WHERE member_id = ? AND status IN ('SUCCEEDED', 'FAILED')
+                """, member.getId());
+    }
+
+    private List<Long> syncIds(Member member) {
+        return jdbcTemplate.queryForList(
+                "SELECT id FROM youtube_sync WHERE member_id = ? ORDER BY id", Long.class, member.getId());
     }
 
     private String syncStatusById(Long syncId) {
