@@ -124,35 +124,15 @@ public class YoutubeSyncBatchProcessor {
             VideoAnalysisResponse response,
             Throwable error,
             BlockingQueue<Completion> completed) {
-        try {
-            publish(batch, claims, response, error, completed);
-        } catch (RuntimeException unexpected) {
-            // 결과를 넘기지 못하면 커밋 루프가 영원히 기다리므로 배치를 실패로 넘긴다.
-            log.error("YouTube 동기화 배치 결과 정리 실패: videoCount={}", batch.size(), unexpected);
-            completed.add(new Completion(BatchAnalysis.failed(batch), List.of(), true));
-        }
-    }
-
-    private void publish(
-            List<String> batch,
-            Claims claims,
-            VideoAnalysisResponse response,
-            Throwable error,
-            BlockingQueue<Completion> completed) {
-        List<String> owned = new ArrayList<>(claims.owned);
-        if (error != null) {
-            // 소유권 판정을 마치지 못한 영상도 이 배치와 함께 실패한다.
-            batch.stream()
-                    .filter(id -> !claims.owned.contains(id)
-                            && !claims.joined.contains(id)
-                            && claims.reused.stream()
-                                    .noneMatch(result -> result.videoId().equals(id)))
-                    .forEach(owned::add);
-        }
-        BatchAnalysis analysis = owned.isEmpty() ? null : analyze(owned, response, error);
         boolean waiting = !claims.joined.isEmpty();
-        if (analysis != null || !claims.reused.isEmpty() || !waiting) {
-            completed.add(new Completion(analysis, List.copyOf(claims.reused), !waiting));
+        try {
+            publishOwned(batch, claims, response, error, waiting, completed);
+        } catch (RuntimeException unexpected) {
+            // 결과를 넘기지 못하면 커밋 루프가 영원히 기다리므로 이 동기화가 소유한 영상만 실패로 넘긴다.
+            // 재사용·합류한 영상은 다른 동기화의 이력이므로 새 FAILED 이력을 만들지 않는다.
+            log.error("YouTube 동기화 배치 결과 정리 실패: videoCount={}", batch.size(), unexpected);
+            completed.add(new Completion(
+                    BatchAnalysis.failed(undecidedOrOwned(batch, claims)), List.copyOf(claims.reused), !waiting));
         }
 
         if (waiting) {
@@ -160,12 +140,36 @@ public class YoutubeSyncBatchProcessor {
         }
     }
 
+    private void publishOwned(
+            List<String> batch,
+            Claims claims,
+            VideoAnalysisResponse response,
+            Throwable error,
+            boolean waiting,
+            BlockingQueue<Completion> completed) {
+        // 소유권 판정을 마치지 못한 영상도 이 배치와 함께 실패한다.
+        List<String> owned = error == null ? List.copyOf(claims.owned) : undecidedOrOwned(batch, claims);
+        BatchAnalysis analysis = owned.isEmpty() ? null : analyze(owned, response, error);
+        if (analysis != null || !claims.reused.isEmpty() || !waiting) {
+            completed.add(new Completion(analysis, List.copyOf(claims.reused), !waiting));
+        }
+    }
+
+    /// 재사용·합류로 판정된 영상을 뺀, 이 동기화가 분석을 소유했거나 아직 판정받지 못한 영상.
+    private static List<String> undecidedOrOwned(List<String> batch, Claims claims) {
+        return batch.stream()
+                .filter(id -> !claims.joined.contains(id)
+                        && claims.reused.stream()
+                                .noneMatch(result -> result.videoId().equals(id)))
+                .toList();
+    }
+
     private List<SharedVideoResult> awaitJoined(List<String> videoIds) {
         try {
             return List.copyOf(sharedAnalysis.awaitResolved(videoIds).values());
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-            log.error("공유 영상 분석 대기가 중단되었습니다: videoCount={}", videoIds.size());
+            log.error("공유 영상 분석 대기가 중단되었습니다: videoCount={}", videoIds.size(), interrupted);
         } catch (RuntimeException error) {
             log.error("공유 영상 분석 대기 실패: videoCount={}", videoIds.size(), error);
         }
