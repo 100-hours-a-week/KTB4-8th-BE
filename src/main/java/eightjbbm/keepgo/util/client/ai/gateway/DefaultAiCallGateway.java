@@ -77,6 +77,7 @@ public class DefaultAiCallGateway implements AiCallGateway {
     public CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
             long syncId, List<String> videoIds, UnaryOperator<List<String>> beforeSend) {
         List<String> requested = List.copyOf(videoIds);
+        UnaryOperator<List<String>> select = beforeSend == null ? UnaryOperator.identity() : beforeSend;
         AtomicReference<List<String>> toSend = new AtomicReference<>(requested);
         return enqueue(
                 "sync:" + syncId,
@@ -84,7 +85,15 @@ public class DefaultAiCallGateway implements AiCallGateway {
                 () -> toSend.get().isEmpty()
                         ? new VideoAnalysisResponse(List.of())
                         : videoAnalysisJobClient.analyzeVideo(toSend.get(), properties.analysisTimeout()),
-                () -> toSend.set(List.copyOf(beforeSend.apply(requested))));
+                () -> toSend.set(subsetOf(requested, select.apply(requested))));
+    }
+
+    private static List<String> subsetOf(List<String> requested, List<String> selected) {
+        List<String> copy = List.copyOf(selected);
+        if (!requested.containsAll(copy)) {
+            throw new IllegalStateException("beforeSend가 요청하지 않은 영상을 돌려주었습니다");
+        }
+        return copy;
     }
 
     @Override
