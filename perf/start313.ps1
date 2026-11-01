@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory)][string]$BaseRoot,
     [Parameter(Mandatory)][string]$JavaHome
 )
@@ -8,9 +8,13 @@ $BaseRoot = (Resolve-Path -LiteralPath $BaseRoot).Path
 $javaExecutable = Join-Path $JavaHome 'bin/java.exe'
 if (!(Test-Path -LiteralPath $javaExecutable)) { throw 'Java 25 경로를 확인하세요' }
 if ($BaseRoot -eq $repoRoot) { throw '부모 SHA의 별도 체크아웃이 필요합니다' }
+$expectedBase = & git -C $repoRoot rev-parse '0137347^{commit}'
+if ($LASTEXITCODE -ne 0) { throw '측정 기준 커밋을 찾을 수 없습니다' }
+$actualBase = & git -C $BaseRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $actualBase -ne $expectedBase) { throw 'BaseRoot는 측정 기준 0137347 체크아웃이어야 합니다' }
 foreach ($checkout in @($BaseRoot, $repoRoot)) {
-    & git -C $checkout diff --quiet -- src/main
-    if ($LASTEXITCODE -ne 0) { throw "생산 코드에 미커밋 변경이 있습니다: $checkout" }
+    $changes = & git -C $checkout status --porcelain -- src/main
+    if ($LASTEXITCODE -ne 0 -or $changes) { throw "생산 코드에 미커밋 변경이 있습니다: $checkout" }
 }
 foreach ($port in @(18180, 18181, 18182, 18183, 18280, 18281, 18282, 18283)) {
     if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
@@ -23,6 +27,14 @@ $overlay = @('build.gradle', 'src/mysqlIntegrationTest/java/eightjbbm/perf/PerfH
 foreach ($relative in $overlay) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $relative) -Destination (Join-Path $BaseRoot $relative)
 }
+$environmentNames = @('JAVA_HOME', 'AI_STUB_PORT', 'AI_STUB_DELAY_MS', 'DB_HOST', 'DB_PORT', 'DB_NAME',
+    'DB_USERNAME', 'DB_PASSWORD', 'PERF_RESET', 'PERF_MEMBERS', 'PERF_VIDEO_COUNT', 'PERF_VIDEO_PAGE_SIZE',
+    'PERF_YOUTUBE_DELAY_MS', 'PERF_MAX_CONCURRENT_SYNCS', 'PERF_DB_POOL_SIZE', 'PERF_RECENT_RESULT_WINDOW',
+    'PERF_SERVER_PORT', 'PERF_MANAGEMENT_PORT', 'PERF_ADMIN_PORT', 'PERF_TOKENS_FILE', 'PERF_KEY_DIR',
+    'AI_SERVER_API_ADDRESS', 'KAKAO_REST_API_KEY')
+$originalEnvironment = @{}
+foreach ($name in $environmentNames) { $originalEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
+try {
 $env:JAVA_HOME = $JavaHome
 $runtimeRoot = Join-Path $repoRoot 'build/perf/313'
 New-Item -ItemType Directory -Force -Path $runtimeRoot | Out-Null
@@ -31,13 +43,18 @@ foreach ($checkout in @($BaseRoot, $repoRoot)) {
     try {
         New-Item -ItemType Directory -Force -Path (Join-Path $checkout 'build/perf') | Out-Null
         $compileLog = Join-Path $checkout 'build/perf/313-compile.log'
-        & ./gradlew.bat perfRuntimeClasspath *> $compileLog
+        $previousPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & ./gradlew.bat perfRuntimeClasspath *> $compileLog
+        } finally { $ErrorActionPreference = $previousPreference }
         if ($LASTEXITCODE -ne 0) { throw "컴파일 실패: $compileLog" }
     } finally { Pop-Location }
 }
 & docker compose -f (Join-Path $PSScriptRoot 'compose.yaml') up -d --wait mysql
 if ($LASTEXITCODE -ne 0) { throw '측정 DB 기동 실패' }
 $processes = @()
+$ready = $false
 try {
     foreach ($version in @('base', 'candidate')) {
         $checkout = if ($version -eq 'base') { $BaseRoot } else { $repoRoot }
@@ -91,9 +108,18 @@ try {
             Start-Sleep -Seconds 1
         }
     }
-    $processes | Select-Object Id, StartTime | ConvertTo-Json | Set-Content (Join-Path $runtimeRoot 'processes.json')
+    ConvertTo-Json -InputObject @($processes | ForEach-Object {
+        [pscustomobject]@{ Id = $_.Id; StartTicks = $_.StartTime.ToUniversalTime().Ticks }
+    }) | Set-Content (Join-Path $runtimeRoot 'processes.json')
+    $ready = $true
     Write-Output 'BASE_AND_CANDIDATE_READY'
-} catch {
-    $processes | Where-Object { !$_.HasExited } | Stop-Process
-    throw
+} finally {
+    if (-not $ready) {
+        $processes | Where-Object { !$_.HasExited } | Stop-Process -ErrorAction SilentlyContinue
+    }
+}
+} finally {
+    foreach ($name in $environmentNames) {
+        [Environment]::SetEnvironmentVariable($name, $originalEnvironment[$name], 'Process')
+    }
 }
