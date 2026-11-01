@@ -36,6 +36,29 @@ class AiServerStubTest {
     }
 
     @Test
+    @DisplayName("영상 중복 제출 수를 회차별로 집계하고 초기화한다")
+    void countsDuplicateVideos() throws Exception {
+        post("/v1/analyze-video", requestBody("video-a"));
+        post("/v1/analyze-video", requestBody("video-a"));
+        post("/v1/analyze-video", requestBody("video-b"));
+        String stats = HTTP.send(
+                        HttpRequest.newBuilder(URI.create(stub.baseUrl() + "/__admin/stats"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString())
+                .body();
+        assertThat(stats).contains("\"submitted_videos\":3", "\"duplicate_videos\":1", "\"in_flight\":0");
+        stub.resetStats();
+        stats = HTTP.send(
+                        HttpRequest.newBuilder(URI.create(stub.baseUrl() + "/__admin/stats"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString())
+                .body();
+        assertThat(stats).contains("\"submitted_videos\":0", "\"duplicate_videos\":0");
+    }
+
+    @Test
     @DisplayName("받은 요청 수와 최대 동시 요청 수를 기록한다")
     void recordsRequestCountAndMaximumConcurrency() {
         stub.setAnalysisDelay(Duration.ofMillis(300));

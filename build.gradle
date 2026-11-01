@@ -166,6 +166,16 @@ tasks.register('youtubePerfHarness', JavaExec) {
 	dependsOn tasks.named('mysqlIntegrationTestClasses')
 }
 
+// 장시간 하네스 실행 시 Gradle 프로세스를 유지하지 않도록 클래스 경로를 내보낸다.
+tasks.register('perfRuntimeClasspath') {
+	dependsOn tasks.named('mysqlIntegrationTestClasses')
+	doLast {
+		def output = layout.buildDirectory.file('perf/runtime-classpath.txt').get().asFile
+		output.parentFile.mkdirs()
+		output.text = sourceSets.mysqlIntegrationTest.runtimeClasspath.asPath
+	}
+}
+
 tasks.named('bootRun') {
 	jvmArgs "-javaagent:${configurations.sentryAgent.singleFile.absolutePath}"
 	environment 'SENTRY_AUTO_INIT', 'false'
