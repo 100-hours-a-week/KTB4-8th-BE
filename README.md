@@ -4,6 +4,12 @@
 
 - [ERD — 전체 관계도와 테이블별 주요 제약](docs/erd.md)
 
+## API 문서
+
+- [API 명세 목차 — FE–BE·AI 기능별·버전별 계약](docs/api/README.md)
+- [명세와 현재 구현의 차이](docs/api/implementation-notes.md)
+- [AI 영상 분석 HTTP 계약과 운영 확인 기록](docs/ai-video-analysis-contract.md)
+
 ## 협업 규칙
 
 - [브랜치 전략](docs/branch-strategy.md)
