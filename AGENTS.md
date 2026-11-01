@@ -18,6 +18,8 @@ Issues and specs are tracked in GitHub Issues for `100-hours-a-week/KTB4-8th-BE`
 
 Use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix` alongside existing labels. See `docs/agents/triage-labels.md`.
 
+Triage에서 작성·수정하는 이슈 제목·본문·댓글과 agent brief는 소제목을 포함해 한국어 서술을 기본으로 한다. 기술 용어·식별자·라벨 이름과 스킬에서 정확한 문구를 요구하는 AI 생성 안내는 원문을 유지할 수 있다. 스킬의 영어 예시나 템플릿보다 이 프로젝트 규칙을 우선한다.
+
 ### Domain docs
 
 Single-context layout: root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.md`.
