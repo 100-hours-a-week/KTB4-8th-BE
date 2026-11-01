@@ -1,5 +1,9 @@
 # KTB4-8th-BE
 
+## 데이터 모델
+
+- [ERD — 전체 관계도와 테이블별 주요 제약](docs/erd.md)
+
 ## 협업 규칙
 
 - [브랜치 전략](docs/branch-strategy.md)
