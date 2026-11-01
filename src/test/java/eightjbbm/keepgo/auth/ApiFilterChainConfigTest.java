@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import eightjbbm.keepgo.auth.accesstokenblacklist.AtBlacklistValidator;
 import eightjbbm.keepgo.auth.exception.AccessTokenFailAuthenticationEntryPoint;
 import eightjbbm.keepgo.recommendation.GetHotPlaceListResponse;
 import eightjbbm.keepgo.recommendation.GetOngoingEventListResponse;
@@ -20,9 +21,11 @@ import eightjbbm.keepgo.util.file.FileService;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,13 +37,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.converter.HttpMessageConverters;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
@@ -48,8 +55,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
+@RequiredArgsConstructor
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @SpringJUnitWebConfig(ApiFilterChainConfigTest.TestConfig.class)
 @DisplayName("공개 추천 API 인증 정책")
@@ -57,10 +68,6 @@ class ApiFilterChainConfigTest {
     private final WebApplicationContext context;
     private MockMvc mvc;
     private HotPlaceServiceV2 hotPlaceService;
-
-    ApiFilterChainConfigTest(WebApplicationContext context) {
-        this.context = context;
-    }
 
     @BeforeEach
     void setUp() {
@@ -109,7 +116,7 @@ class ApiFilterChainConfigTest {
                 .isEqualTo(
                         new ObjectMapper()
                                 .readTree(
-                                        "{\"events\":[{\"name\":\"가을 축제\",\"address\":\"서울 중구\",\"startDate\":\"2026-11-01\",\"endDate\":\"2026-11-30\"}]}"));
+                                        "{\"events\":[{\"name\":\"가을 축제\",\"address\":\"서울 중구\",\"start_date\":\"2026-11-01\",\"end_date\":\"2026-11-30\"}]}"));
     }
 
     @ParameterizedTest
@@ -165,15 +172,7 @@ class ApiFilterChainConfigTest {
     void uploadsWithValidJwt() throws Exception {
         FileService fileService = context.getBean(FileService.class);
         when(fileService.uploadProfileImage(any(), eq(7L))).thenReturn("/public/profile.png");
-        var now = Instant.now();
-        var claims = JwtClaimsSet.builder()
-                .subject("7")
-                .issuedAt(now)
-                .expiresAt(now.plusSeconds(60))
-                .build();
-        String token = context.getBean(JwtEncoder.class)
-                .encode(JwtEncoderParameters.from(claims))
-                .getTokenValue();
+        String token = token("test-issuer");
 
         MockHttpServletResponse response = mvc.perform(multipart("/api/v1/user/profile-image")
                         .file(profileImage())
@@ -186,6 +185,36 @@ class ApiFilterChainConfigTest {
         verify(fileService).uploadProfileImage(any(), eq(7L));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v3/places/hot", "/api/v3/events/ongoing"})
+    @DisplayName("공개 GET도 서명이 유효하지만 발급자가 다른 토큰은 거부한다")
+    void rejectsWrongIssuer(String path) throws Exception {
+        MockHttpServletResponse response = mvc.perform(
+                        get(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token("wrong-issuer")))
+                .andReturn()
+                .getResponse();
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        verifyNoInteractions(hotPlaceService);
+    }
+
+    private String token(String issuer) {
+        var now = Instant.now();
+        var claims = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject("7")
+                .audience(List.of("test-audience"))
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(60))
+                .id("test-token")
+                .claim("client_id", "test-client")
+                .build();
+        var header = JwsHeader.with(SignatureAlgorithm.RS256).type("at+jwt").build();
+        return context.getBean(JwtEncoder.class)
+                .encode(JwtEncoderParameters.from(header, claims))
+                .getTokenValue();
+    }
+
     private MockMultipartFile profileImage() {
         return new MockMultipartFile("profileImage", "profile.png", "image/png", new byte[] {1, 2, 3});
     }
@@ -193,7 +222,14 @@ class ApiFilterChainConfigTest {
     @Configuration
     @EnableWebMvc
     @Import({ApiFilterChainConfig.class, RecommendationControllerV3.class, FileController.class})
-    static class TestConfig {
+    static class TestConfig implements WebMvcConfigurer {
+        @Override
+        public void configureMessageConverters(HttpMessageConverters.ServerBuilder converters) {
+            converters.withJsonConverter(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
+                    .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                    .build()));
+        }
+
         @Bean
         HotPlaceServiceV2 hotPlaceService() {
             return mock(HotPlaceServiceV2.class);
@@ -213,8 +249,11 @@ class ApiFilterChainConfigTest {
 
         @Bean
         JwtDecoder jwtDecoder(KeyPair keyPair) {
-            return NimbusJwtDecoder.withPublicKey((RSAPublicKey) keyPair.getPublic())
-                    .build();
+            var properties = new JwtProperties(
+                    Duration.ofMinutes(1), "test-key", "test-issuer", "test-audience", "test-client", null, null);
+            var blacklistValidator = mock(AtBlacklistValidator.class);
+            when(blacklistValidator.validate(any())).thenReturn(OAuth2TokenValidatorResult.success());
+            return new SecurityConfig(properties).jwtDecoder((RSAPublicKey) keyPair.getPublic(), blacklistValidator);
         }
 
         @Bean
