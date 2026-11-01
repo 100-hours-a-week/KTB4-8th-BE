@@ -15,10 +15,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,9 @@ public class SharedVideoAnalysisService {
     private static final long POLL_INTERVAL_MILLIS = 200;
     private static final Duration WAIT_MARGIN = Duration.ofSeconds(30);
     private static final String IN_PROGRESS_UNIQUE_KEY = "uk_video_analysis_in_progress_video";
+    private static final int MAX_ACQUIRE_ATTEMPTS = 3;
+    private static final long MIN_RETRY_JITTER_MILLIS = 10;
+    private static final long MAX_RETRY_JITTER_MILLIS = 50;
 
     private static final Comparator<VideoAnalysis> NEWEST_COMPLETED = Comparator.comparing(
                     VideoAnalysis::getCompletedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
@@ -96,15 +101,36 @@ public class SharedVideoAnalysisService {
     /// 위반은 합류로 가리지 않고 그대로 던진다. 삽입에 성공해도 그 사이 다른 동기화가 유효한 결과를
     /// 끝냈다면 실행권을 내려놓고 그 결과를 재사용한다. 삽입이 실패하는 경우를 잡아야 하므로 이 메서드는
     /// 트랜잭션 없이 저장소 호출마다 커밋한다.
+    ///
+    /// 끝난 분석의 진행 중 키가 지워진 직후 같은 영상을 동시에 삽입하면 MySQL이 한쪽을 교착으로 롤백한다.
+    /// 교착뿐 아니라 잠금 대기 시간 초과 등 `PessimisticLockingFailureException` 전체가 재시도 대상이다.
+    /// 아직 AI에 보내기 전이므로 새 삽입으로 다시 판정하고, 정해진 횟수를 넘으면 예외를 그대로 던진다.
+    /// 같은 순간에 다시 부딪히지 않도록 재시도 전에 짧은 무작위 지연을 둔다.
     public AnalysisExecutionRight acquireExecutionRight(Long syncId, String videoId) {
         VideoAnalysis inProgressRow;
-        try {
-            inProgressRow = videoAnalysisRepository.saveAndFlush(new VideoAnalysis(videoId, syncId));
-        } catch (DataIntegrityViolationException violation) {
-            if (!violatesInProgressUniqueKey(violation)) {
-                throw violation;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                inProgressRow = videoAnalysisRepository.saveAndFlush(new VideoAnalysis(videoId, syncId));
+                break;
+            } catch (DataIntegrityViolationException violation) {
+                if (!violatesInProgressUniqueKey(violation)) {
+                    throw violation;
+                }
+                return AnalysisExecutionRight.joining();
+            } catch (PessimisticLockingFailureException conflict) {
+                if (attempt >= MAX_ACQUIRE_ATTEMPTS) {
+                    throw conflict;
+                }
+                log.warn("분석 실행권 판정 중 잠금 충돌로 다시 시도합니다: videoId={}, attempt={}", videoId, attempt);
+                try {
+                    Thread.sleep(
+                            ThreadLocalRandom.current().nextLong(MIN_RETRY_JITTER_MILLIS, MAX_RETRY_JITTER_MILLIS + 1)
+                                    * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw conflict;
+                }
             }
-            return AnalysisExecutionRight.joining();
         }
 
         Resolution resolution = resolve(List.of(videoId), inProgressRow.getId()).get(videoId);

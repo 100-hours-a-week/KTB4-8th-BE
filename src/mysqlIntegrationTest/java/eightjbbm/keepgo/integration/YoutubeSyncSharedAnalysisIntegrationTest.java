@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -252,6 +253,51 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
 
         assertThat(granted).filteredOn(Boolean::booleanValue).hasSize(1);
         assertThat(inProgressCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("완료로 진행 중 키가 지워진 영상을 동시에 다시 판정해도 실행권 판정이 교착으로 중단되지 않는다")
+    void racesOnRecentlyCompletedVideoWithoutDeadlockFailure() throws Exception {
+        int contenders = 5;
+        // 교착은 확률적으로 난다. 수정 전 코드에서 경쟁 5명 기준 50라운드는 4회 중 2회, 200라운드는 4회 중 4회 실패했다.
+        int rounds = 200;
+        // 다른 트랜잭션의 일관된 읽기 뷰가 지워진 유일 키 레코드의 purge를 늦추는 운영 상황을 고정한다.
+        try (var snapshot = jdbcTemplate.getDataSource().getConnection();
+                var snapshotStatement = snapshot.createStatement();
+                var executor = Executors.newFixedThreadPool(contenders)) {
+            snapshot.setAutoCommit(false);
+            snapshotStatement.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT");
+            snapshotStatement
+                    .executeQuery("SELECT COUNT(*) FROM video_analysis")
+                    .close();
+            for (int round = 0; round < rounds; round++) {
+                String videoId = "completed-" + round;
+                assertThat(sharedAnalysis.acquireExecutionRight(1L, videoId).state())
+                        .isEqualTo(SharedVideoAnalysisService.ExecutionState.GRANTED);
+                jdbcTemplate.update(
+                        "UPDATE video_analysis SET status = 'NOT_FOUND', completed_at = UTC_TIMESTAMP(6) WHERE video_id = ?",
+                        videoId);
+
+                var start = new CountDownLatch(1);
+                List<Future<SharedVideoAnalysisService.ExecutionState>> attempts = IntStream.range(0, contenders)
+                        .mapToObj(index -> executor.submit(() -> {
+                            start.await();
+                            return sharedAnalysis
+                                    .acquireExecutionRight(2000L + index, videoId)
+                                    .state();
+                        }))
+                        .toList();
+                start.countDown();
+                for (Future<SharedVideoAnalysisService.ExecutionState> attempt : attempts) {
+                    assertThat(attempt.get(30, TimeUnit.SECONDS))
+                            .isIn(
+                                    SharedVideoAnalysisService.ExecutionState.REUSED,
+                                    SharedVideoAnalysisService.ExecutionState.JOINED);
+                }
+            }
+            snapshot.rollback();
+        }
+        assertThat(inProgressCount()).isZero();
     }
 
     @Test
