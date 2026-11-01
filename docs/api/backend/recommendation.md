@@ -525,97 +525,13 @@ AI 서버
 
 ## 요즘 뜨는 곳 목록 조회
 
-다른 버전 탭에는 이 항목이 미기재되어 있다. 지원 중단으로 판단하지 않는다.
+`GET /api/v1/places`는 지원을 종료하여 컨트롤러 매핑을 제거했다. 기존 호출자는 `GET /api/v3/places/hot`으로 전환한다. V1의 sort·size·cursor 기본값 처리, V3 위임 및 리다이렉트는 제공하지 않는다.
 
 <a id="backend-v1-row-19"></a>
 
-### v1 — FE - BE, 원본 19행
+### v1 — 지원 종료
 
-[원본 시트](https://docs.google.com/spreadsheets/d/1ui37GlGUVHzM5lS3ZZE8TauRGyU035JWdjBCJ16TUOk/edit?gid=1284625682#gid=1284625682&range=A19)
-
-원본 메타데이터: B1: 최종 수정일 / D1: 260926 1349.
-
-**번호**
-
-```text
-15
-```
-
-**도메인**
-
-```text
-추천
-```
-
-**API 엔드포인트 이름**
-
-```text
-요즘 뜨는 곳 목록 조회
-```
-
-**비고**
-
-```text
-더미 데이터
-```
-
-**API 엔드포인트 주소**
-
-```text
-GET /api/v1/places?sort=trending&cursor={cursor}&size={size}
-```
-
-**요청 본문**
-
-```text
-없음
-```
-
-**항목 설명 (G열)**
-
-미기재
-
-**응답 코드 (H열)**
-
-```text
-200
-```
-
-**응답 본문**
-
-```text
-{
-    "hot_places": [
-        {
-            "attached_image_url": String,
-            "name": String,
-            "location": String,
-            "category": String
-        },
-        ...
-    ]
-}
-```
-
-**항목 설명 (J열)**
-
-미기재
-
-**발생할 수 있는 오류 코드 (K열)**
-
-```text
-400
-401(Access Token 만료)
-500
-```
-
-**외부 통신**
-
-미기재
-
-**캐시**
-
-미기재
+기존 `GET /api/v1/places?sort=trending&cursor={cursor}&size={size}`와 더미 `hot_places` 응답은 더 이상 제공하지 않는다. V1 장소 상세 조회(`GET /api/v1/places/{placeId}`)와 인증 정책은 이번 지원 종료의 대상이 아니다.
 
 <a id="backend-v3-row-6"></a>
 
@@ -647,7 +563,7 @@ v3
 
 **비고**
 
-미기재
+DB에 저장된 장소의 name·도로명주소(address)를 places 배열로 반환한다. 장소가 없으면 {"places":[]}를 반환한다. 정렬·페이징은 제공하지 않는다.
 
 **API 엔드포인트 주소**
 
@@ -675,13 +591,13 @@ GET /api/v3/places/hot
 
 ```text
 {
-  "places" : {
+  "places" : [
     {
       "name": String,
       "address": String (도로명)
     },
     ...
-  }
+  ]
 }
 ```
 

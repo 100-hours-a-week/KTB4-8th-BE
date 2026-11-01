@@ -4,7 +4,6 @@ import eightjbbm.keepgo.recommendation.RecommendationMapper;
 import eightjbbm.keepgo.recommendation.dto.*;
 import eightjbbm.keepgo.recommendation.service.RecommendationService;
 import eightjbbm.keepgo.util.dto.stub.AdvertisementListResponse;
-import eightjbbm.keepgo.util.dto.stub.TrendingPlacesResponse;
 import eightjbbm.keepgo.util.dto.stub.UnimplementedResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
@@ -81,14 +80,5 @@ public class RecommendationController {
     @GetMapping("/advertisements")
     public ResponseEntity<AdvertisementListResponse> getAdvertisementList() {
         return ResponseEntity.status(HttpStatus.OK).body(AdvertisementListResponse.stub());
-    }
-
-    /// 요즘 뜨는 곳 목록 조회 API
-    ///
-    /// (더미 데이터 제공)
-    @GetMapping("/places")
-    public ResponseEntity<TrendingPlacesResponse> getHotPlacesList(
-            @RequestParam String sort, @RequestParam Integer size, @RequestParam String cursor) {
-        return ResponseEntity.status(HttpStatus.OK).body(TrendingPlacesResponse.stub());
     }
 }
