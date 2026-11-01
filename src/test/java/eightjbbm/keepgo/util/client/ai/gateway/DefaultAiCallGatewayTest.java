@@ -115,6 +115,40 @@ class DefaultAiCallGatewayTest {
     }
 
     @Test
+    @DisplayName("대기열에 여러 건이 쌓여도 동기화마다 번갈아 차례를 준다")
+    void rotatesBetweenSyncsWithBacklog() throws Exception {
+        givenSlots(1);
+        List<String> order = new CopyOnWriteArrayList<>();
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        AtomicInteger calls = new AtomicInteger();
+        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+            List<String> ids = call.getArgument(0);
+            order.add(ids.getFirst());
+            if (calls.incrementAndGet() == 1) {
+                firstStarted.countDown();
+                releaseFirst.await(5, TimeUnit.SECONDS);
+            }
+            return failure();
+        });
+        gateway = startedGateway();
+
+        CompletableFuture<AnalyzeVideoResponseV2> first = gateway.submitAnalysis(1, List.of("a1"), () -> {});
+        assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
+        List<CompletableFuture<AnalyzeVideoResponseV2>> queued = List.of(
+                first,
+                gateway.submitAnalysis(1, List.of("a2"), () -> {}),
+                gateway.submitAnalysis(1, List.of("a3"), () -> {}),
+                gateway.submitAnalysis(2, List.of("b1"), () -> {}),
+                gateway.submitAnalysis(2, List.of("b2"), () -> {}));
+        releaseFirst.countDown();
+
+        CompletableFuture.allOf(queued.toArray(CompletableFuture[]::new)).join();
+
+        assertThat(order).containsExactly("a1", "b1", "a2", "b2", "a3");
+    }
+
+    @Test
     @DisplayName("슬롯을 얻은 뒤 전송 직전에만 분석 중을 기록한다")
     void recordsInProgressJustBeforeSend() throws Exception {
         givenSlots(1);
