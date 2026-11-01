@@ -261,4 +261,3 @@ V8의 `outing_guide_dedup_guard`, `video_analysis_result_dedup`은 이관 중 �
 1. [V1~V9 DDL](../src/main/resources/db/migration/)에서 FK, nullable, 복합 키, 생성 컬럼을 확인한다.
 2. [회원](../src/main/java/eightjbbm/keepgo/member/entity/), [추천](../src/main/java/eightjbbm/keepgo/recommendation/entity/), [위시리스트 항목](../src/main/java/eightjbbm/keepgo/outingwishlist/application/domain/model/OutingWishlistEntry.java), [동기화](../src/main/java/eightjbbm/keepgo/interestextraction/repository/youtubesync/) 매핑과 대조한다.
 3. DB와 애플리케이션의 보장을 구별하고 기존 [ADR](adr/)·용어집에 맞춰 문서를 갱신한다. 이번 문서화는 새로운 설계 결정이나 DB 변경을 포함하지 않는다.
-
