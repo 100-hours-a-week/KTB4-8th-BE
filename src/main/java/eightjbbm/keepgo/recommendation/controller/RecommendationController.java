@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
+    private final RecommendationMapper recommendationMapper;
     private final MessageSource messageSource;
 
     /// 여정 코스 추천 요청 API
@@ -27,7 +28,7 @@ public class RecommendationController {
     /// @return {@link RequestRecommendationResponse}
     @PostMapping("/user/recommendation")
     public ResponseEntity<RequestRecommendationResponse> requestRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        var command = RecommendationMapper.INSTANCE.toRequestRecommendationCommand(Long.valueOf(jwt.getSubject()));
+        var command = recommendationMapper.toRequestRecommendationCommand(Long.valueOf(jwt.getSubject()));
 
         return ResponseEntity.status(HttpStatus.OK)
                 .body(RequestRecommendationResponse.from(recommendationService.requestRecommendation(command)));
@@ -37,7 +38,7 @@ public class RecommendationController {
     /// @param jwt
     @PostMapping("/user/recommendation/cancellation")
     public ResponseEntity<Void> stopRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        var command = RecommendationMapper.INSTANCE.toStopRecommendationCommand(Long.valueOf(jwt.getSubject()));
+        var command = recommendationMapper.toStopRecommendationCommand(Long.valueOf(jwt.getSubject()));
 
         recommendationService.stopRecommendation(command);
 

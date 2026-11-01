@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestConstructor;
@@ -51,7 +52,8 @@ class HotPlaceListIntegrationTest {
     void returnsStoredPlaces() throws Exception {
         repository.saveAndFlush(
                 new OutingPlace("place", "서울숲", "도심 공원", "입구", "서울 성동구 뚝섬로 273", new Coordinate(37.5f, 127.0f), null));
-        var response = mvc.perform(get("/api/v3/places/hot")).andReturn().getResponse();
+        MockHttpServletResponse response =
+                mvc.perform(get("/api/v3/places/hot")).andReturn().getResponse();
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(new ObjectMapper().readTree(response.getContentAsString()))
                 .isEqualTo(new ObjectMapper()
@@ -61,7 +63,8 @@ class HotPlaceListIntegrationTest {
     @Test
     @DisplayName("DB에 장소가 없으면 빈 places 배열을 반환한다")
     void returnsEmptyPlaces() throws Exception {
-        var response = mvc.perform(get("/api/v3/places/hot")).andReturn().getResponse();
+        MockHttpServletResponse response =
+                mvc.perform(get("/api/v3/places/hot")).andReturn().getResponse();
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(new ObjectMapper().readTree(response.getContentAsString()))
                 .isEqualTo(new ObjectMapper().readTree("{\"places\":[]}"));
@@ -101,7 +104,7 @@ class HotPlaceListIntegrationTest {
     }
 
     private static String requiredEnvironment(String name) {
-        var value = System.getenv(name);
+        String value = System.getenv(name);
         if (value == null || !value.matches("jdbc:mysql://[^/]+/")) {
             throw new IllegalStateException(
                     "Set " + name + " to a disposable server, e.g. jdbc:mysql://127.0.0.1:33306/");
