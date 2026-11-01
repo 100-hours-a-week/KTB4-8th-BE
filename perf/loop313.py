@@ -195,18 +195,33 @@ def run(args):
                         command = ["docker", "compose", "-f", str(ROOT / "perf/compose.yaml"), "run", "--rm", "-T",
                                    "-e", f"VUS={n}", "-e", f"RECEIVER_URL=http://host.docker.internal:{args.port}",
                                    "-e", f"SUMMARY_PATH=/work/{summary}", "k6", "run", "perf/k6/loop-313.js"]
+                        process_error = None
+                        stdout, stderr = "", ""
                         try:
                             process = subprocess.run(command, capture_output=True, text=True,
                                                      encoding="utf-8", errors="replace", timeout=360)
+                            stdout, stderr = process.stdout, process.stderr
+                        except (subprocess.TimeoutExpired, OSError) as error:
+                            process_error = error
+                            stdout = getattr(error, "stdout", None) or ""
+                            stderr = getattr(error, "stderr", None) or ""
                         finally:
                             stop.set()
                             monitor.join()
-                        (out / f"{tag}-k6.log").write_text(process.stdout + process.stderr, encoding="utf-8")
-                        samples = list(server.samples)
-                        raw = {"scenario": scenario, "n": n, "iteration": iteration, "version": version,
-                               "warmup": iteration < args.warmups, "samples": samples, "db_readings": readings}
-                        # 실패해도 수신 원시 기록을 먼저 보존한다.
-                        (out / f"{tag}.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
+                            # TimeoutExpired의 부분 출력은 text=True여도 bytes일 수 있다.
+                            stdout = stdout.decode("utf-8", errors="replace") if isinstance(stdout, bytes) else stdout
+                            stderr = stderr.decode("utf-8", errors="replace") if isinstance(stderr, bytes) else stderr
+                            log = stdout + stderr
+                            samples = list(server.samples)
+                            raw = {"scenario": scenario, "n": n, "iteration": iteration, "version": version,
+                                   "warmup": iteration < args.warmups, "samples": samples, "db_readings": readings}
+                            if process_error is not None:
+                                raw["error"] = f"{type(process_error).__name__}: {process_error}"
+                                log += "\n" + raw["error"]
+                            (out / f"{tag}-k6.log").write_text(log, encoding="utf-8")
+                            (out / f"{tag}.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
+                        if process_error is not None:
+                            raise process_error
                         quiet(version)
                         raw["ai"] = request(url(version, 80, "/__admin/stats"))
                         raw["k6_exit_code"] = process.returncode
