@@ -104,9 +104,9 @@ class DefaultAiCallGatewayTest {
         gateway = startedGateway();
 
         CompletableFuture<AnalyzeVideoResponseV2> first = gateway.submitAnalysis(1, List.of("a1"), () -> {});
+        assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
         CompletableFuture<AnalyzeVideoResponseV2> second = gateway.submitAnalysis(1, List.of("a2"), () -> {});
         CompletableFuture<AnalyzeVideoResponseV2> other = gateway.submitAnalysis(2, List.of("b1"), () -> {});
-        assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
         releaseFirst.countDown();
 
         CompletableFuture.allOf(first, second, other).join();
