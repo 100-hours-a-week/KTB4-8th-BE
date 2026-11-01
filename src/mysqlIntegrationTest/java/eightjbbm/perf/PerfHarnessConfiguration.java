@@ -39,7 +39,8 @@ public class PerfHarnessConfiguration {
     /// ?�원마다 ?�로 ?�른 ?�상 ID�??�려�?�??�기?�에?�도 ?�원 �?가?�드 ?�성??겹치지 ?�게 ?�다.
     static final class FixedYoutubeVideoProvider implements YoutubeVideoProvider {
 
-        private final int videoCount;
+        private volatile int videoCount;
+        private volatile boolean shared;
         private final int pageSize;
         private final long delayMillis;
 
@@ -47,6 +48,14 @@ public class PerfHarnessConfiguration {
             this.videoCount = videoCount;
             this.pageSize = pageSize;
             this.delayMillis = delayMillis;
+        }
+
+        void configure(int count, boolean sharedVideos) {
+            if (count != 30 && count != 40) {
+                throw new IllegalArgumentException("측정 영상 수는 30 또는 40이어야 합니다");
+            }
+            videoCount = count;
+            shared = sharedVideos;
         }
 
         @Override
@@ -57,7 +66,7 @@ public class PerfHarnessConfiguration {
             int to = Math.min(videoCount, from + pageSize);
             List<Video> videos = new ArrayList<>();
             for (int index = from; index < to; index++) {
-                videos.add(video("m" + memberId + "-v" + index));
+                videos.add(video((shared ? "shared" : "m" + memberId) + "-v" + index));
             }
 
             VideoListResponse response = new VideoListResponse();

@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import eightjbbm.keepgo.KeepgoApplication;
 import eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager;
+import eightjbbm.keepgo.interestextraction.service.YoutubeVideoProvider;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import java.io.IOException;
@@ -76,6 +77,8 @@ public final class PerfHarnessApplication {
         properties.put("keepgo.youtube-sync.poll-interval-ms", environment("PERF_POLL_INTERVAL_MS", "1000"));
         properties.put("keepgo.youtube-sync.fetch-weight", environment("PERF_FETCH_WEIGHT", "10"));
         properties.put("keepgo.youtube-sync.recent-result-window", environment("PERF_RECENT_RESULT_WINDOW", "1s"));
+        // 앱을 유지한 채 반복 측정하므로 측정용 토큰만 긴 유효기간을 사용한다.
+        properties.put("keepgo.security.jwt.access-token-ttl", "48h");
         properties.put(
                 "keepgo.security.jwt.public-key",
                 keyDirectory.resolve("public_key.pem").toUri().toString());
@@ -122,7 +125,10 @@ public final class PerfHarnessApplication {
                 StandardCharsets.UTF_8);
 
         String adminPort = environment("PERF_ADMIN_PORT", "18083");
-        startAdminServer(Integer.parseInt(adminPort), context.getBean(JdbcTemplate.class));
+        startAdminServer(
+                Integer.parseInt(adminPort),
+                context.getBean(JdbcTemplate.class),
+                (PerfHarnessConfiguration.FixedYoutubeVideoProvider) context.getBean(YoutubeVideoProvider.class));
 
         System.out.printf(
                 "PERF_HARNESS_READY api=http://127.0.0.1:%s management=http://127.0.0.1:%s admin=http://127.0.0.1:%s tokens=%s members=%d videos=%d%n",
@@ -135,7 +141,9 @@ public final class PerfHarnessApplication {
     }
 
     /// k6가 `accepted ??success` ?�간??DB ?�각?�로 계산?????�게 최신 ?�기???�을 ?�출?�다.
-    private static void startAdminServer(int port, JdbcTemplate jdbcTemplate) throws IOException {
+    private static void startAdminServer(
+            int port, JdbcTemplate jdbcTemplate, PerfHarnessConfiguration.FixedYoutubeVideoProvider provider)
+            throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/syncs/latest", exchange -> {
             try {
@@ -154,9 +162,78 @@ public final class PerfHarnessApplication {
             }
         });
         server.createContext("/health", exchange -> writeJson(exchange, "{\"status\":\"ok\"}"));
+        server.createContext("/state", exchange -> writeJson(exchange, toJson(measurementState(jdbcTemplate))));
+        server.createContext("/fixture", exchange -> {
+            if (!exchange.getRequestMethod().equals("POST")) {
+                writeJson(exchange, "{}", 405);
+                return;
+            }
+            provider.configure(
+                    Integer.parseInt(queryParameter(exchange, "count")),
+                    Boolean.parseBoolean(queryParameter(exchange, "shared")));
+            writeJson(exchange, "{\"status\":\"ok\"}");
+        });
+        server.createContext("/reset", exchange -> {
+            if (!exchange.getRequestMethod().equals("POST")) {
+                writeJson(exchange, "{}", 405);
+                return;
+            }
+            Map<String, Object> state = measurementState(jdbcTemplate);
+            if (((Number) state.get("active_syncs")).longValue() != 0
+                    || ((Number) state.get("outbox")).longValue() != 0
+                    || ((Number) state.get("held_slots")).longValue() != 0) {
+                writeJson(exchange, "{\"error\":\"work remains\"}", 409);
+                return;
+            }
+            // 전용 하네스 DB만 초기화한다. 회원·토큰과 Flyway·슬롯 구성은 유지한다.
+            jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
+                if (!connection.getCatalog().matches("keepgo_perf_313_(base|candidate)")) {
+                    throw new SQLException("전용 #313 측정 DB만 초기화할 수 있습니다");
+                }
+                List<String> tables = new ArrayList<>();
+                try (var statement = connection.createStatement();
+                        var rows = statement.executeQuery("SHOW TABLES")) {
+                    while (rows.next()) {
+                        String table = rows.getString(1);
+                        if (!table.endsWith("_seq")
+                                && !List.of("member", "flyway_schema_history", "ai_call_slot")
+                                        .contains(table)) {
+                            if (!table.matches("[a-zA-Z0-9_]+")) {
+                                throw new SQLException("잘못된 측정 테이블 이름");
+                            }
+                            tables.add(table);
+                        }
+                    }
+                }
+                try (var statement = connection.createStatement()) {
+                    statement.execute("SET FOREIGN_KEY_CHECKS=0");
+                    try {
+                        for (String table : tables) {
+                            statement.execute("TRUNCATE TABLE `" + table + "`");
+                        }
+                    } finally {
+                        statement.execute("SET FOREIGN_KEY_CHECKS=1");
+                    }
+                }
+                return null;
+            });
+            provider.configure(30, false);
+            writeJson(exchange, "{\"status\":\"reset\"}");
+        });
         server.setExecutor(java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(0)));
+    }
+
+    private static Map<String, Object> measurementState(JdbcTemplate jdbcTemplate) {
+        return jdbcTemplate.queryForMap("""
+                SELECT
+                  (SELECT count(*) FROM youtube_sync WHERE status IN ('QUEUED','RUNNING')) active_syncs,
+                  (SELECT count(*) FROM outing_guide_embedding_outbox) outbox,
+                  (SELECT count(*) FROM ai_call_slot WHERE holder IS NOT NULL) held_slots,
+                  COALESCE((SELECT TIMESTAMPDIFF(MICROSECOND, MAX(finished_at), NOW(6))/1000
+                            FROM youtube_sync), 999999) since_finished_ms
+                """);
     }
 
     private static Map<String, Object> syncRow(Map<String, Object> row) {

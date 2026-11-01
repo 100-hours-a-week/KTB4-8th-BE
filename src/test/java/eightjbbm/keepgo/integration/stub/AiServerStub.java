@@ -191,9 +191,19 @@ public final class AiServerStub implements AutoCloseable {
     }
 
     private String statsJson() {
+        List<String> submitted = analysisRequestBodies.stream()
+                .flatMap(body -> VIDEO_ID.matcher(body).results().map(match -> match.group(1)))
+                .toList();
         return """
-                {"analysis_requests":%d,"embedding_requests":%d,"request_count":%d,"max_concurrent_requests":%d}
-                """.formatted(analysisRequests.get(), embeddingRequests.get(), requestCount(), maxInFlight.get());
+                {"analysis_requests":%d,"embedding_requests":%d,"request_count":%d,"max_concurrent_requests":%d,"in_flight":%d,"submitted_videos":%d,"duplicate_videos":%d}
+                """.formatted(
+                        analysisRequests.get(),
+                        embeddingRequests.get(),
+                        requestCount(),
+                        maxInFlight.get(),
+                        inFlight.get(),
+                        submitted.size(),
+                        submitted.size() - new HashSet<>(submitted).size());
     }
 
     private void handle(HttpExchange exchange, boolean analysis) throws IOException {
