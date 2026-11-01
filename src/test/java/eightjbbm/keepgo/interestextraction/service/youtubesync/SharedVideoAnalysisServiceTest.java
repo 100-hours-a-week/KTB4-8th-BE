@@ -72,4 +72,19 @@ class SharedVideoAnalysisServiceTest {
                 .isInstanceOf(CannotAcquireLockException.class);
         verify(repository, times(3)).saveAndFlush(any());
     }
+
+    @Test
+    @DisplayName("재시도 대기 중 인터럽트되면 재시도를 멈추고 예외를 던지며 인터럽트 상태를 유지한다")
+    void stopsRetryingWhenInterrupted() {
+        when(repository.saveAndFlush(any())).thenThrow(new CannotAcquireLockException("deadlock"));
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> service.acquireExecutionRight(1L, "v0"))
+                    .isInstanceOf(CannotAcquireLockException.class);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            verify(repository, times(1)).saveAndFlush(any());
+        } finally {
+            Thread.interrupted();
+        }
+    }
 }

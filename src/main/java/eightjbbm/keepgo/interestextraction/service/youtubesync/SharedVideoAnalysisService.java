@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,8 @@ public class SharedVideoAnalysisService {
     private static final Duration WAIT_MARGIN = Duration.ofSeconds(30);
     private static final String IN_PROGRESS_UNIQUE_KEY = "uk_video_analysis_in_progress_video";
     private static final int MAX_ACQUIRE_ATTEMPTS = 3;
+    private static final long MIN_RETRY_JITTER_MILLIS = 10;
+    private static final long MAX_RETRY_JITTER_MILLIS = 50;
 
     private static final Comparator<VideoAnalysis> NEWEST_COMPLETED = Comparator.comparing(
                     VideoAnalysis::getCompletedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
@@ -102,6 +105,7 @@ public class SharedVideoAnalysisService {
     /// 끝난 분석의 진행 중 키가 지워진 직후 같은 영상을 동시에 삽입하면 MySQL이 한쪽을 교착으로 롤백한다.
     /// 교착뿐 아니라 잠금 대기 시간 초과 등 `PessimisticLockingFailureException` 전체가 재시도 대상이다.
     /// 아직 AI에 보내기 전이므로 새 삽입으로 다시 판정하고, 정해진 횟수를 넘으면 예외를 그대로 던진다.
+    /// 같은 순간에 다시 부딪히지 않도록 재시도 전에 짧은 무작위 지연을 둔다.
     public AnalysisExecutionRight acquireExecutionRight(Long syncId, String videoId) {
         VideoAnalysis inProgressRow;
         for (int attempt = 1; ; attempt++) {
@@ -118,6 +122,14 @@ public class SharedVideoAnalysisService {
                     throw conflict;
                 }
                 log.warn("분석 실행권 판정 중 잠금 충돌로 다시 시도합니다: videoId={}, attempt={}", videoId, attempt);
+                try {
+                    Thread.sleep(
+                            ThreadLocalRandom.current().nextLong(MIN_RETRY_JITTER_MILLIS, MAX_RETRY_JITTER_MILLIS + 1)
+                                    * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw conflict;
+                }
             }
         }
 

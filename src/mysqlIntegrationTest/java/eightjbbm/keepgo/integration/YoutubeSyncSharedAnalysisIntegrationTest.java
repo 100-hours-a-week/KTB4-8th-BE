@@ -259,6 +259,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
     @DisplayName("완료로 진행 중 키가 지워진 영상을 동시에 다시 판정해도 실행권 판정이 교착으로 중단되지 않는다")
     void racesOnRecentlyCompletedVideoWithoutDeadlockFailure() throws Exception {
         int contenders = 5;
+        // 교착은 확률적으로 난다. 수정 전 코드에서 경쟁 5명 기준 50라운드는 4회 중 2회, 200라운드는 4회 중 4회 실패했다.
         int rounds = 200;
         // 다른 트랜잭션의 일관된 읽기 뷰가 지워진 유일 키 레코드의 purge를 늦추는 운영 상황을 고정한다.
         try (var snapshot = jdbcTemplate.getDataSource().getConnection();
