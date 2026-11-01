@@ -255,6 +255,49 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
     }
 
     @Test
+    @DisplayName("완료로 진행 중 키가 지워진 영상을 동시에 다시 판정해도 실행권 판정이 교착으로 중단되지 않는다")
+    void racesOnRecentlyCompletedVideoWithoutDeadlockFailure() throws Exception {
+        int contenders = 5;
+        int rounds = 200;
+        // 다른 트랜잭션의 일관된 읽기 뷰가 지워진 유일 키 레코드의 purge를 늦추는 운영 상황을 고정한다.
+        try (var snapshot = jdbcTemplate.getDataSource().getConnection();
+                var executor = Executors.newFixedThreadPool(contenders)) {
+            snapshot.setAutoCommit(false);
+            snapshot.createStatement().execute("START TRANSACTION WITH CONSISTENT SNAPSHOT");
+            snapshot.createStatement()
+                    .executeQuery("SELECT COUNT(*) FROM video_analysis")
+                    .close();
+            for (int round = 0; round < rounds; round++) {
+                String videoId = "completed-" + round;
+                assertThat(sharedAnalysis.acquireExecutionRight(1L, videoId).state())
+                        .isEqualTo(SharedVideoAnalysisService.ExecutionState.GRANTED);
+                jdbcTemplate.update(
+                        "UPDATE video_analysis SET status = 'NOT_FOUND', completed_at = UTC_TIMESTAMP(6) WHERE video_id = ?",
+                        videoId);
+
+                var start = new java.util.concurrent.CountDownLatch(1);
+                List<Future<SharedVideoAnalysisService.ExecutionState>> attempts = IntStream.range(0, contenders)
+                        .mapToObj(index -> executor.submit(() -> {
+                            start.await();
+                            return sharedAnalysis
+                                    .acquireExecutionRight(2000L + index, videoId)
+                                    .state();
+                        }))
+                        .toList();
+                start.countDown();
+                for (Future<SharedVideoAnalysisService.ExecutionState> attempt : attempts) {
+                    assertThat(attempt.get(30, TimeUnit.SECONDS))
+                            .isIn(
+                                    SharedVideoAnalysisService.ExecutionState.REUSED,
+                                    SharedVideoAnalysisService.ExecutionState.JOINED);
+                }
+            }
+            snapshot.rollback();
+        }
+        assertThat(inProgressCount()).isZero();
+    }
+
+    @Test
     @DisplayName("합류한 분석이 실패하면 현재 참여자는 실패로 집계하고 다음 동기화에서 다시 분석한다")
     void sharesFailureAndRetriesOnNextSync() throws Exception {
         AI_STUB.setAnalysisDelayForVideo("video-a", Duration.ofMillis(700));
