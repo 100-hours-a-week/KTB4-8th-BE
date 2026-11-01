@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -261,10 +262,11 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         int rounds = 200;
         // 다른 트랜잭션의 일관된 읽기 뷰가 지워진 유일 키 레코드의 purge를 늦추는 운영 상황을 고정한다.
         try (var snapshot = jdbcTemplate.getDataSource().getConnection();
+                var snapshotStatement = snapshot.createStatement();
                 var executor = Executors.newFixedThreadPool(contenders)) {
             snapshot.setAutoCommit(false);
-            snapshot.createStatement().execute("START TRANSACTION WITH CONSISTENT SNAPSHOT");
-            snapshot.createStatement()
+            snapshotStatement.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT");
+            snapshotStatement
                     .executeQuery("SELECT COUNT(*) FROM video_analysis")
                     .close();
             for (int round = 0; round < rounds; round++) {
@@ -275,7 +277,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
                         "UPDATE video_analysis SET status = 'NOT_FOUND', completed_at = UTC_TIMESTAMP(6) WHERE video_id = ?",
                         videoId);
 
-                var start = new java.util.concurrent.CountDownLatch(1);
+                var start = new CountDownLatch(1);
                 List<Future<SharedVideoAnalysisService.ExecutionState>> attempts = IntStream.range(0, contenders)
                         .mapToObj(index -> executor.submit(() -> {
                             start.await();

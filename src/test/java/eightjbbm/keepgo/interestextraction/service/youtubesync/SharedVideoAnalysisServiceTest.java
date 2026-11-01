@@ -17,7 +17,9 @@ import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("공유 영상 분석 실행권 판정")
@@ -42,6 +44,22 @@ class SharedVideoAnalysisServiceTest {
 
         assertThat(service.acquireExecutionRight(1L, "v0").state())
                 .isEqualTo(SharedVideoAnalysisService.ExecutionState.GRANTED);
+        ArgumentCaptor<VideoAnalysis> inserted = ArgumentCaptor.forClass(VideoAnalysis.class);
+        verify(repository, times(2)).saveAndFlush(inserted.capture());
+        assertThat(inserted.getAllValues().get(0))
+                .isNotSameAs(inserted.getAllValues().get(1));
+    }
+
+    @Test
+    @DisplayName("잠금 충돌 뒤 재시도에서 진행 중 유일 키를 위반하면 합류한다")
+    void joinsWhenRetryViolatesInProgressUniqueKey() {
+        when(repository.saveAndFlush(any()))
+                .thenThrow(new CannotAcquireLockException("deadlock"))
+                .thenThrow(new DataIntegrityViolationException(
+                        "Duplicate entry 'v0' for key 'video_analysis.uk_video_analysis_in_progress_video'"));
+
+        assertThat(service.acquireExecutionRight(1L, "v0").state())
+                .isEqualTo(SharedVideoAnalysisService.ExecutionState.JOINED);
         verify(repository, times(2)).saveAndFlush(any());
     }
 

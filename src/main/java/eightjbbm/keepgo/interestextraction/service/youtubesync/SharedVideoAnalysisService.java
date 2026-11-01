@@ -100,6 +100,7 @@ public class SharedVideoAnalysisService {
     /// 트랜잭션 없이 저장소 호출마다 커밋한다.
     ///
     /// 끝난 분석의 진행 중 키가 지워진 직후 같은 영상을 동시에 삽입하면 MySQL이 한쪽을 교착으로 롤백한다.
+    /// 교착뿐 아니라 잠금 대기 시간 초과 등 `PessimisticLockingFailureException` 전체가 재시도 대상이다.
     /// 아직 AI에 보내기 전이므로 새 삽입으로 다시 판정하고, 정해진 횟수를 넘으면 예외를 그대로 던진다.
     public AnalysisExecutionRight acquireExecutionRight(Long syncId, String videoId) {
         VideoAnalysis inProgressRow;
