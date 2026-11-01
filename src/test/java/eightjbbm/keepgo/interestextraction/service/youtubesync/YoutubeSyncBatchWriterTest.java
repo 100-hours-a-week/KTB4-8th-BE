@@ -32,11 +32,11 @@ class YoutubeSyncBatchWriterTest {
         doThrow(new DataIntegrityViolationException("duplicate", new SQLException("duplicate", "23000", 1062)))
                 .doNothing()
                 .when(commitService)
-                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), anyInt());
+                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), eq(List.of()), anyInt());
 
         writer.commit(1L, "instance-a", 2L, BATCH, 100);
 
-        verify(commitService, times(2)).commit(1L, "instance-a", 2L, BATCH, 100);
+        verify(commitService, times(2)).commit(1L, "instance-a", 2L, BATCH, List.of(), 100);
     }
 
     @Test
@@ -44,12 +44,12 @@ class YoutubeSyncBatchWriterTest {
     void givesUpAfterTwoRetries() {
         doThrow(new CannotAcquireLockException("deadlock", new SQLException("deadlock", "40001", 1213)))
                 .when(commitService)
-                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), anyInt());
+                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), eq(List.of()), anyInt());
 
         assertThatThrownBy(() -> writer.commit(1L, "instance-a", 2L, BATCH, 100))
                 .isInstanceOf(CannotAcquireLockException.class);
 
-        verify(commitService, times(3)).commit(1L, "instance-a", 2L, BATCH, 100);
+        verify(commitService, times(3)).commit(1L, "instance-a", 2L, BATCH, List.of(), 100);
     }
 
     @Test
@@ -64,12 +64,14 @@ class YoutubeSyncBatchWriterTest {
     @DisplayName("재시도할 수 없는 예외는 바로 던진다")
     void doesNotRetryOtherErrors() {
         RuntimeException failure = new IllegalStateException("unexpected");
-        doThrow(failure).when(commitService).commit(anyLong(), anyString(), anyLong(), eq(BATCH), anyInt());
+        doThrow(failure)
+                .when(commitService)
+                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), eq(List.of()), anyInt());
 
         assertThatThrownBy(() -> writer.commit(1L, "instance-a", 2L, BATCH, 100))
                 .isSameAs(failure);
 
-        verify(commitService, times(1)).commit(anyLong(), anyString(), anyLong(), eq(BATCH), anyInt());
+        verify(commitService, times(1)).commit(anyLong(), anyString(), anyLong(), eq(BATCH), eq(List.of()), anyInt());
     }
 
     @Test
@@ -77,11 +79,11 @@ class YoutubeSyncBatchWriterTest {
     void doesNotRetryFencedSync() {
         doThrow(new SyncFencedException(1L))
                 .when(commitService)
-                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), anyInt());
+                .commit(anyLong(), anyString(), anyLong(), eq(BATCH), eq(List.of()), anyInt());
 
         assertThatThrownBy(() -> writer.commit(1L, "instance-a", 2L, BATCH, 100))
                 .isInstanceOf(SyncFencedException.class);
 
-        verify(commitService, times(1)).commit(1L, "instance-a", 2L, BATCH, 100);
+        verify(commitService, times(1)).commit(1L, "instance-a", 2L, BATCH, List.of(), 100);
     }
 }

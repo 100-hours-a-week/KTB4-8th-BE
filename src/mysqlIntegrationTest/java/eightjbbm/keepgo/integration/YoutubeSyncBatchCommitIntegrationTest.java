@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,7 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("YouTube 동기화 배치 커밋 통합 테스트")
 class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport {
 
+    private static final Pattern VIDEO_ID = Pattern.compile("youtube\\.com/shorts/([A-Za-z0-9_-]+)");
     private static final YoutubeStub YOUTUBE = new YoutubeStub();
     private static final AtomicReference<String> FAIL_WISHLIST_FOR_VIDEO = new AtomicReference<>();
     private static final AtomicReference<CountDownLatch> WISHLIST_BARRIER = new AtomicReference<>();
@@ -160,13 +162,13 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("두 회원이 같은 영상을 동시에 동기화해도 각 위시리스트와 분석 결과를 보존한다")
-    void concurrentSyncsKeepBothMembersResults() throws Exception {
+    @DisplayName("두 회원이 같은 영상을 동시에 동기화하면 분석은 한 번만 하고 각 위시리스트에 결과를 반영한다")
+    void concurrentSyncsShareOneAnalysis() throws Exception {
         YOUTUBE.addPage(videos("video-a"));
         AI_STUB.useSharedGuide("동시 가이드", "서울특별시 종로구 동시로 1");
+        AI_STUB.setAnalysisDelay(Duration.ofMillis(300));
         Member first = newMember();
         Member second = newMember();
-        WISHLIST_BARRIER.set(new CountDownLatch(2));
 
         try (var executor = Executors.newFixedThreadPool(2)) {
             Future<List<SseEvent>> firstRun = executor.submit(() -> runToSuccess(token(first)));
@@ -179,14 +181,14 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                             .get("video_failed_count")
                             .asInt())
                     .isZero();
-        } finally {
-            WISHLIST_BARRIER.set(null);
         }
 
         assertThat(guideCount()).isEqualTo(1);
         assertThat(wishlistCount(first)).isEqualTo(1);
         assertThat(wishlistCount(second)).isEqualTo(1);
-        assertThat(videoAnalysisResultCount()).isEqualTo(2);
+        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
+        assertThat(analysisCount()).isEqualTo(1);
+        assertThat(videoAnalysisResultCount()).isEqualTo(1);
     }
 
     @Test
@@ -392,13 +394,14 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                 .isEqualTo(before);
         assertThat(wishlistCount(member)).isEqualTo(2);
         assertThat(syncIds(member)).hasSize(2);
-        for (Long syncId : syncIds(member)) {
-            assertThat(jdbcTemplate.queryForList("""
-                    SELECT r.outing_guide_id FROM video_analysis_result r
-                    JOIN video_analysis a ON a.id = r.video_analysis_id
-                    WHERE a.youtube_sync_id = ? ORDER BY r.outing_guide_id
-                    """, Long.class, syncId)).containsExactlyElementsOf(guideIds);
-        }
+        // 이미 끝난 분석을 재사용하므로 재동기화는 분석 이력과 AI 요청을 늘리지 않고 같은 매핑을 가리킨다.
+        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
+        assertThat(analysisCount()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT r.outing_guide_id FROM video_analysis_result r
+                JOIN video_analysis a ON a.id = r.video_analysis_id
+                WHERE a.video_id = ? ORDER BY r.outing_guide_id
+                """, Long.class, "video-a")).containsExactlyElementsOf(guideIds);
     }
 
     @Test
@@ -585,9 +588,9 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     }
 
     @Test
-    @DisplayName("여러 회원이 동시에 동기화해도 동시 분석 요청은 3건을 넘지 않는다")
-    void concurrentSyncsShareGlobalAnalysisLimit() throws Exception {
-        YOUTUBE.addPage(videos(ids(0, 30)));
+    @DisplayName("여러 회원이 같은 영상들을 동시에 동기화해도 영상별 분석 전송은 중복되지 않고 동시 요청은 3건을 넘지 않는다")
+    void concurrentSyncsDoNotSubmitSameVideoTwice() throws Exception {
+        YOUTUBE.addPage(videos(ids(0, 90)));
         AI_STUB.setAnalysisDelay(Duration.ofMillis(300));
         List<Member> members = List.of(newMember(), newMember(), newMember());
 
@@ -597,12 +600,16 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
                 runs.add(executor.submit(() -> runToSuccess(token(member))));
             }
             for (Future<List<SseEvent>> run : runs) {
-                run.get(30, TimeUnit.SECONDS);
+                JsonNode success = data(run.get(30, TimeUnit.SECONDS).getLast());
+                assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(90);
+                assertThat(success.get("video_failed_count").asInt()).isZero();
             }
         }
 
-        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(9);
+        assertThat(submittedVideoIds()).hasSize(90).doesNotHaveDuplicates();
+        assertThat(AI_STUB.analysisRequestCount()).isGreaterThanOrEqualTo(9);
         assertThat(AI_STUB.maxConcurrentRequests()).isEqualTo(3);
+        members.forEach(member -> assertThat(wishlistCount(member)).isEqualTo(90));
     }
 
     @Test
@@ -726,6 +733,12 @@ class YoutubeSyncBatchCommitIntegrationTest extends MySqlIntegrationTestSupport 
     private int pendingOutboxCount() {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM outing_guide_embedding_outbox WHERE status = 'PENDING'", Integer.class);
+    }
+
+    private List<String> submittedVideoIds() {
+        return AI_STUB.analysisRequestBodies().stream()
+                .flatMap(body -> VIDEO_ID.matcher(body).results().map(result -> result.group(1)))
+                .toList();
     }
 
     private int analysisCount() {

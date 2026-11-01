@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +16,7 @@ import static org.mockito.Mockito.when;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
+import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +42,7 @@ class DefaultAiCallGatewayTest {
             Duration.ofSeconds(30));
 
     private final AiServerService ai = mock(AiServerService.class);
+    private final VideoAnalysisJobClient jobClient = mock(VideoAnalysisJobClient.class);
     private final AiCallSlotRepository slots = mock(AiCallSlotRepository.class);
     private final AtomicInteger slotHeld = new AtomicInteger();
     private final AtomicInteger inFlight = new AtomicInteger();
@@ -200,13 +204,41 @@ class DefaultAiCallGatewayTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    @DisplayName("beforeSend가 없으면 요청한 영상을 모두 보낸다")
+    void sendsAllRequestedVideosWithoutBeforeSend() {
+        givenSlots(1);
+        when(jobClient.analyzeVideo(anyList(), any(Duration.class))).thenReturn(new VideoAnalysisResponse(List.of()));
+        gateway = startedGateway();
+
+        gateway.submitVideoAnalysis(1, List.of("a", "b"), null).join();
+
+        verify(jobClient).analyzeVideo(eq(List.of("a", "b")), any(Duration.class));
+    }
+
+    @Test
+    @DisplayName("beforeSend가 요청하지 않은 영상을 돌려주면 보내지 않고 실패로 끝낸다")
+    void failsWhenBeforeSendReturnsUnrequestedVideo() {
+        givenSlots(1);
+        gateway = startedGateway();
+
+        CompletableFuture<VideoAnalysisResponse> call =
+                gateway.submitVideoAnalysis(1, List.of("a"), requested -> List.of("a", "other"));
+
+        assertThat(call)
+                .failsWithin(Duration.ofSeconds(2))
+                .withThrowableThat()
+                .havingRootCause()
+                .isInstanceOf(IllegalStateException.class);
+        verify(jobClient, never()).analyzeVideo(anyList(), any(Duration.class));
+    }
+
     private DefaultAiCallGateway startedGateway() {
         return startedGateway(PROPERTIES);
     }
 
     private DefaultAiCallGateway startedGateway(AiCallProperties properties) {
-        DefaultAiCallGateway started =
-                new DefaultAiCallGateway(ai, mock(VideoAnalysisJobClient.class), slots, properties);
+        DefaultAiCallGateway started = new DefaultAiCallGateway(ai, jobClient, slots, properties);
         started.start();
         return started;
     }
