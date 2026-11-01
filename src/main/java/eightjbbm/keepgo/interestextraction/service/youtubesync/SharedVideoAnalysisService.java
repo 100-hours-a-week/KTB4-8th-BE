@@ -49,18 +49,24 @@ public class SharedVideoAnalysisService {
     private final AiCallProperties aiCallProperties;
 
     /// 분석 실행권 경쟁의 결과. 얻으면 호출자가 AI에 보내고, 아니면 재사용하거나 진행 중인 분석에 합류한다.
-    public record AnalysisExecutionRight(boolean granted, SharedVideoResult reused) {
+    public enum ExecutionState {
+        GRANTED,
+        REUSED,
+        JOINED
+    }
+
+    public record AnalysisExecutionRight(ExecutionState state, SharedVideoResult reused) {
 
         static AnalysisExecutionRight won() {
-            return new AnalysisExecutionRight(true, null);
+            return new AnalysisExecutionRight(ExecutionState.GRANTED, null);
         }
 
         static AnalysisExecutionRight reusing(SharedVideoResult result) {
-            return new AnalysisExecutionRight(false, result);
+            return new AnalysisExecutionRight(ExecutionState.REUSED, result);
         }
 
         static AnalysisExecutionRight joining() {
-            return new AnalysisExecutionRight(false, null);
+            return new AnalysisExecutionRight(ExecutionState.JOINED, null);
         }
     }
 

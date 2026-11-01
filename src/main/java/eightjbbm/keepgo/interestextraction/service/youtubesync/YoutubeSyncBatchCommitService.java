@@ -85,7 +85,7 @@ public class YoutubeSyncBatchCommitService {
         embeddingOutboxService.enqueue(createdGuides);
     }
 
-    /// 공유 결과만 반영한 배치가 커밋에 실패해도 분석 이력은 건드리지 않고 처리·실패 수만 남긴다.
+    /// 재사용·합류 결과와 실행권 판정 전 실패는 분석 이력 없이 처리·실패 수만 남긴다.
     @Transactional
     public void recordSharedFailed(Long syncId, String instanceId, int videoCount, int progress) {
         fence(syncId, instanceId, videoCount, videoCount, progress);

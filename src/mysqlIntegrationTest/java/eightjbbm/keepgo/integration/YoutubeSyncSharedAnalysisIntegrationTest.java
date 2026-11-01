@@ -2,6 +2,11 @@ package eightjbbm.keepgo.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import eightjbbm.keepgo.integration.stub.AiServerStub;
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
@@ -20,6 +25,7 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallSlotRepository;
 import eightjbbm.keepgo.util.client.ai.gateway.DefaultAiCallGateway;
@@ -29,6 +35,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +85,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
     private final AiServerService aiServerService;
     private final VideoAnalysisJobClient videoAnalysisJobClient;
     private final AiCallSlotRepository slots;
+    private final List<ExecutorService> otherInstanceWaiters = new ArrayList<>();
     private final List<DefaultAiCallGateway> otherInstanceGateways = new ArrayList<>();
 
     YoutubeSyncSharedAnalysisIntegrationTest(
@@ -118,6 +127,8 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
     void shutdownOtherInstances() {
         otherInstanceGateways.forEach(DefaultAiCallGateway::shutdown);
         otherInstanceGateways.clear();
+        otherInstanceWaiters.forEach(ExecutorService::shutdownNow);
+        otherInstanceWaiters.clear();
     }
 
     @Test
@@ -229,8 +240,9 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         try (var executor = Executors.newFixedThreadPool(contenders)) {
             List<Future<Boolean>> attempts = IntStream.range(0, contenders)
                     .mapToObj(index -> executor.submit(() -> sharedAnalysis
-                            .acquireExecutionRight(1000L + index, "race-video")
-                            .granted()))
+                                    .acquireExecutionRight(1000L + index, "race-video")
+                                    .state()
+                            == SharedVideoAnalysisService.ExecutionState.GRANTED))
                     .toList();
             granted = new ArrayList<>();
             for (Future<Boolean> attempt : attempts) {
@@ -281,8 +293,9 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         YoutubeSyncSnapshot ownerSync = syncService.create(owner.getId(), "instance-a", "trace-owner");
         syncService.start(ownerSync.id(), "instance-a", 1, 1, 10);
         assertThat(sharedAnalysis
-                        .acquireExecutionRight(ownerSync.id(), "video-a")
-                        .granted())
+                                .acquireExecutionRight(ownerSync.id(), "video-a")
+                                .state()
+                        == SharedVideoAnalysisService.ExecutionState.GRANTED)
                 .isTrue();
 
         try (var executor = Executors.newFixedThreadPool(1)) {
@@ -338,8 +351,9 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         YoutubeSyncSnapshot ownerSync = syncService.create(owner.getId(), "instance-a", "trace-owner");
         syncService.start(ownerSync.id(), "instance-a", 1, 1, 10);
         assertThat(sharedAnalysis
-                        .acquireExecutionRight(ownerSync.id(), "video-a")
-                        .granted())
+                                .acquireExecutionRight(ownerSync.id(), "video-a")
+                                .state()
+                        == SharedVideoAnalysisService.ExecutionState.GRANTED)
                 .isTrue();
 
         Map<String, SharedVideoResult> resolved =
@@ -390,6 +404,42 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
                 .allSatisfy(result -> assertThat(result.status()).isEqualTo(VideoAnalysisStatus.NOT_FOUND));
     }
 
+    @Test
+    @DisplayName("실행권 판정 전 실패는 다른 동기화의 최신 완료 결과를 가리지 않는다")
+    void preservesCompletedHistoryWhenGatewayFailsBeforeAcquire() {
+        AiCallGateway gateway = mock(AiCallGateway.class);
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any())).thenAnswer(call -> {
+            insertAnalysis(9000, "video-a", "NOT_FOUND", "2026-10-01 00:00:00");
+            return CompletableFuture.failedFuture(new IllegalStateException("before acquire"));
+        });
+        Member member = newMember();
+        try (var waiters = Executors.newVirtualThreadPerTaskExecutor()) {
+            var failingProcessor =
+                    new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager, sharedAnalysis, waiters);
+            Long syncId = runSync(failingProcessor, member, "instance-a", "video-a");
+            assertThat(failedCount(syncId)).isEqualTo(1);
+            assertThat(analysisCount()).isEqualTo(1);
+            assertThat(analysisStatus("video-a")).isEqualTo("NOT_FOUND");
+            assertThat(sharedAnalysis.findCompleted(List.of("video-a"))).containsKey("video-a");
+        }
+        Long nextSync = runSync(processor, member, "instance-a", "video-a");
+        // NOT_FOUND 재사용도 기존 계약상 실패 수에 포함한다.
+        assertThat(failedCount(nextSync)).isEqualTo(1);
+        assertThat(analysisCount()).isEqualTo(1);
+        assertThat(AI_STUB.analysisRequestCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("테스트 DB의 영상 ID와 실행권 유일 키는 모두 바이너리 collation을 쓴다")
+    void verifiesVideoIdCollation() {
+        List<String> collations = jdbcTemplate.queryForList("""
+                SELECT COLLATION_NAME FROM information_schema.columns
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'video_analysis'
+                  AND COLUMN_NAME IN ('video_id', 'in_progress_video_id')
+                """, String.class);
+        assertThat(collations).containsExactlyInAnyOrder("utf8mb4_0900_bin", "utf8mb4_0900_bin");
+    }
+
     private Long runSync(YoutubeSyncBatchProcessor target, Member member, String instanceId, String... videoIds) {
         YoutubeSyncSnapshot sync =
                 syncService.create(member.getId(), instanceId, UUID.randomUUID().toString());
@@ -404,7 +454,9 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
                 new DefaultAiCallGateway(aiServerService, videoAnalysisJobClient, slots, PROPERTIES);
         gateway.start();
         otherInstanceGateways.add(gateway);
-        return new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager, sharedAnalysis);
+        ExecutorService waiters = Executors.newVirtualThreadPerTaskExecutor();
+        otherInstanceWaiters.add(waiters);
+        return new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager, sharedAnalysis, waiters);
     }
 
     private void awaitInProgress(int count) throws InterruptedException {

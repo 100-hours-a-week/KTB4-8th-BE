@@ -11,8 +11,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,18 +31,16 @@ public class YoutubeSyncBatchProcessor {
 
     private static final int BATCH_SIZE = 10;
 
-    /// 합류한 분석을 기다리는 스레드. 기다리는 동안에도 실행권을 얻은 분석의 결과 커밋은 막히지 않아야 한다.
-    private static final Executor WAITERS = Executors.newVirtualThreadPerTaskExecutor();
-
     private final AiCallGateway aiCallGateway;
     private final YoutubeSyncBatchWriter batchWriter;
     private final VideoAnalysisManager videoAnalysisManager;
     private final SharedVideoAnalysisService sharedAnalysis;
+    private final ExecutorService youtubeSyncWaiters;
 
     /// 커밋할 한 덩어리. `last`인 덩어리가 커밋되면 배치 하나가 끝난 것으로 진척도를 올린다.
     private record Completion(BatchAnalysis analysis, List<SharedVideoResult> shared, boolean last) {}
 
-    /// 배치 하나가 전송 직전에 영상별로 나뉜 결과. 게이트웨이 스레드가 쓰고 결과 Future가 끝난 뒤 읽는다.
+    /// 취소 시 beforeSend와 완료 핸들러가 동시에 접근할 수 있어 동시성 컬렉션을 유지한다.
     private static final class BatchExecutionRights {
         private final List<String> granted = new CopyOnWriteArrayList<>();
         private final List<SharedVideoResult> reused = new CopyOnWriteArrayList<>();
@@ -96,7 +93,7 @@ public class YoutubeSyncBatchProcessor {
                     finish(batch, rights, response, error, completed);
                     return null;
                 },
-                WAITERS);
+                youtubeSyncWaiters);
         return future;
     }
 
@@ -105,12 +102,10 @@ public class YoutubeSyncBatchProcessor {
         for (String videoId : requested) {
             SharedVideoAnalysisService.AnalysisExecutionRight outcome =
                     sharedAnalysis.acquireExecutionRight(syncId, videoId);
-            if (outcome.granted()) {
-                rights.granted.add(videoId);
-            } else if (outcome.reused() != null) {
-                rights.reused.add(outcome.reused());
-            } else {
-                rights.joined.add(videoId);
+            switch (outcome.state()) {
+                case GRANTED -> rights.granted.add(videoId);
+                case REUSED -> rights.reused.add(outcome.reused());
+                case JOINED -> rights.joined.add(videoId);
             }
         }
         return List.copyOf(rights.granted);
@@ -133,7 +128,7 @@ public class YoutubeSyncBatchProcessor {
             // 재사용·합류한 영상은 다른 동기화의 이력이므로 새 FAILED 이력을 만들지 않는다.
             log.error("YouTube 동기화 배치 결과 정리 실패: videoCount={}", batch.size(), unexpected);
             completed.add(new Completion(
-                    BatchAnalysis.failed(undecidedOrGranted(batch, rights)), List.copyOf(rights.reused), !waiting));
+                    BatchAnalysis.failed(List.copyOf(rights.granted)), failedUndecided(batch, rights), !waiting));
         }
 
         if (waiting) {
@@ -148,21 +143,25 @@ public class YoutubeSyncBatchProcessor {
             Throwable error,
             boolean waiting,
             BlockingQueue<Completion> completed) {
-        // 실행권 판정을 마치지 못한 영상도 이 배치와 함께 실패한다.
-        List<String> granted = error == null ? List.copyOf(rights.granted) : undecidedOrGranted(batch, rights);
+        List<String> granted = List.copyOf(rights.granted);
         BatchAnalysis analysis = granted.isEmpty() ? null : analyze(granted, response, error);
-        if (analysis != null || !rights.reused.isEmpty() || !waiting) {
-            completed.add(new Completion(analysis, List.copyOf(rights.reused), !waiting));
+        List<SharedVideoResult> shared = error == null ? List.copyOf(rights.reused) : failedUndecided(batch, rights);
+        if (analysis != null || !shared.isEmpty() || !waiting) {
+            completed.add(new Completion(analysis, shared, !waiting));
         }
     }
 
-    /// 재사용·합류로 판정된 영상을 뺀, 이 동기화가 분석 실행권을 얻었거나 아직 판정받지 못한 영상.
-    private static List<String> undecidedOrGranted(List<String> batch, BatchExecutionRights rights) {
-        return batch.stream()
-                .filter(id -> !rights.joined.contains(id)
+    /// 판정 전 실패는 전역 분석 이력을 만들지 않고 이 동기화의 처리·실패 수에만 반영한다.
+    private static List<SharedVideoResult> failedUndecided(List<String> batch, BatchExecutionRights rights) {
+        List<SharedVideoResult> shared = new ArrayList<>(rights.reused);
+        batch.stream()
+                .filter(id -> !rights.granted.contains(id)
+                        && !rights.joined.contains(id)
                         && rights.reused.stream()
                                 .noneMatch(result -> result.videoId().equals(id)))
-                .toList();
+                .map(SharedVideoResult::failed)
+                .forEach(shared::add);
+        return List.copyOf(shared);
     }
 
     private List<SharedVideoResult> awaitJoined(List<String> videoIds) {

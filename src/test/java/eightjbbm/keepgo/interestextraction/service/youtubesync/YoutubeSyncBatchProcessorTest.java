@@ -23,7 +23,10 @@ import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.UnaryOperator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.CannotAcquireLockException;
@@ -35,8 +38,14 @@ class YoutubeSyncBatchProcessorTest {
     private final YoutubeSyncBatchWriter batchWriter = mock(YoutubeSyncBatchWriter.class);
     private final VideoAnalysisManager videoAnalysisManager = mock(VideoAnalysisManager.class);
     private final SharedVideoAnalysisService sharedAnalysis = mock(SharedVideoAnalysisService.class);
+    private final ExecutorService waiters = Executors.newVirtualThreadPerTaskExecutor();
     private final YoutubeSyncBatchProcessor processor =
-            new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager, sharedAnalysis);
+            new YoutubeSyncBatchProcessor(gateway, batchWriter, videoAnalysisManager, sharedAnalysis, waiters);
+
+    @AfterEach
+    void shutdownWaiters() {
+        waiters.shutdownNow();
+    }
 
     @Test
     @DisplayName("재시도가 모두 실패한 배치는 FAILED로 기록한다")
@@ -50,7 +59,8 @@ class YoutubeSyncBatchProcessorTest {
         processor.process(1L, "instance-a", 2L, YoutubeStub.videos("v0"), 10);
 
         verify(batchWriter).commit(anyLong(), anyString(), anyLong(), any(BatchAnalysis.class), anyList(), anyInt());
-        verify(batchWriter).recordFailed(1L, "instance-a", List.of("v0"), 100);
+        verify(batchWriter).recordSharedFailed(1L, "instance-a", 1, 100);
+        verify(batchWriter, never()).recordFailed(anyLong(), anyString(), anyList(), anyInt());
     }
 
     @Test
@@ -69,7 +79,7 @@ class YoutubeSyncBatchProcessorTest {
     }
 
     @Test
-    @DisplayName("실행권 판정 중 오류가 나면 배치 전체를 FAILED로 한 번에 커밋한다")
+    @DisplayName("실행권 판정 중 오류가 나면 얻은 영상만 FAILED 이력을 남기고 판정 전 영상은 실패 수만 반영한다")
     void failsWholeBatchWhenAcquireExecutionRightThrows() {
         when(sharedAnalysis.acquireExecutionRight(1L, "v0"))
                 .thenReturn(SharedVideoAnalysisService.AnalysisExecutionRight.won());
@@ -83,9 +93,8 @@ class YoutubeSyncBatchProcessorTest {
                         eq(1L),
                         eq("instance-a"),
                         eq(2L),
-                        argThat(analysis ->
-                                analysis.videoIds().equals(List.of("v0", "v1")) && analysis.failedCount() == 2),
-                        eq(List.of()),
+                        argThat(analysis -> analysis.videoIds().equals(List.of("v0")) && analysis.failedCount() == 1),
+                        eq(List.of(SharedVideoResult.failed("v1"))),
                         eq(100));
         verify(batchWriter, never()).recordFailed(anyLong(), anyString(), anyList(), anyInt());
     }

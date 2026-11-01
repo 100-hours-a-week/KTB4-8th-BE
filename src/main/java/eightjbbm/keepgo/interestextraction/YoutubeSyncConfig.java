@@ -1,5 +1,7 @@
 package eightjbbm.keepgo.interestextraction;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -9,6 +11,12 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @Configuration
 @EnableConfigurationProperties(YoutubeSyncProperties.class)
 public class YoutubeSyncConfig {
+
+    /// 종료 시 합류 대기를 중단해 DB 폴링을 멈춘다.
+    @Bean(destroyMethod = "shutdownNow")
+    public ExecutorService youtubeSyncWaiters() {
+        return Executors.newVirtualThreadPerTaskExecutor();
+    }
 
     @Bean("youtubeSyncTaskExecutor")
     public ThreadPoolTaskExecutor youtubeSyncTaskExecutor(YoutubeSyncProperties properties) {
