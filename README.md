@@ -31,3 +31,7 @@
 |DB_PASSWORD|DB에 접속할 계정의 비밀번호|0000|
 |DB_DRIVER|DB에 해당하는 JDBC 드라이버 이름|com.mysql.cj.jdbc.Driver|
 |DB_DIALECT|DB에 해당하는 SQL 방언|MySQL|
+
+## 제품 문서
+
+- [사용자 페르소나](docs/persona.md)
