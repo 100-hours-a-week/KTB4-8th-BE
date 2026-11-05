@@ -34,11 +34,11 @@ flowchart LR
         direction TB
         MS["MemberServiceV4<br/>filter"]
         IE["InterestExtractor.query"]
-        MV["ModelVersionProvider<br/>TTL 30초 캐시"]
     end
 
     subgraph WK["BE 워커 인스턴스 (소비자, AI 서버와 1:1)"]
         direction TB
+        MV["ModelVersionProvider<br/>TTL 30초 캐시"]
         POLL["폴러<br/>Semaphore(3)<br/>클레임 10 x free"]
         CLIENT["VideoAnalysisJobClient<br/>10건씩 호출"]
         SAVE["결과 저장<br/>(한 트랜잭션)"]
@@ -46,6 +46,7 @@ flowchart LR
 
     subgraph DB["MySQL"]
         VA[("video_analysis<br/>(큐 행)")]
+        WV[("analysis_worker_version<br/>워커별 게시 버전")]
         VAR[("video_analysis_result<br/>분석-가이드 매핑")]
         OG[("outing_guide")]
     end
@@ -53,8 +54,10 @@ flowchart LR
     AI["AI 서버<br/>GET v3/version<br/>POST v3/analyze-video"]
 
     MS -->|"query(videoId)"| IE
-    IE -->|"버전 조회"| MV
-    MV --> AI
+    IE -->|"현재 버전 조회"| WV
+    MV -->|"GET v3/version"| AI
+    POLL -->|"버전 게시"| WV
+    POLL --> MV
     IE -->|"1 완료 행 재사용 / 2 INSERT·합류"| VA
     IE -.->|"DB 폴링 대기 200ms~2s"| VA
     POLL -->|"FOR UPDATE SKIP LOCKED<br/>PENDING → RUNNING"| VA
@@ -77,8 +80,8 @@ sequenceDiagram
     participant A as AI 서버
 
     M->>P: query(videoId)
-    P->>A: GET v3/version (캐시 미스 시)
-    P->>D: 현재 버전의 완료 행 조회
+    P->>D: 게시된 현재 분석 버전 조회 (analysis_worker_version)
+    P->>D: 그 버전의 완료 행 조회
     alt 완료 행 있음
         D-->>P: 결과
     else 없음
@@ -87,7 +90,9 @@ sequenceDiagram
             P->>D: 상태 조회
         end
     end
-    C->>D: SKIP LOCKED 클레임 (RUNNING)
+    C->>A: GET v3/version (캐시 미스 시)
+    C->>D: 버전 게시
+    C->>D: SKIP LOCKED 클레임 (RUNNING, 행에 버전 기록)
     C->>A: POST v3/analyze-video (10건)
     A-->>C: results[]
     C->>D: 결과 저장 + 조건부 SUCCESS
@@ -97,24 +102,26 @@ sequenceDiagram
 
 ## 분석 버전
 
-- 분석 버전은 AI 서버 `GET v3/version`의 `data.commit`이다. 조회 결과는 짧은 TTL(초기 30초)로 캐시한다.
-- 작업 행에는 제출 시점의 버전을 고정한다. 버전 조회에 실패하면 새로 제출하지 않고 예외로 실패한다. 만료 전 캐시 값이 있으면 그 값을 쓴다.
-- **알려진 한계:** 분석 응답에 버전이 없으므로 제출 후 AI가 재배포되면 이전 커밋으로 기록될 수 있다. 문제가 관찰되면 호출 전후 버전 비교를 도입한다.
-- 재사용 범위는 같은 버전의 `SUCCESS`·`NOT_FOUND`뿐이다. 다른 버전의 결과는 보존하되 재사용하지 않는다.
+- 분석 버전은 AI 서버 `GET v3/version`의 `data.commit`이다. 이 서버와 통신하는 주체는 워커뿐이다. 워커는 조회 결과를 짧은 TTL(초기 30초)로 캐시한다.
+- 워커는 폴링마다 자기 AI의 버전을 `analysis_worker_version(worker_id, analysis_version, updated_at)`에 게시한다. API 인스턴스는 AI 서버에 직접 묻지 않고 이 테이블을 읽는다.
+- **현재 버전:** 게시 후 일정 시간(초기 60초, DB 시간) 이내인 행 중 `updated_at`이 가장 최근인 값이다. 그런 행이 없으면 처리할 워커가 없다는 뜻이므로 새로 제출하지 않고 예외로 실패한다.
+- 제출 행의 `analysis_version`은 NULL이다. 워커가 클레임할 때 자기 버전을 행에 기록해 확정한다. 재시도로 `PENDING`에 돌아가면 다시 NULL로 비우고, 다음 클레임이 새로 확정한다.
+- **알려진 한계:** 분석 응답에 버전이 없으므로 클레임 후 AI가 재배포되면 이전 커밋으로 기록될 수 있다. 문제가 관찰되면 호출 전후 버전 비교를 도입한다. 워커마다 버전이 다르면 가장 최근 게시한 버전이 현재 버전이므로 재사용 판단이 흔들릴 수 있다.
+- 재사용 범위는 현재 버전의 `SUCCESS`·`NOT_FOUND`뿐이다. 다른 버전의 결과는 보존하되 재사용하지 않는다.
 
 ## 데이터 모델
 
-`video_analysis` 행을 큐 행으로 진화시킨다. 영상 하나와 분석 버전 하나에 활성 행은 최대 하나다.
+`video_analysis` 행을 큐 행으로 진화시킨다. 영상 하나에 활성 행(`PENDING`·`RUNNING`)은 최대 하나다. 활성 행은 버전과 무관하게 합류 대상이다.
 
 | 컬럼 | 설명 |
 |---|---|
-| `video_id`, `analysis_version` | 대상 영상과 제출 시점 분석 버전 |
+| `video_id`, `analysis_version` | 대상 영상과 워커가 클레임 때 확정한 분석 버전(제출 직후·재시도 대기 중은 NULL) |
 | `status` | `PENDING`, `RUNNING`, `SUCCESS`, `NOT_FOUND`, `FAILED` |
 | `attempt` | 클레임 때 1 증가. 소비자 사망·임대 만료도 시도로 센다 |
 | `next_run_at` | 재시도 대기 종료 시각(DB 시간) |
 | `lease_until`, `lease_owner` | 임대 만료 시각(DB 시간)과 소비자 식별자 |
 | `failure_code`, `excluded_candidates`, `completed_at` | 기존 컬럼 유지 |
-| `active_key` | 생성 컬럼. `PENDING`·`RUNNING`일 때만 `(video_id, analysis_version)`으로 채워지고 유일 인덱스를 건다 |
+| `active_key` | 생성 컬럼. `PENDING`·`RUNNING`일 때만 `video_id`로 채워지고 유일 인덱스를 건다 |
 
 - 기존 `youtube_sync_id`와 `in_progress_video_id` 생성 컬럼·유일 키는 제거한다.
 - `video_analysis_result`(분석-가이드 매핑)는 그대로 쓴다. 행이 영상·버전당 하나가 되어 재사용 판단이 단순해진다.
@@ -180,7 +187,8 @@ stateDiagram-v2
 | 대기 타임아웃 | 10분 |
 | 대기 폴링 | 200ms → 2초 |
 | 소비자 빈 큐 폴링 | 1초 |
-| 버전 캐시 TTL | 30초 |
+| 버전 캐시 TTL (워커) | 30초 |
+| 게시 버전 유효 시간 | 60초 |
 
 ## 변경 범위 (현재 코드 기준)
 
@@ -211,8 +219,8 @@ YouTube 연동(계정 연결·해제·조회) 관련 코드는 동기화와 무�
 1. `docs`: 이 설계 문서와 용어집
 2. `refactor`: 가이드 해석·매핑과 충돌 재시도를 기존 커밋 서비스·라이터에서 독립 컴포넌트로 추출
 3. `refactor`: 기존 동기화 스택, 레거시 v2 분석 경로, AI 게이트웨이·슬롯, 임베딩 경로 제거(관련 테스트 포함)
-4. `feat(mysql)`: 마이그레이션. `video_analysis` 큐 컬럼·상태 변경, 유일 키 교체, 기존 행 백필
-5. `feat(ai)`: `/v3/analyze-video`(`videos[]`) 클라이언트 전환과 분석 버전 조회(`ModelVersionProvider`)
+4. `feat(mysql)`: 마이그레이션. `video_analysis` 큐 컬럼·상태 변경, 유일 키 교체, 기존 행 백필, `analysis_worker_version` 테이블 생성
+5. `feat(ai)`: `/v3/analyze-video`(`videos[]`) 클라이언트 전환과 워커의 분석 버전 조회·게시(`ModelVersionProvider`, `analysis_worker_version`)
 6. `feat`: 생산자. 이력 재사용·제출·합류·대기
 7. `feat`: 소비자. `Semaphore(3)`·클레임·호출·결과 저장·재시도·임대 만료 회수
 8. `feat`: `InterestExtractor`·`MemberServiceV4` 연결과 흐름 테스트
