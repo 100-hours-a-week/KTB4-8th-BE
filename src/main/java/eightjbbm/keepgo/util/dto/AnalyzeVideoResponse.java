@@ -3,10 +3,7 @@ package eightjbbm.keepgo.util.dto;
 import java.time.Instant;
 
 public sealed interface AnalyzeVideoResponse {
-    public record Success(
-            String message,
-            AnalyzedData data
-    ) implements AnalyzeVideoResponse {
+    public record Success(String message, AnalyzedData data) implements AnalyzeVideoResponse {
         public record AnalyzedData(
                 String placeName,
                 String region,
@@ -14,8 +11,7 @@ public sealed interface AnalyzeVideoResponse {
                 Instant eventStartDate,
                 Instant eventEndDate,
                 Float confidence,
-                String summary
-        ) {}
+                String summary) {}
 
         public String getCategory() {
             return data().category();
@@ -25,11 +21,10 @@ public sealed interface AnalyzeVideoResponse {
             return data().placeName();
         }
 
-        public String getSummary() { return data().summary(); }
+        public String getSummary() {
+            return data().summary();
+        }
     }
 
-    public record Error(
-            String message,
-            Object data
-    ) implements AnalyzeVideoResponse {}
+    public record Error(String message, Object data) implements AnalyzeVideoResponse {}
 }

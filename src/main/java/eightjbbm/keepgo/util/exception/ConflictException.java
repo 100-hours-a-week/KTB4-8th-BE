@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class ConflictException extends ErrorResponseException {
     public ConflictException() {
-        super(
-                HttpStatus.CONFLICT,
-                ProblemDetail.forStatus(HttpStatus.CONFLICT),
-                null
-        );
+        super(HttpStatus.CONFLICT, ProblemDetail.forStatus(HttpStatus.CONFLICT), null);
     }
 }

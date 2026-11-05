@@ -1,13 +1,12 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
+import eightjbbm.keepgo.common.domain.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 @Entity
 @Getter
@@ -29,5 +28,10 @@ public class OutingPlace extends OutingGuide {
     @Override
     public boolean isAvailable(Instant instant) {
         return this.getBusinessSchedule() != null && this.getBusinessSchedule().isAvailable(instant);
+    }
+
+    @Override
+    public GuideType guideType() {
+        return GuideType.PLACE;
     }
 }

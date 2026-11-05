@@ -26,15 +26,11 @@ public class RefreshAuthenticationProvider implements AuthenticationProvider {
     }
 
     private void validateRefreshToken(String refreshToken) {
-        var refreshTokenHash = refreshTokenManager.get(refreshToken)
-                .orElseThrow(
-                        () -> new OAuth2AuthenticationException(
-                                OAuth2ErrorCodes.INVALID_GRANT));
-        if (refreshTokenHash.state() != RefreshTokenState.ACTIVE
-                || refreshTokenHash.isExpired()) {
-            throw new OAuth2AuthenticationException(
-                    OAuth2ErrorCodes.INVALID_GRANT
-            );
+        var refreshTokenHash = refreshTokenManager
+                .get(refreshToken)
+                .orElseThrow(() -> new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT));
+        if (refreshTokenHash.state() != RefreshTokenState.ACTIVE || refreshTokenHash.isExpired()) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
         }
     }
 

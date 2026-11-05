@@ -1,0 +1,11 @@
+{
+  "message":"analyze_success",
+  "data":{"results":[
+    {"video_url":"https://youtube.com/shorts/video-a","status":"success","error":null,"place_type":"장소",
+     "place_name":"산책 공원","address":"서울특별시 종로구 세종대로 1","lat":37.57,"lng":126.98},
+    {"video_url":"https://youtube.com/shorts/video-a","status":"success","error":null,"place_type":"이벤트",
+     "place_name":"가을 행사","address":null,"event_start_date":"2026-10-28"},
+    {"video_url":"https://youtube.com/shorts/video-b","status":"not_found","error":null},
+    {"video_url":"https://youtube.com/shorts/video-c","status":"failed","error":"VIDEO_UNAVAILABLE"}
+  ]}
+}

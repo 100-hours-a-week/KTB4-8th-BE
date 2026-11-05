@@ -1,11 +1,10 @@
 package eightjbbm.keepgo.util.cache.recommendationjob;
 
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -24,7 +23,6 @@ public class RecommendationJobCacheRepository {
     public void delete(Long memberId) {
         getRecommendationJobCache().evict(memberId);
     }
-
 
     private Cache getRecommendationJobCache() {
         Cache cache = cacheManager.getCache(cacheName);

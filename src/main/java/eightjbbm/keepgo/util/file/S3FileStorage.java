@@ -1,14 +1,13 @@
 package eightjbbm.keepgo.util.file;
 
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import java.io.IOException;
+import java.io.InputStream;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-
-import java.io.IOException;
-import java.io.InputStream;
 
 public class S3FileStorage implements FileStorage {
 
@@ -35,13 +34,7 @@ public class S3FileStorage implements FileStorage {
                 .build();
 
         try (InputStream inputStream = file.getInputStream()) {
-            s3Client.putObject(
-                    request,
-                    RequestBody.fromInputStream(
-                            inputStream,
-                            file.getSize()
-                    )
-            );
+            s3Client.putObject(request, RequestBody.fromInputStream(inputStream, file.getSize()));
         } catch (SdkException e) {
             throw new IOException("S3 파일 업로드에 실패했습니다.", e);
         }
@@ -49,10 +42,8 @@ public class S3FileStorage implements FileStorage {
 
     @Override
     public void delete(String key) throws IOException {
-        DeleteObjectRequest request = DeleteObjectRequest.builder()
-                .bucket(bucket)
-                .key(key)
-                .build();
+        DeleteObjectRequest request =
+                DeleteObjectRequest.builder().bucket(bucket).key(key).build();
 
         try {
             s3Client.deleteObject(request);

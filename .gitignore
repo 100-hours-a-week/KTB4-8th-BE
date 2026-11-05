@@ -1,12 +1,16 @@
 HELP.md
 .gradle
 build/
+perf/__pycache__/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 application-local.yml
 application-test.yml
 .env
+
+### Agent skills ###
+.agents/skills/
 
 ### STS ###
 .apt_generated
@@ -38,3 +42,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### JWT 서명 키 (로컬 생성, 커밋 금지) ###
+src/main/resources/keys/

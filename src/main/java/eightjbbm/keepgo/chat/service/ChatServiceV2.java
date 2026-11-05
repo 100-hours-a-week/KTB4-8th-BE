@@ -14,6 +14,11 @@ import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.exception.BadRequestException;
 import eightjbbm.keepgo.util.exception.NotFoundException;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
+import java.io.IOException;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,12 +26,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.io.IOException;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.Set;
 
 @Slf4j
 @Service
@@ -49,18 +48,16 @@ public class ChatServiceV2 {
         var lease = requestGuard.acquire(command.memberId());
 
         try {
-            var member = memberRepository.findById(command.memberId())
-                    .orElseThrow(NotFoundException::new);
+            var member = memberRepository.findById(command.memberId()).orElseThrow(NotFoundException::new);
 
-            var criteria = outingCriteriaRepository.findById(command.memberId())
-                    .orElseGet(() ->
-                            OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
+            var criteria = outingCriteriaRepository
+                    .findById(command.memberId())
+                    .orElseGet(() -> OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
 
             var chat = chatRepository.save(Chat.from(member, command.content()));
             var connection = new ChatConnection(chat.getId().toString());
 
-            Thread.startVirtualThread(() ->
-                    reply(command, member, criteria, chat, connection, lease));
+            Thread.startVirtualThread(() -> reply(command, member, criteria, chat, connection, lease));
 
             return connection.emitter;
         } catch (RuntimeException | Error error) {
@@ -79,14 +76,12 @@ public class ChatServiceV2 {
             OutingCriteria criteria,
             Chat chat,
             ChatConnection connection,
-            ChatRequestGuard.Lease lease
-    ) {
+            ChatRequestGuard.Lease lease) {
         String event = "service-unavailable";
         Object payload = unavailable();
 
         try {
-            connection.send("accepted", Map.of(
-                    "chat", new ChatPayload(chat.getContent(), false)));
+            connection.send("accepted", Map.of("chat", new ChatPayload(chat.getContent(), false)));
 
             var response = aiServerService.extractSlot(command.content(), criteria);
 
@@ -100,9 +95,8 @@ public class ChatServiceV2 {
             var data = success.data();
             var updated = updateCriteria(criteria, data);
 
-            var successPayload = Map.of(
-                    "chat", new ChatPayload(data.botMessage(), true),
-                    "slot", SlotPayload.from(updated));
+            var successPayload =
+                    Map.of("chat", new ChatPayload(data.botMessage(), true), "slot", SlotPayload.from(updated));
 
             chatRepository.save(new Chat(member, data.botMessage(), true));
             outingCriteriaRepository.save(updated);
@@ -115,8 +109,7 @@ public class ChatServiceV2 {
             try {
                 lease.close();
             } catch (RuntimeException error) {
-                log.error("채팅 실행 권한 해제 실패: memberId={}",
-                        command.memberId(), error);
+                log.error("채팅 실행 권한 해제 실패: memberId={}", command.memberId(), error);
 
                 event = "service-unavailable";
                 payload = unavailable();
@@ -130,10 +123,7 @@ public class ChatServiceV2 {
         return ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
-    private OutingCriteria updateCriteria(
-            OutingCriteria previous,
-            ExtractSlotResponseV2.SuccessData data
-    ) {
+    private OutingCriteria updateCriteria(OutingCriteria previous, ExtractSlotResponseV2.SuccessData data) {
         var slot = data.slot();
 
         // AI availableTime은 분 단위 숫자 문자열이라는 전제입니다.
@@ -144,15 +134,15 @@ public class ChatServiceV2 {
         var updated = previous.update(
                 slot.origin(),
                 slot.region(),
-                slot.datetime() == null ? null : slot.datetime()
-                        .atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+                slot.datetime() == null
+                        ? null
+                        : slot.datetime().atZone(ZoneId.of("Asia/Seoul")).toInstant(),
                 minutes,
                 slot.category(),
                 data.query());
 
         var availableMinutes = updated.getUserAvailableTimeMinutes();
-        if (availableMinutes != null
-                && (availableMinutes < 0 || availableMinutes % 60 != 0)) {
+        if (availableMinutes != null && (availableMinutes < 0 || availableMinutes % 60 != 0)) {
             throw new ServiceUnavailableException();
         }
 
@@ -206,8 +196,7 @@ public class ChatServiceV2 {
         }
 
         void fail() {
-            finish("service-unavailable",
-                    ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE));
+            finish("service-unavailable", ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE));
         }
 
         private synchronized void close() {
@@ -216,17 +205,14 @@ public class ChatServiceV2 {
     }
 
     record ChatPayload(
-            String content,
-            @JsonProperty("is_by_bot") boolean isByBot
-    ) {}
+            String content, @JsonProperty("is_by_bot") boolean isByBot) {}
 
     record SlotPayload(
             Coordinate coordinate,
             @JsonProperty("location_name_requested") String locationName,
             @JsonProperty("time_requested_datetime") String datetime,
             @JsonProperty("time_available_hours") Integer availableHours,
-            Set<String> categories
-    ) {
+            Set<String> categories) {
         static SlotPayload from(OutingCriteria criteria) {
             var datetime = criteria.getRequestedDatetime();
             var minutes = criteria.getUserAvailableTimeMinutes();
@@ -234,9 +220,10 @@ public class ChatServiceV2 {
             return new SlotPayload(
                     criteria.getUserCoordinate(),
                     criteria.getRequestedLocationName(),
-                    datetime == null ? null : datetime
-                            .atZone(ZoneId.of("Asia/Seoul"))
-                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                    datetime == null
+                            ? null
+                            : datetime.atZone(ZoneId.of("Asia/Seoul"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
                     minutes == null ? null : minutes / 60,
                     criteria.getCategories());
         }

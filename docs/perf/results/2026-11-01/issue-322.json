@@ -1,0 +1,98 @@
+[
+  {
+    "run": "pool10-limit20-run1",
+    "generated_at": "2026-11-01T11:53:21.428Z",
+    "metrics": {
+      "accepted_to_success_ms": {
+        "p50": 7217,
+        "p95": 8533.4,
+        "max": 8610,
+        "count": 5
+      },
+      "success_rate": 1,
+      "failed_syncs": 0,
+      "ai_analysis_calls_total": 15,
+      "ai_embedding_calls_total": 30,
+      "db_connections_active": {
+        "max": 6,
+        "value": 0
+      },
+      "db_connections_pending": {
+        "max": 0,
+        "value": 0
+      },
+      "http_req_failed": 0,
+      "http_reqs": 51,
+      "http_reqs_rate": 1.2697195721402952,
+      "iterations": 43,
+      "iteration_duration_ms": {
+        "p50": 882.590496,
+        "p95": 8518.716365699998
+      }
+    }
+  },
+  {
+    "run": "pool10-limit20-run2",
+    "generated_at": "2026-11-01T11:54:14.986Z",
+    "metrics": {
+      "accepted_to_success_ms": {
+        "p50": 6443,
+        "p95": 7808.799999999999,
+        "max": 8138,
+        "count": 5
+      },
+      "success_rate": 1,
+      "failed_syncs": 0,
+      "ai_analysis_calls_total": 15,
+      "ai_embedding_calls_total": 36,
+      "db_connections_active": {
+        "max": 6,
+        "value": 0
+      },
+      "db_connections_pending": {
+        "max": 0,
+        "value": 0
+      },
+      "http_req_failed": 0,
+      "http_reqs": 53,
+      "http_reqs_rate": 1.3242765983148135,
+      "iterations": 45,
+      "iteration_duration_ms": {
+        "p50": 983.312353,
+        "p95": 7516.688125199999
+      }
+    }
+  },
+  {
+    "run": "pool10-limit3",
+    "generated_at": "2026-11-01T11:55:09.635Z",
+    "metrics": {
+      "accepted_to_success_ms": {
+        "p50": 5768,
+        "p95": 6343.1,
+        "max": 6407,
+        "count": 3
+      },
+      "success_rate": 0.6,
+      "failed_syncs": 2,
+      "ai_analysis_calls_total": 9,
+      "ai_embedding_calls_total": 67,
+      "db_connections_active": {
+        "max": 2,
+        "value": 0
+      },
+      "db_connections_pending": {
+        "max": 0,
+        "value": 0
+      },
+      "http_req_failed": 0,
+      "http_reqs": 46,
+      "http_reqs_rate": 1.1487793099197885,
+      "iterations": 40,
+      "iteration_duration_ms": {
+        "p50": 945.3676055000001,
+        "p95": 6721.8349879
+      }
+    }
+  }
+]

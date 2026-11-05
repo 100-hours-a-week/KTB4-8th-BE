@@ -1,10 +1,9 @@
 package eightjbbm.keepgo.util.file;
 
 import jakarta.persistence.*;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.UUID;
 
 @Entity
 @Getter
@@ -31,12 +30,7 @@ public class File {
         this.storagePath = storagePath;
     }
 
-    public File(
-            FileStorageProperties.Provider storageType,
-            String objectKey,
-            String bucket,
-            String region
-    ) {
+    public File(FileStorageProperties.Provider storageType, String objectKey, String bucket, String region) {
         this.storagePath = "/public/files/" + UUID.randomUUID();
         this.storageType = storageType;
         this.objectKey = objectKey;

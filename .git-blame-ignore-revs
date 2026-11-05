@@ -1,0 +1,6 @@
+# git blame에서 제외할 커밋 목록. 사용하려면 다음을 실행한다.
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub도 이 파일을 인식한다.
+
+# style: Spotless로 Palantir Java Format 적용 (#269) — 저장소 전체 Java 재포맷
+cd5df13d7aa1715cb205af4a6607b85b1e7245ec

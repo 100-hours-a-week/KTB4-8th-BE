@@ -6,10 +6,6 @@ import org.springframework.web.ErrorResponseException;
 
 public class UnsupportedMediaTypeException extends ErrorResponseException {
     public UnsupportedMediaTypeException() {
-        super(
-                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-                ProblemDetail.forStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                null
-        );
+        super(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ProblemDetail.forStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE), null);
     }
 }

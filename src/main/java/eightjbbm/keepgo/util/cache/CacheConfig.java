@@ -1,17 +1,14 @@
 package eightjbbm.keepgo.util.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.time.Duration;
-import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
@@ -26,8 +23,7 @@ public class CacheConfig {
                         .maximumSize(1000)
                         .expireAfterWrite(Duration.ofSeconds(600))
                         .recordStats()
-                        .build()
-        );
+                        .build());
 
         var recommendationJob = new CaffeineCache(
                 "recommendationJob",
@@ -35,8 +31,7 @@ public class CacheConfig {
                         .maximumSize(1000)
                         .expireAfterWrite(Duration.ofSeconds(600))
                         .recordStats()
-                        .build()
-        );
+                        .build());
 
         var slot = new CaffeineCache(
                 "slot",
@@ -44,8 +39,7 @@ public class CacheConfig {
                         .maximumSize(1000)
                         .expireAfterWrite(Duration.ofSeconds(600))
                         .recordStats()
-                        .build()
-        );
+                        .build());
 
         var atBlacklist = new CaffeineCache(
                 "atBlacklist",
@@ -53,8 +47,7 @@ public class CacheConfig {
                         .maximumSize(1000)
                         .expireAfterWrite(Duration.ofSeconds(600))
                         .recordStats()
-                        .build()
-        );
+                        .build());
 
         cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist));
         return cacheManager;

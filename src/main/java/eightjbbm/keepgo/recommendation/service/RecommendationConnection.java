@@ -1,15 +1,13 @@
 package eightjbbm.keepgo.recommendation.service;
 
+import java.io.IOException;
+import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
-import java.util.UUID;
-
 final class RecommendationConnection {
 
-    private static final String PREFIX =
-            "outing-course-recommendation.";
+    private static final String PREFIX = "outing-course-recommendation.";
 
     final Long memberId;
     final String jobId = UUID.randomUUID().toString();
@@ -51,9 +49,7 @@ final class RecommendationConnection {
     }
 
     private void send(String event, Object data) throws IOException {
-        var builder = SseEmitter.event()
-                .id(jobId)
-                .name(PREFIX + event);
+        var builder = SseEmitter.event().id(jobId).name(PREFIX + event);
 
         if (data instanceof String text) {
             builder.data(text);

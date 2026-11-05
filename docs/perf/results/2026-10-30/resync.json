@@ -1,0 +1,39 @@
+﻿{
+    "scenario":  "resync",
+    "conditions":  {
+                       "video_page_size":  50,
+                       "youtube_delay_ms":  200,
+                       "member_count":  40,
+                       "video_count":  30
+                   },
+    "generated_at":  "2026-10-29T17:23:35.139Z",
+    "metrics":  {
+                    "accepted_to_success_ms":  {
+                                                   "p50":  1536,
+                                                   "p95":  1536,
+                                                   "max":  1536,
+                                                   "count":  1
+                                               },
+                    "success_rate":  1,
+                    "failed_syncs":  0,
+                    "ai_analysis_calls_total":  3,
+                    "ai_embedding_calls_total":  0,
+                    "db_connections_active":  {
+                                                  "max":  1,
+                                                  "value":  0
+                                              },
+                    "db_connections_pending":  {
+                                                   "max":  0,
+                                                   "value":  0
+                                               },
+                    "http_req_failed":  0,
+                    "http_reqs":  37,
+                    "http_reqs_rate":  1.8495719258256273,
+                    "iterations":  30,
+                    "iteration_duration_ms":  {
+                                                  "p50":  622.174,
+                                                  "p95":  1323.8668899999975
+                                              }
+                },
+    "extra":  null
+}

@@ -1,20 +1,20 @@
 package eightjbbm.keepgo.util.file;
 
-import lombok.RequiredArgsConstructor;
-import org.apache.tomcat.util.http.fileupload.FileUploadException;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.http.fileupload.FileUploadException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -32,10 +32,7 @@ public class FileService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public String uploadFile(
-            MultipartFile file,
-            Long userId
-    ) throws FileUploadException {
+    public String uploadFile(MultipartFile file, Long userId) throws FileUploadException {
         String extension = extractAndValidateExtension(file);
         String filename = generateFilename("profile", extension);
         String storageKey = "profile/" + filename;
@@ -55,8 +52,7 @@ public class FileService {
                 provider,
                 storageKey,
                 isS3 ? storageProperties.s3().bucket() : null,
-                isS3 ? storageProperties.s3().region() : null
-        ));
+                isS3 ? storageProperties.s3().region() : null));
 
         return storedFile.getStoragePath();
     }
@@ -69,51 +65,41 @@ public class FileService {
 
         String extension = StringUtils.getFilenameExtension(originalName);
         if (extension == null || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
-            throw new RuntimeException("INVALID_FILE_EXTENSION"); //415?
+            throw new RuntimeException("INVALID_FILE_EXTENSION"); // 415?
         }
 
         return extension;
     }
 
     private String generateFilename(String prefix, String extension) {
-        String timestamp = Instant.now().atZone(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        String uuid = UUID.randomUUID()
-                .toString()
-                .substring(0, 8);
+        String timestamp =
+                Instant.now().atZone(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        String uuid = UUID.randomUUID().toString().substring(0, 8);
         return prefix + "-" + timestamp + "-" + uuid + "." + extension;
     }
 
     private void registerRollbackCleanup(String storageKey) {
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 
-                    @Override
-                    public void afterCompletion(int status) {
-                        if (status == STATUS_ROLLED_BACK) {
-                            deleteAfterRollback(storageKey);
-                        } else if (status == STATUS_UNKNOWN) {
-                            log.error(
-                                    "파일 메타데이터 트랜잭션 결과를 확인할 수 없습니다. "
-                                            + "파일 상태 확인이 필요합니다. provider={}, key={}",
-                                    storageProperties.provider(),
-                                    storageKey
-                            );
-                        }
-                    }
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    deleteAfterRollback(storageKey);
+                } else if (status == STATUS_UNKNOWN) {
+                    log.error(
+                            "파일 메타데이터 트랜잭션 결과를 확인할 수 없습니다. " + "파일 상태 확인이 필요합니다. provider={}, key={}",
+                            storageProperties.provider(),
+                            storageKey);
                 }
-        );
+            }
+        });
     }
 
     private void deleteAfterRollback(String storageKey) {
         try {
             fileStorage.delete(storageKey);
         } catch (Exception e) {
-            log.error(
-                    "DB 롤백 후 파일 삭제에 실패했습니다. provider={}, key={}",
-                    storageProperties.provider(),
-                    storageKey,
-                    e
-            );
+            log.error("DB 롤백 후 파일 삭제에 실패했습니다. provider={}, key={}", storageProperties.provider(), storageKey, e);
         }
     }
 }

@@ -1,16 +1,31 @@
 package eightjbbm.keepgo.chat.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
+
 import eightjbbm.keepgo.chat.entity.Chat;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.service.dto.ExtractSlotResponseV2;
 import eightjbbm.keepgo.chat.service.dto.SendChatMessageCommandV2;
-import eightjbbm.keepgo.chat.service.requeststore.ChatRequestStore;
 import eightjbbm.keepgo.chat.service.requeststore.ChatRequestGuard;
+import eightjbbm.keepgo.chat.service.requeststore.ChatRequestStore;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.util.Coordinate;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,22 +41,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
-
 @ExtendWith(MockitoExtension.class)
 class ChatServiceV2Test {
 
@@ -49,11 +48,20 @@ class ChatServiceV2Test {
     private static final String CONTENT = "내일 강남에서 3시간 카페 가고 싶어";
     private static final String REPLY = "강남 카페를 찾아볼게요.";
 
-    @Mock ChatRepository chatRepository;
-    @Mock OutingCriteriaRepository outingCriteriaRepository;
-    @Mock AiServerExtractSlotApiService aiServerService;
-    @Mock MemberRepository memberRepository;
-    @Mock ChatRequestStore requestStore;
+    @Mock
+    ChatRepository chatRepository;
+
+    @Mock
+    OutingCriteriaRepository outingCriteriaRepository;
+
+    @Mock
+    AiServerExtractSlotApiService aiServerService;
+
+    @Mock
+    MemberRepository memberRepository;
+
+    @Mock
+    ChatRequestStore requestStore;
 
     private final JsonMapper json = JsonMapper.builder().build();
 
@@ -65,8 +73,11 @@ class ChatServiceV2Test {
     @BeforeEach
     void setUp() {
         var service = new ChatServiceV2(
-                chatRepository, outingCriteriaRepository, aiServerService,
-                memberRepository, new ChatRequestGuard(requestStore));
+                chatRepository,
+                outingCriteriaRepository,
+                aiServerService,
+                memberRepository,
+                new ChatRequestGuard(requestStore));
         mvc = standaloneSetup(new TestController(service)).build();
 
         member = Member.create("테스터");
@@ -76,28 +87,26 @@ class ChatServiceV2Test {
 
         when(requestStore.acquire(eq(MEMBER_ID), anyString())).thenReturn(true);
         doAnswer(invocation -> {
-            released.countDown();
-            return null;
-        }).when(requestStore).release(eq(MEMBER_ID), anyString());
+                    released.countDown();
+                    return null;
+                })
+                .when(requestStore)
+                .release(eq(MEMBER_ID), anyString());
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
-        when(outingCriteriaRepository.findById(MEMBER_ID))
-                .thenReturn(Optional.of(criteria));
+        when(outingCriteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.of(criteria));
         when(chatRepository.save(any(Chat.class))).thenAnswer(invocation -> {
             Chat chat = invocation.getArgument(0);
-            ReflectionTestUtils.setField(chat, "id",
-                    Boolean.TRUE.equals(chat.getIsByBot()) ? 101L : 100L);
+            ReflectionTestUtils.setField(chat, "id", Boolean.TRUE.equals(chat.getIsByBot()) ? 101L : 100L);
             return chat;
         });
     }
 
     @Test
-    void 정상_처리하면_accepted_다음_success를_보내고_채팅과_슬롯을_저장한다()
-            throws Exception {
+    void 정상_처리하면_accepted_다음_success를_보내고_채팅과_슬롯을_저장한다() throws Exception {
         var datetime = LocalDateTime.of(2026, 10, 21, 14, 0);
         var coordinate = new Coordinate(37.5f, 127.0f);
 
-        givenSuccess(new ExtractSlotResponseV2.Slot(
-                coordinate, "강남", datetime, "180", Set.of("카페")));
+        givenSuccess(new ExtractSlotResponseV2.Slot(coordinate, "강남", datetime, "180", Set.of("카페")));
 
         var events = requestEvents();
 
@@ -119,9 +128,7 @@ class ChatServiceV2Test {
         assertEquals(37.5, slot.path("coordinate").path("lat").asDouble(), 0.001);
         assertEquals(127.0, slot.path("coordinate").path("lng").asDouble(), 0.001);
         assertEquals("강남", slot.path("location_name_requested").asText());
-        assertEquals(
-                "2026-10-21 14:00:00",
-                slot.path("time_requested_datetime").asText());
+        assertEquals("2026-10-21 14:00:00", slot.path("time_requested_datetime").asText());
         assertEquals(3, slot.path("time_available_hours").asInt());
         assertEquals("카페", slot.path("categories").get(0).asText());
 
@@ -146,13 +153,10 @@ class ChatServiceV2Test {
     }
 
     @Test
-    void 첫_대화라면_빈_슬롯으로_AI를_호출하고_null_필드를_응답한다()
-            throws Exception {
-        when(outingCriteriaRepository.findById(MEMBER_ID))
-                .thenReturn(Optional.empty());
+    void 첫_대화라면_빈_슬롯으로_AI를_호출하고_null_필드를_응답한다() throws Exception {
+        when(outingCriteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
 
-        givenSuccess(new ExtractSlotResponseV2.Slot(
-                null, null, null, null, null));
+        givenSuccess(new ExtractSlotResponseV2.Slot(null, null, null, null, null));
 
         var events = requestEvents();
 
@@ -172,8 +176,7 @@ class ChatServiceV2Test {
     }
 
     @Test
-    void 추출되지_않은_값은_유지하고_카테고리는_기존_값과_합친다()
-            throws Exception {
+    void 추출되지_않은_값은_유지하고_카테고리는_기존_값과_합친다() throws Exception {
         var datetime = LocalDateTime.of(2026, 10, 21, 14, 0);
 
         criteria = new OutingCriteria(
@@ -185,11 +188,9 @@ class ChatServiceV2Test {
                 Set.of("카페"),
                 "기존 취향");
 
-        when(outingCriteriaRepository.findById(MEMBER_ID))
-                .thenReturn(Optional.of(criteria));
+        when(outingCriteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.of(criteria));
 
-        givenSuccess(new ExtractSlotResponseV2.Slot(
-                null, null, null, null, Set.of("전시")));
+        givenSuccess(new ExtractSlotResponseV2.Slot(null, null, null, null, Set.of("전시")));
 
         requestEvents();
 
@@ -220,8 +221,7 @@ class ChatServiceV2Test {
     }
 
     @Test
-    void AI_성공_응답의_필수_데이터가_없으면_오류_이벤트로_종료한다()
-            throws Exception {
+    void AI_성공_응답의_필수_데이터가_없으면_오류_이벤트로_종료한다() throws Exception {
         when(aiServerService.extractSlot(eq(CONTENT), any(OutingCriteria.class)))
                 .thenReturn(new ExtractSlotResponseV2.Success("success", null));
 
@@ -229,10 +229,8 @@ class ChatServiceV2Test {
     }
 
     @Test
-    void 가용_시간이_정수_시간으로_변환되지_않으면_저장하지_않는다()
-            throws Exception {
-        givenSuccess(new ExtractSlotResponseV2.Slot(
-                null, null, null, "90", Set.of()));
+    void 가용_시간이_정수_시간으로_변환되지_않으면_저장하지_않는다() throws Exception {
+        givenSuccess(new ExtractSlotResponseV2.Slot(null, null, null, "90", Set.of()));
 
         assertFailure(requestEvents());
     }
@@ -240,9 +238,7 @@ class ChatServiceV2Test {
     private void givenSuccess(ExtractSlotResponseV2.Slot slot) {
         when(aiServerService.extractSlot(eq(CONTENT), any(OutingCriteria.class)))
                 .thenReturn(new ExtractSlotResponseV2.Success(
-                        "success",
-                        new ExtractSlotResponseV2.SuccessData(
-                                slot, "카페 선호", REPLY)));
+                        "success", new ExtractSlotResponseV2.SuccessData(slot, "카페 선호", REPLY)));
     }
 
     private void assertFailure(List<Event> events) {
@@ -272,8 +268,7 @@ class ChatServiceV2Test {
 
         var body = mvc.perform(asyncDispatch(pending))
                 .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(
-                        MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andReturn()
                 .getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
@@ -317,8 +312,7 @@ class ChatServiceV2Test {
 
         @PostMapping(value = "/test/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
         SseEmitter send() {
-            return service.sendChatMessage(
-                    new SendChatMessageCommandV2(MEMBER_ID, CONTENT));
+            return service.sendChatMessage(new SendChatMessageCommandV2(MEMBER_ID, CONTENT));
         }
     }
 }

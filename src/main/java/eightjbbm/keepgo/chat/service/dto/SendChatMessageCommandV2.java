@@ -1,7 +1,3 @@
 package eightjbbm.keepgo.chat.service.dto;
 
-public record SendChatMessageCommandV2(
-        Long memberId,
-        String content
-) {
-}
+public record SendChatMessageCommandV2(Long memberId, String content) {}

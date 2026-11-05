@@ -1,14 +1,13 @@
 package eightjbbm.keepgo.chat.repository;
 
 import eightjbbm.keepgo.chat.entity.Chat;
+import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
 
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Long> {
@@ -23,11 +22,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
             and (:cursor is null or c.id < :cursor)
         order by c.id desc
         """)
-    List<Chat> findVisibleChats(
-            @Param("memberId") Long memberId,
-            @Param("cursor") Long cursor,
-            Pageable pageable
-    );
+    List<Chat> findVisibleChats(@Param("memberId") Long memberId, @Param("cursor") Long cursor, Pageable pageable);
 
     Slice<Chat> findByMemberIdAndIdLessThanOrderByCreatedAtDescIdDesc(Long memberId, Long id, Pageable pageable);
 }

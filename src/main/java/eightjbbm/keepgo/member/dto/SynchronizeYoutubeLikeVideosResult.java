@@ -1,4 +1,3 @@
 package eightjbbm.keepgo.member.dto;
 
-public record SynchronizeYoutubeLikeVideosResult() {
-}
+public record SynchronizeYoutubeLikeVideosResult() {}

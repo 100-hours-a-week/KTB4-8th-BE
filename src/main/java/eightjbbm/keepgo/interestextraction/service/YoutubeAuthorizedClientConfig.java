@@ -13,19 +13,11 @@ public class YoutubeAuthorizedClientConfig {
 
     @Bean("youtubeAuthorizedClientManager")
     public OAuth2AuthorizedClientManager youtubeAuthorizedClientManager(
-            ClientRegistrationRepository registrations,
-            OAuth2AuthorizedClientService clients
-    ) {
-        var manager = new AuthorizedClientServiceOAuth2AuthorizedClientManager(
-                registrations,
-                clients
-        );
+            ClientRegistrationRepository registrations, OAuth2AuthorizedClientService clients) {
+        var manager = new AuthorizedClientServiceOAuth2AuthorizedClientManager(registrations, clients);
 
         manager.setAuthorizedClientProvider(
-                OAuth2AuthorizedClientProviderBuilder.builder()
-                        .refreshToken()
-                        .build()
-        );
+                OAuth2AuthorizedClientProviderBuilder.builder().refreshToken().build());
 
         return manager;
     }

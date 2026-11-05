@@ -4,8 +4,5 @@ public enum VideoAnalysisStatus {
     SUCCESS,
     FAILED,
     NOT_FOUND,
-    TOO_LONG,
-    ALREADY_SYNCHRONIZED,
-    ALREADY_ANALYZED,
-    PROCESSABLE;
+    IN_PROGRESS
 }

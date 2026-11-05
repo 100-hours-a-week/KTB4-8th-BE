@@ -2,23 +2,20 @@ package eightjbbm.keepgo.chat.entity;
 
 import eightjbbm.keepgo.member.entity.Member;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 @Entity
 @Getter
 @NoArgsConstructor
 public class Chat {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "member_id",
-            nullable = false
-    )
+    @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
     private String content;

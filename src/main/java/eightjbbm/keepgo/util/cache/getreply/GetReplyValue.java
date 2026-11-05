@@ -3,7 +3,7 @@ package eightjbbm.keepgo.util.cache.getreply;
 import lombok.Getter;
 
 @Getter
-public class GetReplyValue{
+public class GetReplyValue {
     private GetReplyJobStatus status;
     private String reply;
 

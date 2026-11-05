@@ -1,10 +1,6 @@
 package eightjbbm.keepgo.recommendation.service;
 
 import eightjbbm.keepgo.util.Coordinate;
-import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -13,12 +9,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class KakaoPlaceSearch {
 
-    private static final String BASE_URL =
-            "https://dapi.kakao.com/v2/local/search/keyword.json";
+    private static final String BASE_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
 
     private final String apiKey;
     private final HttpClient httpClient;
@@ -27,31 +25,25 @@ public class KakaoPlaceSearch {
     public KakaoPlaceSearch() {
         String key = System.getenv("KAKAO_REST_API_KEY");
         if (key == null || key.isBlank()) {
-            throw new IllegalStateException(
-                    "KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다."
-            );
+            throw new IllegalStateException("KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다.");
         }
 
         this.apiKey = key.trim();
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+        this.httpClient =
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.objectMapper = new ObjectMapper();
     }
 
     /**
      * 검색 결과 첫 번째 장소의 좌표를 반환합니다.
      */
-    public Coordinate getCoordinates(String keyword)
-            throws IOException, InterruptedException {
+    public Coordinate getCoordinates(String keyword) throws IOException, InterruptedException {
 
         if (keyword == null || keyword.isBlank()) {
             throw new IllegalArgumentException("검색할 장소명을 입력해주세요.");
         }
 
-        String encodedKeyword = URLEncoder.encode(
-                keyword.trim(), StandardCharsets.UTF_8
-        );
+        String encodedKeyword = URLEncoder.encode(keyword.trim(), StandardCharsets.UTF_8);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "?query=" + encodedKeyword + "&size=1"))
@@ -60,23 +52,17 @@ public class KakaoPlaceSearch {
                 .GET()
                 .build();
 
-        HttpResponse<String> response = httpClient.send(
-                request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
-        );
+        HttpResponse<String> response =
+                httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
         if (response.statusCode() != 200) {
-            throw new IOException(
-                    "카카오 장소 검색 API 요청 실패: HTTP " + response.statusCode()
-            );
+            throw new IOException("카카오 장소 검색 API 요청 실패: HTTP " + response.statusCode());
         }
 
-        JsonNode documents = objectMapper.readTree(response.body())
-                .path("documents");
+        JsonNode documents = objectMapper.readTree(response.body()).path("documents");
 
         if (!documents.isArray() || documents.isEmpty()) {
-            throw new java.util.NoSuchElementException(
-                    "'" + keyword + "'에 대한 검색 결과가 없습니다."
-            );
+            throw new java.util.NoSuchElementException("'" + keyword + "'에 대한 검색 결과가 없습니다.");
         }
 
         JsonNode place = documents.get(0);

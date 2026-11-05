@@ -9,11 +9,4 @@ import java.time.Instant;
 /// @param availableTime 외출 가능 시간
 /// @param category 카테고리
 public record RequestRecommendationRequest(
-        Float lat,
-        Float lng,
-        String location,
-        Instant scheduledTimeSlot,
-        Integer availableTime,
-        String category
-) {
-}
+        Float lat, Float lng, String location, Instant scheduledTimeSlot, Integer availableTime, String category) {}

@@ -3,6 +3,18 @@ plugins {
 	id 'org.springframework.boot' version '4.1.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id "io.sentry.jvm.gradle" version "6.23.0"
+	id 'com.diffplug.spotless' version '8.10.4'
+}
+
+spotless {
+	java {
+		target 'src/*/java/**/*.java'
+		palantirJavaFormat('2.103.0')
+		lineEndings 'UNIX'
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
 }
 
 sentry {
@@ -40,6 +52,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.apache.httpcomponents.client5:httpclient5'
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-authorization-server'
@@ -66,6 +79,7 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-cache-test'
+	testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
 }
 
 configurations {
@@ -96,6 +110,70 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+sourceSets {
+	mysqlIntegrationTest {
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+		// 스텁과 SSE 테스트 클라이언트는 MySQL 없이도 검증하므로 test 소스셋에 두고 재사용한다.
+		compileClasspath += sourceSets.test.output
+		runtimeClasspath += sourceSets.test.output
+	}
+}
+
+configurations {
+	mysqlIntegrationTestImplementation.extendsFrom testImplementation
+	mysqlIntegrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.register('mysqlIntegrationTest', Test) {
+	description = 'Verifies Flyway migrations against an explicitly configured, disposable MySQL server.'
+	group = 'verification'
+	testClassesDirs = sourceSets.mysqlIntegrationTest.output.classesDirs
+	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
+	environment 'MYSQL_TEST_SERVER_URL', providers.gradleProperty('mysqlTestServerUrl')
+			.orElse(providers.environmentVariable('MYSQL_TEST_SERVER_URL')).getOrElse('')
+	// 통합 테스트의 Spring 컨텍스트는 실제 카카오 호출을 하지 않지만, 빈 생성 시 키를 요구한다.
+	environment 'KAKAO_REST_API_KEY', providers.environmentVariable('KAKAO_REST_API_KEY').orElse('integration-test')
+	useJUnitPlatform()
+	shouldRunAfter tasks.named('test')
+	// An external database can change even when the compiled test inputs do not.
+	outputs.upToDateWhen { false }
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('mysqlIntegrationTest')
+}
+
+// k6 성능 측정에서도 같은 AI 스텁을 고정 지연과 함께 띄울 수 있게 한다.
+tasks.register('aiStub', JavaExec) {
+	description = 'Runs the reusable AI server HTTP stub for k6 and manual integration tests.'
+	group = 'verification'
+	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
+	mainClass = 'eightjbbm.keepgo.integration.stub.AiServerStub'
+	environment 'AI_STUB_PORT', providers.gradleProperty('aiStubPort').orElse('18080').get()
+	environment 'AI_STUB_DELAY_MS', providers.gradleProperty('aiStubDelayMs').orElse('0').get()
+	dependsOn tasks.named('mysqlIntegrationTestClasses')
+}
+
+// k6 시나리오가 실제 애플리케이션·MySQL·스텁을 고정 조건으로 호출할 수 있게 한다.
+tasks.register('youtubePerfHarness', JavaExec) {
+	description = 'Runs the application with fixed YouTube/AI stubs and writes perf member tokens.'
+	group = 'verification'
+	classpath = sourceSets.mysqlIntegrationTest.runtimeClasspath
+	mainClass = 'eightjbbm.perf.PerfHarnessApplication'
+	dependsOn tasks.named('mysqlIntegrationTestClasses')
+}
+
+// 장시간 하네스 실행 시 Gradle 프로세스를 유지하지 않도록 클래스 경로를 내보낸다.
+tasks.register('perfRuntimeClasspath') {
+	dependsOn tasks.named('mysqlIntegrationTestClasses')
+	doLast {
+		def output = layout.buildDirectory.file('perf/runtime-classpath.txt').get().asFile
+		output.parentFile.mkdirs()
+		output.text = sourceSets.mysqlIntegrationTest.runtimeClasspath.asPath
+	}
 }
 
 tasks.named('bootRun') {

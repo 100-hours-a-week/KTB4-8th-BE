@@ -17,22 +17,20 @@ public class FileController {
 
     private final FileService fileService;
 
-     /// 프로필 사진 업로드 API
-     ///
-     /// 구현 1차적으로 완료
-     /// @param jwt
-     /// @param file
+    /// 프로필 사진 업로드 API
+    ///
+    /// 구현 1차적으로 완료
+    /// @param jwt
+    /// @param file
     @PostMapping("/user/profile-image")
     public ResponseEntity<Void> uploadProfileImage(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestPart("profileImage") MultipartFile file
-    ) throws FileUploadException {
+            @AuthenticationPrincipal Jwt jwt, @RequestPart("profileImage") MultipartFile file)
+            throws FileUploadException {
 
         Long userId = Long.valueOf(jwt.getSubject());
         String uploadPath = fileService.uploadProfileImage(file, userId);
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
+        return ResponseEntity.status(HttpStatus.CREATED)
                 .header("Location", toFullUrl(uploadPath))
                 .build();
     }
@@ -46,9 +44,8 @@ public class FileController {
             return relativePath;
         }
 
-        String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .build()
-                .toUriString();
+        String baseUrl =
+                ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
 
         return baseUrl + relativePath;
     }

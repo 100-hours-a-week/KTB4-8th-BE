@@ -1,18 +1,17 @@
 package eightjbbm.keepgo.recommendation.entity;
 
-import eightjbbm.keepgo.sandbox.ds.Address;
-import eightjbbm.keepgo.sandbox.ds.BusinessSchedule;
+import eightjbbm.keepgo.common.domain.Address;
+import eightjbbm.keepgo.common.domain.BusinessSchedule;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.file.File;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.Objects;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.time.Instant;
-
 
 @Entity
 @Getter
@@ -20,15 +19,20 @@ import java.time.Instant;
 @NoArgsConstructor
 @DiscriminatorColumn(name = "type")
 public abstract class OutingGuide {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private Long id;
+
     private String name;
     private String category;
     private String description;
     private String locationDetail;
+
     @Nullable
     private Address address;
+
     private Coordinate coordinate;
+
     @Nullable
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "business_schedule", columnDefinition = "json")
@@ -57,8 +61,18 @@ public abstract class OutingGuide {
 
     public abstract boolean isAvailable(Instant instant);
 
+    /// 롤백된 저장 시도에서 받은 식별자를 지운다. 다시 저장하면 merge가 아니라 새 행 삽입이 된다.
+    public void clearUnsavedId() {
+        this.id = null;
+    }
+
+    /// 나들이 가이드의 유형. 같은 이름·주소라도 장소와 행사는 서로 다른 가이드다.
+    public abstract GuideType guideType();
+
+    /// (유형, 이름, 도로명주소)를 정확히 비교한다. 모든 필드가 같은 경우에만 같은 가이드다.
     public boolean isSameAs(OutingGuide outingGuide) {
-        return this.name.equals(outingGuide.getName()) &&
-                (this.address == null || this.address.equals(outingGuide.getAddress()));
+        return this.guideType() == outingGuide.guideType()
+                && Objects.equals(this.name, outingGuide.getName())
+                && Objects.equals(this.address, outingGuide.getAddress());
     }
 }

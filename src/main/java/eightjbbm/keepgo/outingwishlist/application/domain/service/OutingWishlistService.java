@@ -1,27 +1,19 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service;
 
-import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
 import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlistQueryRepository;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingCollectionPrivateRepository;
-import eightjbbm.keepgo.outingwishlist.application.domain.model.PageToken;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntryType;
 import eightjbbm.keepgo.outingwishlist.application.domain.service.dto.*;
 import eightjbbm.keepgo.outingwishlist.common.EventNotFoundException;
-import eightjbbm.keepgo.outingwishlist.common.InvalidPageTokenException;
 import eightjbbm.keepgo.outingwishlist.common.OutingCourseNotFoundException;
 import eightjbbm.keepgo.outingwishlist.common.PlaceNotFoundException;
-import eightjbbm.keepgo.recommendation.entity.OutingCourse;
-import eightjbbm.keepgo.recommendation.entity.OutingEvent;
-import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
-import eightjbbm.keepgo.util.exception.UnprocessableContentException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -29,221 +21,121 @@ public class OutingWishlistService {
 
     private final MemberRepository memberRepository;
     private final OutingCourseRepository outingCourseRepository;
-    private final OutingCollectionPrivateRepository outingWishlistRepository;
+    private final OutingWishlist outingWishlist;
     private final OutingWishlistQueryRepository outingWishlistQueryRepository;
-    private final PageTokenCodec pageTokenCodec;
-
-    private final static int PAGE_SIZE = 10;
+    private final OutingWishlistPageReader outingWishlistPageReader;
 
     /// 여행 위시리스트에 추가한 장소 목록 조회 API
     ///
     @Transactional(readOnly = true)
-    public GetPlaceListResult getPlaceList(
-            GetPlaceListCommand command
-    ) {
-        var pageToken = (command.cursor() == null)
-                ? new PageToken(null, null)
-                : pageTokenCodec.decode(command.cursor())
-                .orElseThrow(InvalidPageTokenException::new);
-        List<OutingCollectionPrivate> wishlistEntries = outingWishlistQueryRepository
-                .findAllByCursor(
-                        command.memberId(),
-                        "place",
-                        pageToken,
-                        PAGE_SIZE);
-        String nextCursor = (wishlistEntries.size() <= PAGE_SIZE)
-                ? null
-                : pageTokenCodec.encode(
-                        new PageToken(
-                                wishlistEntries.getLast().getId(),
-                                wishlistEntries.getLast().getCreateDatetime()));
-        return GetPlaceListResult.from(
-                wishlistEntries.subList(
-                        0,
-                        Math.min(
-                                PAGE_SIZE,
-                                wishlistEntries.size())),
-                nextCursor);
+    public GetPlaceListResult getPlaceList(GetPlaceListCommand command) {
+        var page = outingWishlistPageReader.readGuides(
+                command.memberId(), OutingWishlistEntryType.PLACE, command.location(), false, command.cursor());
+        return GetPlaceListResult.from(page.entries(), page.nextCursor());
     }
 
     /// 여행 위시리스트에 추가한 장소 상세 조회 API
     ///
     @Transactional(readOnly = true)
-    public GetPlaceDetailResult getPlaceDetail(
-            GetPlaceDetailCommand command
-    ) {
-        OutingCollectionPrivate wishlistEntry = outingWishlistRepository
+    public GetPlaceDetailResult getPlaceDetail(GetPlaceDetailCommand command) {
+        OutingWishlistEntry wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(
-                        command.memberId(),
-                        command.placeId())
+                        command.memberId(), command.placeId(), OutingWishlistEntryType.PLACE)
                 .orElseThrow(PlaceNotFoundException::new);
-        if (!(wishlistEntry.getOutingGuide() instanceof OutingPlace)) {
-            throw new UnprocessableContentException();
-        }
         return GetPlaceDetailResult.from(wishlistEntry);
     }
 
     /// 여행 위시리스트에 추가한 행사 목록 조회 API
     ///
     @Transactional(readOnly = true)
-    public GetEventListResult getEventList(
-            GetEventListCommand command
-    ) {
-        var pageToken = command.cursor() == null
-                ? new PageToken(null, null)
-                : pageTokenCodec.decode(command.cursor())
-                .orElseThrow(InvalidPageTokenException::new);
-        List<OutingCollectionPrivate> wishlistEntries = outingWishlistQueryRepository
-                .findAllByCursor(
-                        command.memberId(),
-                        "event",
-                        pageToken,
-                        PAGE_SIZE);
-        String nextCursor = (wishlistEntries.size() <= PAGE_SIZE)
-                ? null
-                : pageTokenCodec.encode(
-                new PageToken(
-                        wishlistEntries.getLast().getId(),
-                        wishlistEntries.getLast().getCreateDatetime()));
-        return GetEventListResult.from(
-                wishlistEntries.subList(
-                        0,
-                        Math.min(
-                                PAGE_SIZE,
-                                wishlistEntries.size())),
-                nextCursor);
+    public GetEventListResult getEventList(GetEventListCommand command) {
+        var page = outingWishlistPageReader.readGuides(
+                command.memberId(),
+                OutingWishlistEntryType.EVENT,
+                null,
+                Boolean.TRUE.equals(command.ongoing()),
+                command.cursor());
+        return GetEventListResult.from(page.entries(), page.nextCursor());
     }
 
     /// 여행 위시리스트에 추가한 행사 상세 조회 API
     ///
     @Transactional(readOnly = true)
-    public GetEventDetailResult getEventDetail(
-            GetEventDetailCommand command
-    ) {
-        OutingCollectionPrivate wishlistEntry = outingWishlistRepository
+    public GetEventDetailResult getEventDetail(GetEventDetailCommand command) {
+        OutingWishlistEntry wishlistEntry = outingWishlist
                 .findByMemberIdAndTypeAndOutingWishlistEntryId(
-                        command.memberId(),
-                        command.eventId())
+                        command.memberId(), command.eventId(), OutingWishlistEntryType.EVENT)
                 .orElseThrow(EventNotFoundException::new);
-        if (!(wishlistEntry.getOutingGuide() instanceof OutingEvent)) {
-            throw new UnprocessableContentException();
-        }
         return GetEventDetailResult.from(wishlistEntry);
     }
 
     @Transactional(readOnly = true)
-    public GetOutingCourseListResult getOutingCourseList(
-            GetOutingCourseListCommand command
-    ) {
-        var pageToken = command.cursor() == null
-                ? new PageToken(null, null)
-                : pageTokenCodec.decode(command.cursor())
-                .orElseThrow(InvalidPageTokenException::new);
+    public GetOutingCourseListResult getOutingCourseList(GetOutingCourseListCommand command) {
+        var page = outingWishlistPageReader.readCourses(command.memberId(), command.location(), command.cursor());
 
-        if ((pageToken.id() == null)
-                != (pageToken.createDatetime() == null)) {
-            throw new InvalidPageTokenException();
-        }
-
-        var entries = outingWishlistQueryRepository.findCoursesByCursor(
-                command.memberId(),
-                command.location(),
-                pageToken,
-                PAGE_SIZE);
-
-        boolean hasNext = entries.size() > PAGE_SIZE;
-
-        var pageEntries = entries.subList(
-                0,
-                Math.min(entries.size(), PAGE_SIZE));
-
-        String nextCursor = null;
-
-        if (hasNext) {
-            var lastEntry = pageEntries.getLast();
-
-            nextCursor = pageTokenCodec.encode(
-                    new PageToken(
-                            lastEntry.getId(),
-                            lastEntry.getCreateDatetime()));
-        }
-
-        var courseIds = pageEntries.stream()
+        var courseIds = page.entries().stream()
                 .map(entry -> entry.getOutingCourse().getId())
                 .distinct()
                 .toList();
 
-        var stops = outingWishlistQueryRepository
-                .findStopsByCourseIds(courseIds);
+        var stops = outingWishlistQueryRepository.findStopsByCourseIds(courseIds);
 
-        return GetOutingCourseListResult.from(
-                pageEntries,
-                stops,
-                nextCursor);
+        return GetOutingCourseListResult.from(page.entries(), stops, page.nextCursor());
     }
 
     @Transactional(readOnly = true)
-    public GetOutingCourseDetailResult getOutingCourseDetail(
-            GetOutingCourseDetailCommand command
-    ) {
+    public GetOutingCourseDetailResult getOutingCourseDetail(GetOutingCourseDetailCommand command) {
         var entry = outingWishlistQueryRepository
-                .findCourseDetail(
-                        command.memberId(),
-                        command.outingCourseId())
-                .orElseThrow(
-                        eightjbbm.keepgo.util.exception.NotFoundException::new);
+                .findCourseDetail(command.memberId(), command.outingCourseId())
+                .orElseThrow(eightjbbm.keepgo.util.exception.NotFoundException::new);
 
-        return GetOutingCourseDetailResult.from(
-                entry,
-                java.time.Instant.now());
+        return GetOutingCourseDetailResult.from(entry, java.time.Instant.now());
     }
 
     @Transactional
-    public AddOutingCourseResult addOutingCourse(
-            AddOutingCourseCommand command
-    ) {
-        var savedOutingWishlistEntry = outingWishlistRepository.save(
-                OutingCollectionPrivate.from(
-                        memberRepository.getReferenceById(command.memberId()),
-                        outingCourseRepository.getReferenceById(command.outingCourseId())));
-        return AddOutingCourseResult.from(
-                savedOutingWishlistEntry.getId()
-        );
+    public AddOutingCourseResult addOutingCourse(AddOutingCourseCommand command) {
+        if (!outingCourseRepository.existsById(command.outingCourseId())) {
+            throw new OutingCourseNotFoundException();
+        }
+
+        // shortcut: 동시에 들어온 같은 요청은 DB 제약 없이 막지 못한다, 중복이 실제로 생기면 유니크 제약을 추가한다.
+        List<OutingWishlistEntry> existing = outingWishlist.findActiveByMemberIdAndOutingCourseId(
+                command.memberId(), command.outingCourseId(), OutingWishlistEntryType.OUTING_COURSE);
+        if (!existing.isEmpty()) {
+            return AddOutingCourseResult.from(existing.getFirst().getId());
+        }
+
+        var savedOutingWishlistEntry = outingWishlist.save(OutingWishlistEntry.from(
+                memberRepository.getReferenceById(command.memberId()),
+                outingCourseRepository.getReferenceById(command.outingCourseId())));
+        return AddOutingCourseResult.from(savedOutingWishlistEntry.getId());
     }
 
     @Transactional
-    public void removePlace(
-        Long memberId,
-        Long placeId
-    ) {
-        var wishlistEntry = outingWishlistRepository
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId)
+    public void removePlace(Long memberId, Long placeId) {
+        var wishlistEntry = outingWishlist
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, placeId, OutingWishlistEntryType.PLACE)
                 .orElseThrow(PlaceNotFoundException::new);
         wishlistEntry.delete();
-        outingWishlistRepository.save(wishlistEntry);
+        outingWishlist.save(wishlistEntry);
     }
 
     @Transactional
-    public void removeEvent(
-        Long memberId,
-        Long eventId
-    ) {
-        var wishlistEntry = outingWishlistRepository
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId)
+    public void removeEvent(Long memberId, Long eventId) {
+        var wishlistEntry = outingWishlist
+                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, eventId, OutingWishlistEntryType.EVENT)
                 .orElseThrow(EventNotFoundException::new);
         wishlistEntry.delete();
-        outingWishlistRepository.save(wishlistEntry);
+        outingWishlist.save(wishlistEntry);
     }
 
     @Transactional
-    public void removeOutingCourse(
-        Long memberId,
-        Long outingCourseId
-    ) {
-        var wishlistEntry = outingWishlistRepository
-                .findByMemberIdAndTypeAndOutingWishlistEntryId(memberId, outingCourseId)
+    public void removeOutingCourse(Long memberId, Long outingCourseId) {
+        var wishlistEntry = outingWishlist
+                .findByMemberIdAndIdAndTypeAndDeleteDatetimeIsNull(
+                        memberId, outingCourseId, OutingWishlistEntryType.OUTING_COURSE)
                 .orElseThrow(OutingCourseNotFoundException::new);
         wishlistEntry.delete();
-        outingWishlistRepository.save(wishlistEntry);
+        outingWishlist.save(wishlistEntry);
     }
 }

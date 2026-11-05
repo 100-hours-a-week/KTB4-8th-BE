@@ -5,15 +5,23 @@ import jakarta.persistence.Embeddable;
 
 @Embeddable
 public record Coordinate(
-        @Column(name = "lat", nullable = true)
-        Float lat,
-        @Column(name = "lng", nullable = true)
-        Float lng
-) {
+        @Column(name = "lat", nullable = true) Float lat,
+        @Column(name = "lng", nullable = true) Float lng) {
     public boolean equals(Coordinate other) {
         if (other == null) {
             return false;
         }
         return (lat.equals(other.lat()) && lng.equals(other.lng()));
+    }
+
+    public boolean isValid() {
+        return lat != null
+                && lng != null
+                && Float.isFinite(lat)
+                && Float.isFinite(lng)
+                && lat >= -90
+                && lat <= 90
+                && lng >= -180
+                && lng <= 180;
     }
 }

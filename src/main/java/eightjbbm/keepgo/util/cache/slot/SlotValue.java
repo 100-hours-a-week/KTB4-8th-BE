@@ -1,16 +1,12 @@
 package eightjbbm.keepgo.util.cache.slot;
 
 import eightjbbm.keepgo.util.Coordinate;
+import java.time.LocalDateTime;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Set;
 
 @Getter
 @Setter
@@ -30,15 +26,7 @@ public class SlotValue {
             String requestedLocationName,
             LocalDateTime requestedDateTime,
             Integer availableTime,
-            Set<String> categories
-    ) {
-        return new SlotValue(
-                query,
-                coordinate,
-                requestedLocationName,
-                requestedDateTime,
-                availableTime,
-                categories
-        );
+            Set<String> categories) {
+        return new SlotValue(query, coordinate, requestedLocationName, requestedDateTime, availableTime, categories);
     }
 }

@@ -6,15 +6,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@ConditionalOnProperty(
-        name = "keepgo.ephemeral.provider",
-        havingValue = "caffeine",
-        matchIfMissing = true
-)
+@ConditionalOnProperty(name = "keepgo.ephemeral.provider", havingValue = "caffeine", matchIfMissing = true)
 public class CaffeineChatRequestStore implements ChatRequestStore {
 
     private final Cache<Long, String> requests =
-            Caffeine.newBuilder().build();
+            Caffeine.newBuilder().expireAfterWrite(ChatRequestStore.REQUEST_TTL).build();
 
     @Override
     public boolean acquire(Long memberId, String requestId) {

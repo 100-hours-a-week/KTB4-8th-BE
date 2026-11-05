@@ -1,7 +1,5 @@
 package eightjbbm.keepgo.config;
 
-import eightjbbm.keepgo.util.client.google.GoogleApiClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
@@ -20,15 +18,9 @@ public class TestGoogleClientConfig {
     private MockRestServiceServer mockServer;
 
     @Bean
-    RestClient googleRestClient(
-            RestClient.Builder builder
-    ) {
-        var b = builder
-                .baseUrl("https://www.googleapis.com")
-                .defaultHeader(
-                        HttpHeaders.ACCEPT,
-                        MediaType.APPLICATION_JSON_VALUE
-                );
+    RestClient googleRestClient(RestClient.Builder builder) {
+        var b = builder.baseUrl("https://www.googleapis.com")
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
 
         mockServer = MockRestServiceServer.bindTo(b).build();
 

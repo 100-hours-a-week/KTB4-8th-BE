@@ -1,10 +1,9 @@
 package eightjbbm.keepgo.outingwishlist.application.domain.service.dto;
 
-import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingCollectionPrivate;
+import eightjbbm.keepgo.outingwishlist.application.domain.model.OutingWishlistEntry;
 import eightjbbm.keepgo.recommendation.entity.OutingEvent;
 import eightjbbm.keepgo.util.Coordinate;
 import jakarta.annotation.Nullable;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -20,16 +19,10 @@ public record GetEventDetailResult(
         LocalDate saveDate,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
-        @Nullable Place place
-) {
-    public record Place(
-            String name,
-            String addressSg,
-            String addressRoad,
-            Coordinate coordinate
-    ) {}
+        @Nullable Place place) {
+    public record Place(String name, String addressSg, String addressRoad, Coordinate coordinate) {}
 
-    public static GetEventDetailResult from(OutingCollectionPrivate wishlistEntry) {
+    public static GetEventDetailResult from(OutingWishlistEntry wishlistEntry) {
         OutingEvent event = (OutingEvent) wishlistEntry.getOutingGuide();
         return new GetEventDetailResult(
                 wishlistEntry.getId(),
@@ -40,7 +33,9 @@ public record GetEventDetailResult(
                 wishlistEntry.getCreateDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
                 event.getStartDatetime() == null
                         ? null
-                        : event.getStartDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
+                        : event.getStartDatetime()
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate(),
                 event.getEndDatetime() == null
                         ? null
                         : event.getEndDatetime().atZone(ZoneId.systemDefault()).toLocalDate(),
@@ -48,8 +43,6 @@ public record GetEventDetailResult(
                         null,
                         (event.getAddress() == null) ? null : event.getAddress().toSg(),
                         (event.getAddress() == null) ? null : event.getAddress().toRoad(),
-                        event.getCoordinate()
-                )
-        );
+                        event.getCoordinate()));
     }
 }
