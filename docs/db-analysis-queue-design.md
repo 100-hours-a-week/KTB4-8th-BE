@@ -28,14 +28,18 @@ MemberServiceV4.foo
 
 ```mermaid
 flowchart LR
-    subgraph BE["BE 워커 (AI 서버와 1:1)"]
+    subgraph API["BE API 인스턴스 (생산자)"]
         direction TB
         MS["MemberServiceV4<br/>filter"]
-        IE["InterestExtractor.query<br/>(생산자)"]
+        IE["InterestExtractor.query"]
         MV["ModelVersionProvider<br/>TTL 30초 캐시"]
-        POLL["폴러 (소비자)<br/>Semaphore(3)<br/>클레임 10 x free"]
-        SAVE["결과 저장<br/>(한 트랜잭션)"]
+    end
+
+    subgraph WK["BE 워커 인스턴스 (소비자, AI 서버와 1:1)"]
+        direction TB
+        POLL["폴러<br/>Semaphore(3)<br/>클레임 10 x free"]
         CLIENT["VideoAnalysisJobClient<br/>10건씩 호출"]
+        SAVE["결과 저장<br/>(한 트랜잭션)"]
     end
 
     subgraph DB["MySQL"]
@@ -67,7 +71,7 @@ sequenceDiagram
     participant M as MemberServiceV4
     participant P as InterestExtractor
     participant D as video_analysis
-    participant C as 폴러
+    participant C as 워커 폴러
     participant A as AI 서버
 
     M->>P: query(videoId)
@@ -193,6 +197,7 @@ YouTube 연동(계정 연결·해제·조회) 관련 코드는 동기화와 무�
 ## AI 동시성 게이트
 
 - AI 서버 인스턴스 하나의 동시 분석 한도는 3이다. 요청마다 큐를 두지 않고 `video_analysis` 테이블이 유일한 중앙 큐다. 기존 동기화별 라운드 로빈 큐는 없앤다.
+- 생산자(`InterestExtractor.query`까지)는 BE API 인스턴스에서, 폴러 이후(클레임·AI 호출·결과 저장·재시도)는 별도의 BE 워커 인스턴스에서 실행한다. 두 인스턴스는 `video_analysis` 테이블로만 통신한다.
 - AI 서버 인스턴스와 BE 워커는 1:1이고 로드밸런서는 없다. 호출 주체가 워커 하나뿐이므로 DB 슬롯(`ai_call_slot`)은 쓰지 않고 워커 내부 `Semaphore(3)`로 동시 호출을 제한한다. `free`는 남은 퍼밋 수이며 클레임 크기는 `10 × free`다.
 - 워커 AI 주소는 인스턴스별 설정(`keepgo.clients.ai.address`)이다.
 - **알려진 한계:** 워커 재시작 직후 AI 서버가 이전 호출을 처리 중이면 동시 호출이 일시적으로 3건을 넘을 수 있다.
