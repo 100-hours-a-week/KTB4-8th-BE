@@ -15,9 +15,11 @@ MemberServiceV4.foo
   → YoutubeServiceV4.fetchLikedVideos
   → filter(likedVideos)                 // 별도 메서드, query와 무관
   → 영상마다 가상 스레드: InterestExtractor.query(videoId)
-        1. 현재 분석 버전의 완료 행(SUCCESS/NOT_FOUND)이 있으면 그 결과를 반환
+        1. video_analysis에서 현재 분석 버전의 완료 행(SUCCESS/NOT_FOUND)을 찾고,
+           있으면 video_analysis_result → outing_guide로 이력의 OutingGuide를 읽어 반환
         2. 없으면 작업 행 INSERT(이미 활성 행이 있으면 합류), 폴링으로 대기
-        3. 완료되면 List<OutingGuide> 반환 (대상 없음은 빈 리스트)
+        3. 완료되면 같은 경로(video_analysis_result → outing_guide)로 읽어
+           List<OutingGuide> 반환 (대상 없음은 빈 리스트)
         4. 최종 실패·대기 타임아웃은 예외
   → OutingWishlistServiceV4 로 회원별 반영
 
