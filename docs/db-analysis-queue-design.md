@@ -21,7 +21,7 @@ MemberServiceV4.foo
         4. 최종 실패·대기 타임아웃은 예외
   → OutingWishlistServiceV4 로 회원별 반영
 
-소비자(폴러) ──▶ 빈 AI 슬롯 수 × 10 건 클레임 ──▶ 10건씩 AI 호출 ──▶ 결과 저장(한 트랜잭션)
+소비자(폴러) ──▶ 남은 퍼밋 수 × 10 건 클레임 ──▶ 10건씩 AI 호출 ──▶ 결과 저장(한 트랜잭션)
 ```
 
 ## 분석 버전
@@ -66,8 +66,8 @@ PENDING ──클레임(attempt+1, lease)──▶ RUNNING ──▶ SUCCESS | N
 
 ## 소비자
 
-- 폴러 하나가 빈 AI 슬롯 수 `free`를 확인하고 `FOR UPDATE SKIP LOCKED`로 최대 `10 × free`건을 클레임한다. C=3이므로 최대 30건이다.
-- 10건씩 나눠 슬롯당 한 번 `POST /v3/analyze-video`를 호출한다. 배치를 채우려고 기다리지 않고 준비된 것만으로 바로 호출한다.
+- 폴러 하나가 워커 내부 `Semaphore(3)`의 남은 퍼밋 수 `free`를 확인하고 `FOR UPDATE SKIP LOCKED`로 최대 `10 × free`건을 클레임한다. C=3이므로 최대 30건이다.
+- 10건씩 나눠 퍼밋당 한 번 `POST /v3/analyze-video`를 호출한다. 배치를 채우려고 기다리지 않고 준비된 것만으로 바로 호출한다.
 - 요청은 `video_url`만 보낸다. `upload_date`·`title`·`description`은 선택이므로 null로 보낸다.
 - 임대 만료 행은 폴링 때 `PENDING`으로 되돌린다.
 
@@ -78,8 +78,7 @@ PENDING ──클레임(attempt+1, lease)──▶ RUNNING ──▶ SUCCESS | N
 1. 후보를 검증한다(`OutingGuideCandidateValidator`).
 2. 이미 있는 가이드는 재사용하고 없으면 생성해 영속화한다(`GuideKey` 동일성).
 3. `(분석, 가이드)` 매핑을 저장한다.
-4. 새 가이드의 임베딩 아웃박스를 적재한다.
-5. 조건부 갱신으로 작업을 `SUCCESS`/`NOT_FOUND`로 바꾼다.
+4. 조건부 갱신으로 작업을 `SUCCESS`/`NOT_FOUND`로 바꾼다.
 
 유일 키·교착 충돌은 기존 `YoutubeSyncBatchWriter`의 재시도(errno 1062/1205/1213) 방식을 재사용한다.
 
@@ -112,30 +111,32 @@ PENDING ──클레임(attempt+1, lease)──▶ RUNNING ──▶ SUCCESS | N
 
 | 분류 | 대상 |
 |---|---|
-| 재사용 | `video_analysis_result`와 엔티티·저장소, `VideoAnalysisJobClient`·`VideoAnalysisResponse`·`AiRequestException`, `OutingGuideCandidateValidator`, `OutingGuideFactory`, `GuideKey`, `BatchAnalysis.from`, 임베딩 경로(`EmbeddingOutboxPoller`, `submitEmbedding`, EMBEDDING 슬롯), `outing_guide`와 유일 키 |
-| 수정 | `VideoAnalysis`·`VideoAnalysisStatus`·`VideoAnalysisRepository`, 가이드 해석·매핑·임베딩 적재(`YoutubeSyncBatchCommitService`에서 추출), 재시도(`YoutubeSyncBatchWriter`에서 추출), v4 클래스 4종 구현 |
+| 재사용 | `video_analysis_result`와 엔티티·저장소, `VideoAnalysisJobClient`·`VideoAnalysisResponse`·`AiRequestException`, `OutingGuideCandidateValidator`, `OutingGuideFactory`, `GuideKey`, `BatchAnalysis.from`, `outing_guide`와 유일 키 |
+| 수정 | `VideoAnalysis`·`VideoAnalysisStatus`·`VideoAnalysisRepository`, 가이드 해석·매핑(`YoutubeSyncBatchCommitService`에서 추출), 재시도(`YoutubeSyncBatchWriter`에서 추출), v4 클래스 4종 구현 |
 | 제거 | 기존 동기화 스택 전체: `YoutubeSyncCoordinator`·`YoutubeSyncService`·`YoutubeSyncBatchProcessor`·`YoutubeSyncBatchCommitService`(추출 후)·`YoutubeSync*` 엔티티·저장소와 heartbeat·sweeper·fencing, v2·v3 동기화 컨트롤러와 SSE |
-| 제거 | `SharedVideoAnalysisService`, `VideoAnalysisManager`, 레거시 v2 분석 경로(`DefaultYoutubeVideoAnalyzer`, `InterestExtractionServiceV2`, 구 V2 요청·응답 DTO, `AiServerService`), `video_analysis.youtube_sync_id`, `uk_video_analysis_in_progress_video`와 하드코딩된 키 이름, 분석용 게이트웨이 큐(`DefaultAiCallGateway`의 분석 경로) |
+| 제거 | `SharedVideoAnalysisService`, `VideoAnalysisManager`, 레거시 v2 분석 경로(`DefaultYoutubeVideoAnalyzer`, `InterestExtractionServiceV2`, 구 V2 요청·응답 DTO, `AiServerService`), `video_analysis.youtube_sync_id`, `uk_video_analysis_in_progress_video`와 하드코딩된 키 이름 |
+| 제거 | AI 호출 게이트웨이·슬롯 전체(`ai_call_slot` 테이블, `AiCallSlot*`, `AiCallType`, `AiCallGateway`, `DefaultAiCallGateway`, `AiCallProperties`)와 임베딩 경로(`EmbeddingOutboxPoller`, `submitEmbedding`, `embedding_outbox`와 가이드 생성 시 적재 호출). 정확한 범위는 3단계에서 코드로 확정한다 |
 
 YouTube 연동(계정 연결·해제·조회) 관련 코드는 동기화와 무관하므로 건드리지 않는다. 회원 동기화의 진척도·SSE·회원당 활성 동기화 보장은 이번 실험 범위에서 빠지며, 통합 시 새 흐름 위에서 다시 설계한다.
 
 ## AI 동시성 게이트
 
 - AI 서버 인스턴스 하나의 동시 분석 한도는 3이다. 요청마다 큐를 두지 않고 `video_analysis` 테이블이 유일한 중앙 큐다. 기존 동기화별 라운드 로빈 큐는 없앤다.
-- 호출 동시성은 `ai_call_slot`의 ANALYSIS 슬롯을 DB 임대로 확보해 제한한다. 슬롯 수(`analysisLimit`)는 `3 × AI 서버 인스턴스 수`로 설정한다. 소비자가 확보한 슬롯 수가 곧 `free`이며 클레임 크기 `10 × free`를 정한다.
-- 소비자를 늘려도 슬롯 수가 전역 상한이다. 슬롯 임대 시간도 DB 시간으로 비교한다.
+- AI 서버 인스턴스와 BE 워커는 1:1이고 로드밸런서는 없다. 호출 주체가 워커 하나뿐이므로 DB 슬롯(`ai_call_slot`)은 쓰지 않고 워커 내부 `Semaphore(3)`로 동시 호출을 제한한다. `free`는 남은 퍼밋 수이며 클레임 크기는 `10 × free`다.
+- 워커 AI 주소는 인스턴스별 설정(`keepgo.clients.ai.address`)이다.
+- **알려진 한계:** 워커 재시작 직후 AI 서버가 이전 호출을 처리 중이면 동시 호출이 일시적으로 3건을 넘을 수 있다.
 
 ## 구현 순서
 
 각 단계는 컴파일과 해당 단계 테스트가 통과하는 하나의 커밋으로 남긴다.
 
 1. `docs`: 이 설계 문서와 용어집
-2. `refactor`: 가이드 해석·매핑·임베딩 적재와 충돌 재시도를 기존 커밋 서비스·라이터에서 독립 컴포넌트로 추출
-3. `refactor`: 기존 동기화 스택, 레거시 v2 분석 경로, 분석용 게이트웨이 큐 제거(관련 테스트 포함)
+2. `refactor`: 가이드 해석·매핑과 충돌 재시도를 기존 커밋 서비스·라이터에서 독립 컴포넌트로 추출
+3. `refactor`: 기존 동기화 스택, 레거시 v2 분석 경로, AI 게이트웨이·슬롯, 임베딩 경로 제거(관련 테스트 포함)
 4. `feat(mysql)`: 마이그레이션. `video_analysis` 큐 컬럼·상태 변경, 유일 키 교체, 기존 행 백필
 5. `feat(ai)`: `/v3/analyze-video`(`videos[]`) 클라이언트 전환과 분석 버전 조회(`ModelVersionProvider`)
 6. `feat`: 생산자. 이력 재사용·제출·합류·대기
-7. `feat`: 소비자. 슬롯 임대·클레임·호출·결과 저장·재시도·임대 만료 회수
+7. `feat`: 소비자. `Semaphore(3)`·클레임·호출·결과 저장·재시도·임대 만료 회수
 8. `feat`: `InterestExtractor`·`MemberServiceV4` 연결과 흐름 테스트
 
 마이그레이션과 엔티티·enum 변경은 같은 커밋에서 컴파일이 깨지지 않도록 3~4단계에 걸쳐 맞춘다.
