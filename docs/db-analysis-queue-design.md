@@ -24,6 +24,71 @@ MemberServiceV4.foo
 소비자(폴러) ──▶ 남은 퍼밋 수 × 10 건 클레임 ──▶ 10건씩 AI 호출 ──▶ 결과 저장(한 트랜잭션)
 ```
 
+## 구성도
+
+```mermaid
+flowchart LR
+    subgraph BE["BE 워커 (AI 서버와 1:1)"]
+        direction TB
+        MS["MemberServiceV4<br/>filter"]
+        IE["InterestExtractor.query<br/>(생산자)"]
+        MV["ModelVersionProvider<br/>TTL 30초 캐시"]
+        POLL["폴러 (소비자)<br/>Semaphore(3)<br/>클레임 10 x free"]
+        SAVE["결과 저장<br/>(한 트랜잭션)"]
+        CLIENT["VideoAnalysisJobClient<br/>10건씩 호출"]
+    end
+
+    subgraph DB["MySQL"]
+        VA[("video_analysis<br/>(큐 행)")]
+        VAR[("video_analysis_result<br/>분석-가이드 매핑")]
+        OG[("outing_guide")]
+    end
+
+    AI["AI 서버<br/>GET v3/version<br/>POST v3/analyze-video"]
+
+    MS -->|"query(videoId)"| IE
+    IE -->|"버전 조회"| MV
+    MV --> AI
+    IE -->|"1 완료 행 재사용 / 2 INSERT·합류"| VA
+    IE -.->|"DB 폴링 대기 200ms~2s"| VA
+    POLL -->|"FOR UPDATE SKIP LOCKED<br/>PENDING → RUNNING"| VA
+    POLL --> CLIENT
+    CLIENT -->|"videos[].video_url"| AI
+    AI -->|"data.results[]"| CLIENT
+    CLIENT --> SAVE
+    SAVE -->|"가이드 재사용·생성"| OG
+    SAVE -->|"매핑 저장"| VAR
+    SAVE -->|"조건부 갱신<br/>attempt, RUNNING"| VA
+    IE -->|"List of OutingGuide"| MS
+```
+
+```mermaid
+sequenceDiagram
+    participant M as MemberServiceV4
+    participant P as InterestExtractor
+    participant D as video_analysis
+    participant C as 폴러
+    participant A as AI 서버
+
+    M->>P: query(videoId)
+    P->>A: GET v3/version (캐시 미스 시)
+    P->>D: 현재 버전의 완료 행 조회
+    alt 완료 행 있음
+        D-->>P: 결과
+    else 없음
+        P->>D: INSERT PENDING (유일 키로 합류)
+        loop 폴링
+            P->>D: 상태 조회
+        end
+    end
+    C->>D: SKIP LOCKED 클레임 (RUNNING)
+    C->>A: POST v3/analyze-video (10건)
+    A-->>C: results[]
+    C->>D: 결과 저장 + 조건부 SUCCESS
+    D-->>P: 완료
+    P-->>M: List of OutingGuide
+```
+
 ## 분석 버전
 
 - 분석 버전은 AI 서버 `GET v3/version`의 `data.commit`이다. 조회 결과는 짧은 TTL(초기 30초)로 캐시한다.
@@ -52,11 +117,17 @@ MemberServiceV4.foo
 
 ## 상태 전이와 재시도
 
-```text
-PENDING ──클레임(attempt+1, lease)──▶ RUNNING ──▶ SUCCESS | NOT_FOUND
-   ▲                                     │
-   └── 영상별 failed / 배치 실패 / 임대 만료 (attempt < 3, next_run_at 설정)
-                                         └─ attempt ≥ 3 ──▶ FAILED
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: 제출 (활성 행이 있으면 합류)
+    PENDING --> RUNNING: 클레임 (attempt+1, lease 180초)
+    RUNNING --> SUCCESS: 가이드 매핑 저장
+    RUNNING --> NOT_FOUND: 대상 없음
+    RUNNING --> PENDING: failed·배치 실패·임대 만료<br/>(attempt < 3, next_run_at 설정)
+    RUNNING --> FAILED: attempt >= 3
+    SUCCESS --> [*]
+    NOT_FOUND --> [*]
+    FAILED --> [*]
 ```
 
 - 영상별 `failed`, 배치 전체 실패(HTTP 오류·타임아웃·잘못된 응답), 임대 만료는 모두 같은 `attempt`로 센다. AI 오류 문자열은 구분하지 않고 모두 재시도 대상이다.
