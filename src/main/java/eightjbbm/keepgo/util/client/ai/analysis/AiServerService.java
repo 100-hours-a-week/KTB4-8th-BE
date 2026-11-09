@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.util.client.ai.analysis;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
+import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -46,14 +47,17 @@ public class AiServerService {
     }
 
     public void embedPlaces(List<OutingGuide> newOutingGuides) {
-        var request = restClient.post().uri("/v1/embed-places").body(EmbedPlaceRequestV2.from(newOutingGuides));
+        var request = restClient.post().uri("/v3/embed-places").body(EmbedPlaceRequest.from(newOutingGuides));
 
         long startNanos = System.nanoTime();
         try {
-            request.retrieve().toBodilessEntity();
+            var response = request.retrieve().body(EmbedPlaceResponse.class);
+            if (response == null || !Boolean.TRUE.equals(response.success())) {
+                throw new AiRequestException(AiRequestException.Kind.INVALID_AI_RESPONSE, 200, null, null);
+            }
         } finally {
             long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-            log.info("AI /v1/embed-places 호출 소요 시간: {}ms", elapsedMillis);
+            log.info("AI /v3/embed-places 호출 소요 시간: {}ms", elapsedMillis);
         }
     }
 }

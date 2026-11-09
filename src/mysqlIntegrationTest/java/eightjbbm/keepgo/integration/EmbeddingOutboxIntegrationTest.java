@@ -152,6 +152,21 @@ class EmbeddingOutboxIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("200 응답이어도 success가 false면 실패로 보고 다시 시도하도록 남긴다")
+    void retriesWhenSuccessFalse() {
+        Member member = newMember();
+        Long syncId = runningSync(member);
+        AI_STUB.failEmbedding(200, "{\"success\":false,\"place_id\":1}");
+        batchWriter.commit(syncId, INSTANCE_ID, member.getId(), batch("v0", "가이드 A", "서울시 A로 1"), 100);
+
+        poller.pollOnce();
+
+        assertThat(outboxStatus()).isEqualTo("PENDING");
+        assertThat(outboxAttemptCount()).isEqualTo(1);
+        assertThat(AI_STUB.embeddingRequestBodies().get(0)).containsPattern("\"place_id\":\\s*\\d+");
+    }
+
+    @Test
     @DisplayName("임베딩이 실패하면 backoff만큼 미루고, 최대 횟수 뒤에는 FAILED로 남긴다")
     void appliesBackoffAndLeavesFailedRow() {
         Member member = newMember();
