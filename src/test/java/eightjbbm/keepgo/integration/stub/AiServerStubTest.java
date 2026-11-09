@@ -85,6 +85,18 @@ class AiServerStubTest {
     }
 
     @Test
+    @DisplayName("/v3/analyze-video의 videos[] 요청을 받아 영상별 결과를 돌려준다")
+    void acceptsV3VideosRequest() throws Exception {
+        HttpResponse<String> response = post(
+                "/v3/analyze-video",
+                "{\"videos\":[{\"video_url\":\"https://youtube.com/shorts/video-a\","
+                        + "\"upload_date\":null,\"title\":null,\"description\":null}]}");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("https://youtube.com/shorts/video-a");
+    }
+
+    @Test
     @DisplayName("5xx와 잘못된 응답을 주입한다")
     void injectsServerErrorAndMalformedBody() throws Exception {
         stub.failAnalysis(503, "{\"message\":\"down\"}");

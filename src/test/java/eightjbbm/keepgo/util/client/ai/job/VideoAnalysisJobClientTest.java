@@ -8,6 +8,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.*;
@@ -33,7 +34,7 @@ class VideoAnalysisJobClientTest {
 
     private void serve(int status, String body, String retryAfter, long delayMillis) throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v1/analyze-video", exchange -> {
+        server.createContext("/v3/analyze-video", exchange -> {
             calls.incrementAndGet();
             assertEquals("POST", exchange.getRequestMethod());
             request.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
@@ -57,7 +58,7 @@ class VideoAnalysisJobClientTest {
         });
         server.start();
         client = new VideoAnalysisJobClient(
-                URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1/analyze-video"),
+                URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v3/analyze-video"),
                 new ObjectMapper());
     }
 
@@ -68,7 +69,10 @@ class VideoAnalysisJobClientTest {
             fixture = new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
         serve(200, fixture, null, 0);
-        var response = client.analyzeVideo(List.of("video-a", "video-b", "video-c"), Duration.ofMinutes(2));
+        var response = client.analyzeVideo(
+                List.of("video-a", "video-b", "video-c"),
+                Map.of("video-a", new VideoMeta("2026-11-02", "제목", "설명")),
+                Duration.ofMinutes(2));
         assertNotNull(response);
         assertEquals(3, response.results().size());
         assertEquals(
@@ -81,7 +85,12 @@ class VideoAnalysisJobClientTest {
         assertEquals(
                 new ObjectMapper()
                         .readTree(
-                                "{\"video_urls\":[\"https://youtube.com/shorts/video-a\",\"https://youtube.com/shorts/video-b\",\"https://youtube.com/shorts/video-c\"]}"),
+                                """
+                                {"videos":[
+                                  {"video_url":"https://youtube.com/shorts/video-a","upload_date":"2026-11-02","title":"제목","description":"설명"},
+                                  {"video_url":"https://youtube.com/shorts/video-b","upload_date":null,"title":null,"description":null},
+                                  {"video_url":"https://youtube.com/shorts/video-c","upload_date":null,"title":null,"description":null}]}
+                                """),
                 new ObjectMapper().readTree(request.get()));
         assertEquals(1, calls.get());
     }
@@ -99,7 +108,7 @@ class VideoAnalysisJobClientTest {
     void rejectsMalformedEnvelopeOrMissingVideos(String body) throws Exception {
         serve(200, body, null, 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
         assertEquals(1, calls.get());
     }
@@ -120,7 +129,7 @@ class VideoAnalysisJobClientTest {
     void rejectsInvalidIdsStatesAndGuideStructures(String rows) throws Exception {
         serve(200, "{\"message\":\"analyze_success\",\"data\":{\"results\":[" + rows + "]}}", null, 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
         assertEquals(1, calls.get());
     }
@@ -135,7 +144,7 @@ class VideoAnalysisJobClientTest {
                         + "{\"video_url\":\"https://youtube.com/shorts/b\",\"status\":\"not_found\",\"error\":null}]}}",
                 null,
                 0);
-        var response = client.analyzeVideo(List.of("a", "b"), Duration.ofSeconds(5));
+        var response = client.analyzeVideo(List.of("a", "b"), Map.of(), Duration.ofSeconds(5));
 
         assertEquals(
                 VideoAnalysisResponse.Status.UNKNOWN,
@@ -155,7 +164,7 @@ class VideoAnalysisJobClientTest {
                         + "\"error\":null,\"place_type\":\"OTHER\"}]}}",
                 null,
                 0);
-        var response = client.analyzeVideo(List.of("a"), Duration.ofSeconds(5));
+        var response = client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5));
 
         assertEquals(
                 VideoAnalysisResponse.GuideType.UNKNOWN,
@@ -167,7 +176,7 @@ class VideoAnalysisJobClientTest {
     void preservesHttpStatusEvenWhenErrorBodyIsNotJson(int status) throws Exception {
         serve(status, "<html>not-json</html>", "12", 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.HTTP_ERROR, exception.kind());
         assertEquals(status, exception.statusCode());
         assertEquals("12", exception.retryAfter());
@@ -179,7 +188,7 @@ class VideoAnalysisJobClientTest {
     void preservesRawRetryAfterForJobRetryPolicy(String header) throws Exception {
         serve(429, "bad-body", header, 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(header, exception.retryAfter());
     }
 
@@ -191,7 +200,7 @@ class VideoAnalysisJobClientTest {
         serve(200, "{}", null, 1200);
         long started = System.nanoTime();
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofMillis(300)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofMillis(300)));
         assertEquals(AiRequestException.Kind.TIMEOUT, exception.kind());
         assertNotNull(exception.getCause());
         assertTrue(Duration.ofNanos(System.nanoTime() - started).toMillis() < 1000);
@@ -201,7 +210,7 @@ class VideoAnalysisJobClientTest {
     @Test
     void doesNotCallServerAfterJobDeadline() throws Exception {
         serve(200, "{}", null, 0);
-        var exception = assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ZERO));
+        var exception = assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ZERO));
         assertEquals(AiRequestException.Kind.TIMEOUT, exception.kind());
         assertEquals(0, calls.get());
     }
@@ -211,7 +220,7 @@ class VideoAnalysisJobClientTest {
         serve(200, "{}", null, 0);
         server.stop(0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.TRANSPORT_ERROR, exception.kind());
         assertInstanceOf(java.net.ConnectException.class, exception.getCause());
     }
@@ -222,7 +231,7 @@ class VideoAnalysisJobClientTest {
         try {
             Thread.currentThread().interrupt();
             var exception = assertThrows(
-                    AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                    AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
             assertEquals(AiRequestException.Kind.INTERRUPTED, exception.kind());
             assertInstanceOf(InterruptedException.class, exception.getCause());
             assertTrue(Thread.currentThread().isInterrupted());
@@ -236,7 +245,7 @@ class VideoAnalysisJobClientTest {
     void verifiesActualServerContractWhenExplicitlyConfigured() {
         var ids = List.of(System.getenv("AI_ANALYSIS_CONTRACT_VIDEO_IDS").split(","));
         client = new VideoAnalysisJobClient(URI.create(System.getenv("AI_ANALYSIS_CONTRACT_URL")), new ObjectMapper());
-        var response = client.analyzeVideo(ids, Duration.ofSeconds(130));
+        var response = client.analyzeVideo(ids, Map.of(), Duration.ofSeconds(130));
         assertEquals(
                 new java.util.HashSet<>(ids),
                 response.results().stream()
@@ -251,7 +260,7 @@ class VideoAnalysisJobClientTest {
             fixture = new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
         serve(200, fixture, null, 0);
-        var response = client.analyzeVideo(List.of("aaaa", "bbbb", "cccc", "dddd"), Duration.ofSeconds(5));
+        var response = client.analyzeVideo(List.of("aaaa", "bbbb", "cccc", "dddd"), Map.of(), Duration.ofSeconds(5));
         assertEquals(4, response.results().size());
         assertEquals(2, response.results().get(1).guides().size());
         var place = response.results().getFirst().guides().getFirst();
@@ -279,7 +288,7 @@ class VideoAnalysisJobClientTest {
         delayBody = true;
         serve(503, "unavailable", "12", 1200);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofMillis(300)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofMillis(300)));
         assertEquals(AiRequestException.Kind.HTTP_ERROR, exception.kind());
         assertEquals(503, exception.statusCode());
         assertEquals("12", exception.retryAfter());
@@ -296,7 +305,7 @@ class VideoAnalysisJobClientTest {
                 null,
                 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
     }
 
@@ -310,7 +319,7 @@ class VideoAnalysisJobClientTest {
     void neverRetriesImmediatelyRetryableHttpFailure() throws Exception {
         serve(503, "unavailable", "0", 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.HTTP_ERROR, exception.kind());
         assertEquals(1, calls.get());
     }
@@ -332,7 +341,7 @@ class VideoAnalysisJobClientTest {
                 null,
                 0);
         var exception =
-                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Duration.ofSeconds(5)));
+                assertThrows(AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
         assertEquals(AiRequestException.Kind.INVALID_AI_RESPONSE, exception.kind());
     }
 }

@@ -26,11 +26,13 @@
 
 ## Wire 형식과 내부 결과
 
-`POST /v1/analyze-video`, 요청·응답은 JSON이다. 전용 `VideoAnalysisJobClient`는 `keepgo.clients.ai.address`를 서버 주소로 사용한다. 기존 채팅·추천 및 분석 클라이언트와 별도의 HTTP 클라이언트를 사용하며, 기존 분석 진입점의 호출 경로는 이 작업에서 전환하지 않는다.
+`POST /v3/analyze-video`, 요청·응답은 JSON이다. 전용 `VideoAnalysisJobClient`는 `keepgo.clients.ai.address`를 서버 주소로 사용한다. 기존 채팅·추천 및 분석 클라이언트와 별도의 HTTP 클라이언트를 사용하며, 기존 분석 진입점의 호출 경로는 이 작업에서 전환하지 않는다.
 
 ```json
-{"video_urls":["https://youtube.com/shorts/aaaa"]}
+{"videos":[{"video_url":"https://youtube.com/shorts/aaaa","upload_date":"2026-11-02","title":"제목","description":"설명"}]}
 ```
+
+`video_url`만 필수이며 YouTube 동기화는 `upload_date`(`snippet.publishedAt`의 한국 시간 기준 `yyyy-MM-dd`), `title`, `description`을 YouTube Data API 응답에서 채운다. 값이 없으면 키를 유지한 채 null로 보내고, 영상은 요청에서 빠지지 않는다. 메타는 분석에만 쓰며 분석 결과에 저장하지 않는다.
 
 성공 응답은 `message: "analyze_success"`와 `data.results` 배열이다. 각 행은 `video_url`, `status`, `error`와 후보 필드를 갖는다. 내부 입력 영상 ID는 요청 때 만든 정확한 URL로 역매핑하며 URL을 임의로 정규화하지 않는다.
 
@@ -48,7 +50,7 @@
 
 명세 예시는 같은 `video_url`의 성공 행을 여러 번 반환한다. 따라서 Wire에서 성공 행의 URL 반복은 복수 Guide를 뜻하며, 내부에서 영상별 한 `Result`와 Guide 목록으로 묶는다. 같은 영상의 중복 미발견/실패 행이나 서로 충돌하는 상태는 허용하지 않는다. 후보 중복 제거와 저장 가능성 검증은 후속 업무 계층의 책임이다.
 
-이는 #224의 초기 설명에 있는 영상별 `guides` 배열·대문자 유형을 **내부 결과**로 제공하는 어댑터다. 실제 외부 계약은 공유 명세의 `/v1` 및 평탄한 행 구조를 따른다. `/v2` 경로 또는 구형 응답으로의 fallback을 추가하지 않는다. 명세만으로 서버 구현의 배포 버전을 확인할 수는 없다.
+이는 #224의 초기 설명에 있는 영상별 `guides` 배열·대문자 유형을 **내부 결과**로 제공하는 어댑터다. 실제 외부 계약은 공유 명세의 `/v1` 및 평탄한 행 구조를 따른다. `/v1`·`video_urls` 요청, `/v2` 경로 또는 구형 응답으로의 fallback을 추가하지 않는다. 명세만으로 서버 구현의 배포 버전을 확인할 수는 없다.
 
 ## 응답 검증과 실패 전달
 
@@ -96,7 +98,7 @@ bash gradlew test --tests '*VideoAnalysisJobClientTest'
 실제 AI 서버 확인은 명시적으로 URL과 영상 ID를 지정한다. 서버 주소나 인증 정보를 저장소에 커밋하지 않는다.
 
 ```bash
-export AI_ANALYSIS_CONTRACT_URL='https://<AI 서버>/v1/analyze-video'
+export AI_ANALYSIS_CONTRACT_URL='https://<AI 서버>/v3/analyze-video'
 export AI_ANALYSIS_CONTRACT_VIDEO_IDS='aaaa,bbbb,cccc,dddd'
 bash gradlew test --tests '*VideoAnalysisJobClientTest.verifiesActualServerContractWhenExplicitlyConfigured'
 ```

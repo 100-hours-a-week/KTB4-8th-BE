@@ -14,6 +14,7 @@ import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,7 +76,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
         List<CompletableFuture<?>> calls = new ArrayList<>();
         for (DefaultAiCallGateway gateway : List.of(first, second)) {
             for (int i = 0; i < 3; i++) {
-                calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), ids -> ids));
+                calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), Map.of(), ids -> ids));
             }
         }
 
@@ -94,7 +95,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
                  WHERE slot_type = 'ANALYSIS'
                 """);
 
-        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), ids -> ids);
+        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), Map.of(), ids -> ids);
 
         assertThat(call).succeedsWithin(Duration.ofSeconds(5));
     }
@@ -104,7 +105,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
     void doesNotRetryAnalysisOnServerError() {
         AI_STUB.failAnalysis(503, "{\"message\":\"unavailable\"}");
 
-        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), ids -> ids);
+        CompletableFuture<?> call = gateway().submitVideoAnalysis(1L, List.of("v0"), Map.of(), ids -> ids);
         call.handle((response, error) -> null).join();
 
         assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
@@ -126,7 +127,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
 
         List<CompletableFuture<VideoAnalysisResponse>> calls = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), ids -> ids));
+            calls.add(gateway.submitVideoAnalysis(i, List.of("v" + i), Map.of(), ids -> ids));
         }
 
         assertThat(calls.getLast().join().results()).hasSize(1);

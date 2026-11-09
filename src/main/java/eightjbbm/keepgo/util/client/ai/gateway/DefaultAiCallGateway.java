@@ -6,6 +6,7 @@ import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
+import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
@@ -75,7 +76,10 @@ public class DefaultAiCallGateway implements AiCallGateway {
 
     @Override
     public CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
-            long syncId, List<String> videoIds, UnaryOperator<List<String>> beforeSend) {
+            long syncId,
+            List<String> videoIds,
+            Map<String, VideoMeta> metas,
+            UnaryOperator<List<String>> beforeSend) {
         List<String> requested = List.copyOf(videoIds);
         UnaryOperator<List<String>> select = beforeSend == null ? UnaryOperator.identity() : beforeSend;
         AtomicReference<List<String>> toSend = new AtomicReference<>(requested);
@@ -84,7 +88,7 @@ public class DefaultAiCallGateway implements AiCallGateway {
                 AiCallType.ANALYSIS,
                 () -> toSend.get().isEmpty()
                         ? new VideoAnalysisResponse(List.of())
-                        : videoAnalysisJobClient.analyzeVideo(toSend.get(), properties.analysisTimeout()),
+                        : videoAnalysisJobClient.analyzeVideo(toSend.get(), metas, properties.analysisTimeout()),
                 () -> toSend.set(subsetOf(requested, select.apply(requested))));
     }
 

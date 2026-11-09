@@ -1,10 +1,15 @@
 package eightjbbm.keepgo.interestextraction.service.youtubesync;
 
+import com.google.api.client.util.DateTime;
 import com.google.api.services.youtube.model.Video;
+import com.google.api.services.youtube.model.VideoSnippet;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
+import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +36,7 @@ import org.springframework.stereotype.Service;
 public class YoutubeSyncBatchProcessor {
 
     private static final int BATCH_SIZE = 10;
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     private final AiCallGateway aiCallGateway;
     private final YoutubeSyncBatchWriter batchWriter;
@@ -57,6 +64,8 @@ public class YoutubeSyncBatchProcessor {
             return;
         }
 
+        Map<String, VideoMeta> metas = targets.stream()
+                .collect(Collectors.toMap(Video::getId, YoutubeSyncBatchProcessor::metaOf, (first, duplicate) -> first));
         BlockingQueue<Completion> completed = new LinkedBlockingQueue<>();
         List<CompletableFuture<VideoAnalysisResponse>> submitted = new ArrayList<>();
         try {
@@ -64,7 +73,7 @@ public class YoutubeSyncBatchProcessor {
                 completed.add(new Completion(null, List.copyOf(reusable.values()), true));
             }
             for (List<String> batch : batches) {
-                submitted.add(submit(syncId, batch, completed));
+                submitted.add(submit(syncId, batch, metas, completed));
             }
 
             for (int done = 0; done < total; ) {
@@ -83,11 +92,26 @@ public class YoutubeSyncBatchProcessor {
         }
     }
 
+    private static VideoMeta metaOf(Video video) {
+        VideoSnippet snippet = video.getSnippet();
+        if (snippet == null) {
+            return VideoMeta.EMPTY;
+        }
+        DateTime publishedAt = snippet.getPublishedAt();
+        String uploadDate = publishedAt == null
+                ? null
+                : Instant.ofEpochMilli(publishedAt.getValue())
+                        .atZone(SEOUL)
+                        .toLocalDate()
+                        .toString();
+        return new VideoMeta(uploadDate, snippet.getTitle(), snippet.getDescription());
+    }
+
     private CompletableFuture<VideoAnalysisResponse> submit(
-            Long syncId, List<String> batch, BlockingQueue<Completion> completed) {
+            Long syncId, List<String> batch, Map<String, VideoMeta> metas, BlockingQueue<Completion> completed) {
         BatchExecutionRights rights = new BatchExecutionRights();
         CompletableFuture<VideoAnalysisResponse> future = aiCallGateway.submitVideoAnalysis(
-                syncId, batch, requested -> acquireExecutionRight(syncId, requested, rights));
+                syncId, batch, metas, requested -> acquireExecutionRight(syncId, requested, rights));
         future.handleAsync(
                 (response, error) -> {
                     finish(batch, rights, response, error, completed);

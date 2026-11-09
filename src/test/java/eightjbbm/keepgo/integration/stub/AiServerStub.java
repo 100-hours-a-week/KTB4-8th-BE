@@ -31,6 +31,7 @@ public final class AiServerStub implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(AiServerStub.class);
     private static final String ANALYZE_PATH = "/v1/analyze-video";
+    private static final String ANALYZE_V3_PATH = "/v3/analyze-video";
     private static final String EMBED_PATH = "/v1/embed-places";
     private static final Pattern VIDEO_URL = Pattern.compile("https://youtube\\.com/shorts/[A-Za-z0-9_-]+");
     private static final Pattern VIDEO_ID = Pattern.compile("https://youtube\\.com/shorts/([A-Za-z0-9_-]+)");
@@ -66,6 +67,7 @@ public final class AiServerStub implements AutoCloseable {
             throw new IllegalStateException("AI 스텁 서버를 시작하지 못했습니다", exception);
         }
         server.createContext(ANALYZE_PATH, exchange -> handle(exchange, true));
+        server.createContext(ANALYZE_V3_PATH, exchange -> handle(exchange, true));
         server.createContext(EMBED_PATH, exchange -> handle(exchange, false));
         server.createContext("/__admin/stats", exchange -> write(exchange, new StubResponse(200, statsJson(), false)));
         server.createContext("/__admin/reset", exchange -> {
