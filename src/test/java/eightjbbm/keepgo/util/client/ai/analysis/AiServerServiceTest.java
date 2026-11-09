@@ -87,6 +87,22 @@ class AiServerServiceTest {
         assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
     }
 
+    @Test
+    @DisplayName("success 필드가 없으면 실패로 처리한다")
+    void failsWhenSuccessMissing() {
+        responseBody = "{\"place_id\":7}";
+
+        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
+    }
+
+    @Test
+    @DisplayName("응답 본문이 비어 있으면 실패로 처리한다")
+    void failsWhenBodyEmpty() {
+        responseBody = "";
+
+        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
+    }
+
     private static OutingPlace guide(long id) {
         var guide = new OutingPlace(
                 "카페", "성수 A카페", "대화 소음 적음", "상세", "서울특별시 성동구 A로 1", new Coordinate(37.5f, 127.0f), null);
