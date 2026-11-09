@@ -5,12 +5,13 @@
 [API 명세 목차](api/README.md)에 공유 스프레드시트의 전체 6개 탭을 문서화했다.
 영상 분석 외의 나들이 조건 추출·코스 추천·취소·임베딩 저장·삭제는
 [나들이 조건 추출](api/ai/criteria-extraction.md), [코스 추천·취소](api/ai/course-recommendation.md),
-[임베딩](api/ai/embedding.md) 명세를 확인한다. 각 API 항목 아래에서 버전을 비교할 수 있다. 탭 버전과 URL 버전은 별개이며 최신 AI 탭도
-실제 경로는 `/v1/...`를 사용한다.
+[임베딩](api/ai/embedding.md) 명세를 확인한다. 각 API 항목 아래에서 버전을 비교할 수 있다. 탭 버전과 URL 버전은 별개이며 공유 명세의 최신 AI 탭은
+`/v1/...` 경로와 `video_urls` 요청을 기재한다. #350의 영상 분석 호출은
+`POST /v3/analyze-video`와 `videos[]` 요청을 사용하며, 다른 기능은 명세의 경로를 따른다.
 
-2026-11-01에 원본 `AI(v3)` 탭을 다시 읽었다. 이 문서의 핵심 wire 계약인
-`video_urls`, 평탄한 `data.results[]`, 동일 URL의 복수 성공 행,
-`place_type: 장소 / 이벤트`는 유지되어 있다. 원문 예시의 스마트 따옴표와 잘린
+2026-11-01에 원본 `AI(v3)` 탭을 다시 읽었다. 이 문서의 응답 wire 계약인
+평탄한 `data.results[]`, 동일 URL의 복수 성공 행,
+`place_type: 장소 / 이벤트`는 유지되어 있다. 요청의 `video_urls`는 탭에 남아 있으나 구현은 `videos[]`로 전환했다. 원문 예시의 스마트 따옴표와 잘린
 후주는 [영상 분석 명세](api/ai/video-analysis.md)에 보존하고, 불명확한 의미를 추가 확정하지 않았다.
 
 각 기능 문서의 ‘현재 구현과 확인 필요 사항’에 AI API의 DTO 차이와
@@ -50,7 +51,7 @@
 
 명세 예시는 같은 `video_url`의 성공 행을 여러 번 반환한다. 따라서 Wire에서 성공 행의 URL 반복은 복수 Guide를 뜻하며, 내부에서 영상별 한 `Result`와 Guide 목록으로 묶는다. 같은 영상의 중복 미발견/실패 행이나 서로 충돌하는 상태는 허용하지 않는다. 후보 중복 제거와 저장 가능성 검증은 후속 업무 계층의 책임이다.
 
-이는 #224의 초기 설명에 있는 영상별 `guides` 배열·대문자 유형을 **내부 결과**로 제공하는 어댑터다. 실제 외부 계약은 공유 명세의 `/v1` 및 평탄한 행 구조를 따른다. `/v1`·`video_urls` 요청, `/v2` 경로 또는 구형 응답으로의 fallback을 추가하지 않는다. 명세만으로 서버 구현의 배포 버전을 확인할 수는 없다.
+이는 #224의 초기 설명에 있는 영상별 `guides` 배열·대문자 유형을 **내부 결과**로 제공하는 어댑터다. 실제 외부 계약은 `/v3` 요청과 공유 명세의 평탄한 행 응답 구조를 따른다. `/v1`·`video_urls` 요청, `/v2` 경로 또는 구형 응답으로의 fallback을 추가하지 않는다. 명세만으로 서버 구현의 배포 버전을 확인할 수는 없다.
 
 ## 응답 검증과 실패 전달
 
@@ -113,9 +114,9 @@ bash gradlew test --tests '*VideoAnalysisJobClientTest.verifiesActualServerContr
 
 | 확인 항목 | 확인 결과 | 판정 |
 |---|---|---|
-| 새 분석 계약의 URL·필드 | `POST /v1/analyze-video`, 요청 `video_urls`, 응답 `data.results[]`. 같은 `video_url`의 성공 행 반복이 복수 Guide이고, 각 행의 `place_type`이 `장소`/`이벤트`다. | 확인 |
+| 새 분석 계약의 URL·필드 | 응답 `data.results[]`. 같은 `video_url`의 성공 행 반복이 복수 Guide이고, 각 행의 `place_type`이 `장소`/`이벤트`다. 요청은 당시 `POST /v1/analyze-video`·`video_urls`로 확인했으나 현재 구현은 `POST /v3/analyze-video`·`videos[]`를 보내며, 실제 서버의 `/v3` 지원은 확인하지 않았다. | 응답 확인, `/v3` 요청 확인 필요 |
 | 새 분석 계약의 배포 여부·일정 | 이미 배포됐다. 별도 예정 일정은 없다. | 확인 |
-| `/v1/analyze-video` 최대 동시 처리 수 | 3건이다. | 확인 |
+| 영상 분석(`analyze-video`) 최대 동시 처리 수 | 3건이다. | 확인 |
 | 임베딩의 Guide ID 기준 upsert | `POST /v1/embed-places`는 같은 `place_id`로 재호출하면 덮어쓴다. | 확인 |
 | 임베딩 성공 응답의 의미 | `200`, `message: embed_success`, `data.embedded_count` 응답은 실제 저장 완료를 뜻한다. | 확인 |
 
