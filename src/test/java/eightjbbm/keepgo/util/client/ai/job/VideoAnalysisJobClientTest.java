@@ -135,6 +135,25 @@ class VideoAnalysisJobClientTest {
     }
 
     @Test
+    @DisplayName("메타 맵이 null이어도 영상을 null 메타로 요청에 포함한다")
+    void sendsNullMetaWhenMetasIsNull() throws Exception {
+        serve(
+                200,
+                "{\"message\":\"analyze_success\",\"data\":{\"results\":["
+                        + "{\"video_url\":\"https://youtube.com/shorts/a\",\"status\":\"not_found\",\"error\":null}]}}",
+                null,
+                0);
+        client.analyzeVideo(List.of("a"), null, Duration.ofSeconds(5));
+
+        assertEquals(
+                new ObjectMapper()
+                        .readTree(
+                                "{\"videos\":[{\"video_url\":\"https://youtube.com/shorts/a\","
+                                        + "\"upload_date\":null,\"title\":null,\"description\":null}]}"),
+                new ObjectMapper().readTree(request.get()));
+    }
+
+    @Test
     @DisplayName("알 수 없는 상태는 영상 단위 실패로 보존한다")
     void preservesUnknownStatusForVideoLevelFailure() throws Exception {
         serve(

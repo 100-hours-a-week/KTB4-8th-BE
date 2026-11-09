@@ -78,7 +78,7 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
         var videos = new ArrayList<RequestVideo>();
         for (String id : videoIds) {
             String url = "https://youtube.com/shorts/" + id;
-            var meta = metas.getOrDefault(id, VideoMeta.EMPTY);
+            var meta = metas == null ? VideoMeta.EMPTY : metas.getOrDefault(id, VideoMeta.EMPTY);
             urls.put(url, id);
             videos.add(new RequestVideo(url, meta.uploadDate(), meta.title(), meta.description()));
         }
