@@ -84,4 +84,12 @@ public class AiServerApiClient {
         log.info(response.toString());
         return response;
     }
+
+    public AiWarmupResponse warmUp() {
+        return aiServerRestClient.post().uri("/v3/warmip").retrieve().body(AiWarmupResponse.class);
+    }
+
+    public AiVersionResponse version() {
+        return aiServerRestClient.get().uri("/v3/version").retrieve().body(AiVersionResponse.class);
+    }
 }
