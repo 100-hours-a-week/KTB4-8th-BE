@@ -9,15 +9,19 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Set;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
@@ -34,6 +38,8 @@ import tools.jackson.databind.ObjectMapper;
 /// 이벤트는 `event:` 줄과 JSON `data:`로 읽고, `data`가 `{"event": ..., "data": ...}` 봉투이면 봉투를 풀어 읽는다.
 @Slf4j
 public final class AiSseClient implements AutoCloseable {
+    private static final Set<String> EVENTS = Set.of("delta", "status", "done", "error");
+
     private final URI baseUri;
     private final ObjectMapper mapper;
     private final CloseableHttpClient httpClient;
@@ -50,6 +56,9 @@ public final class AiSseClient implements AutoCloseable {
                 .build();
         this.httpClient = HttpClients.custom()
                 .setConnectionManager(connections)
+                .setDefaultRequestConfig(RequestConfig.custom()
+                        .setConnectionRequestTimeout(Timeout.ofMilliseconds(connectTimeout.toMillis()))
+                        .build())
                 .disableAutomaticRetries()
                 .disableRedirectHandling()
                 .build();
@@ -66,11 +75,16 @@ public final class AiSseClient implements AutoCloseable {
         try {
             response = httpClient.executeOpen(null, request, null);
         } catch (IOException exception) {
-            throw fail(path, Phase.BEFORE_STREAM, new ServiceUnavailableException(), exception);
+            throw fail(path, Phase.BEFORE_STREAM, new ServiceUnavailableException(), "connect", exception);
         }
         try {
             if (response.getCode() != 200) {
-                throw fail(path, Phase.BEFORE_STREAM, AiErrors.fromHttpStatus(response.getCode()), null);
+                throw fail(
+                        path,
+                        Phase.BEFORE_STREAM,
+                        AiErrors.fromHttpStatus(response.getCode()),
+                        "http=" + response.getCode() + ", body=" + bodyOf(response),
+                        null);
             }
             return read(path, response, onEvent);
         } finally {
@@ -94,7 +108,7 @@ public final class AiSseClient implements AutoCloseable {
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 if (line.isEmpty()) {
                     if (!data.isEmpty()) {
-                        var result = dispatch(path, name, data.toString(), text, onEvent);
+                        AiStreamResult result = dispatch(path, name, data.toString(), text, onEvent);
                         if (result != null) return result;
                     }
                     name = null;
@@ -107,14 +121,15 @@ public final class AiSseClient implements AutoCloseable {
                 }
             }
         } catch (IOException exception) {
-            throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), exception);
+            throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "io", exception);
         }
         // 마지막 이벤트가 빈 줄로 끝나지 않은 채 끊긴 경우도 여기로 온다.
-        throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), null);
+        throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "eof", null);
     }
 
     private AiStreamResult dispatch(
             String path, String name, String data, StringBuilder text, Consumer<AiStreamEvent> onEvent) {
+        if (name != null && !EVENTS.contains(name)) return null;
         JsonNode payload;
         try {
             payload = mapper.readTree(data);
@@ -123,12 +138,12 @@ public final class AiSseClient implements AutoCloseable {
                 payload = payload.path("data");
             }
         } catch (JacksonException exception) {
-            throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), exception);
+            throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "invalid_json", exception);
         }
         switch (name == null ? "" : name) {
             case "delta" -> {
                 if (!payload.path("text").isString()) {
-                    throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), null);
+                    throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "delta_without_text", null);
                 }
                 text.append(payload.get("text").asString());
                 onEvent.accept(new AiStreamEvent("delta", payload));
@@ -137,23 +152,33 @@ public final class AiSseClient implements AutoCloseable {
             case "done" -> {
                 return new AiStreamResult(text.toString(), payload);
             }
-            case "error" ->
-                throw fail(
-                        path,
-                        Phase.IN_STREAM,
-                        AiErrors.fromMessage(payload.path("message").asString()),
-                        null);
+            case "error" -> {
+                var message = payload.path("message");
+                String reason = message.isString() ? message.asString() : null;
+                throw fail(path, Phase.IN_STREAM, AiErrors.fromMessage(reason), "error=" + reason, null);
+            }
             default -> {}
         }
         return null;
     }
 
-    private static AiStreamException fail(String path, Phase phase, ErrorResponseException error, Throwable cause) {
+    private static String bodyOf(ClassicHttpResponse response) {
+        try {
+            var body = response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity());
+            return body.length() > 200 ? body.substring(0, 200) : body;
+        } catch (IOException | ParseException exception) {
+            return "";
+        }
+    }
+
+    private static AiStreamException fail(
+            String path, Phase phase, ErrorResponseException error, String reason, Throwable cause) {
         log.error(
-                "AI 스트림 실패: path={}, phase={}, status={}",
+                "AI 스트림 실패: path={}, phase={}, status={}, reason={}",
                 path,
                 phase,
                 error.getStatusCode().value(),
+                reason,
                 cause);
         return new AiStreamException(phase, error, cause);
     }

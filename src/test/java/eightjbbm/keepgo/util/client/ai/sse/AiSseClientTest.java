@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.ErrorResponseException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -207,6 +208,57 @@ class AiSseClientTest {
         var thrown = failure(new ArrayList<>());
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
+        assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("알 수 없는 이름의 이벤트는 JSON이 아니어도 무시한다")
+    void ignoresUnknownEventWithoutParsing() throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, "event: ping\ndata: keepalive\n\n");
+            chunk(out, "event: done\ndata: {}\n\n");
+            endChunks(out);
+        });
+
+        var result = client.stream("/v3/extract/stream", Map.of(), event -> {});
+
+        assertThat(result.text()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "잘못된 이벤트 #{index}")
+    @DisplayName("해석할 수 없는 이벤트는 스트림 도중 실패로 변환한다")
+    @ValueSource(
+            strings = {
+                "data: {broken\n\n",
+                "data: {\"event\":\"delta\",\"data\":{}}\n\n",
+                "data: {\"event\":\"delta\",\"data\":{\"text\":1}}\n\n"
+            })
+    void failsOnMalformedEvent(String event) throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, event);
+            chunk(out, "data: {\"event\":\"done\",\"data\":{}}\n\n");
+            endChunks(out);
+        });
+
+        var thrown = failure(new ArrayList<>());
+
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
+        assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("error 이벤트의 message가 문자열이 아니어도 503으로 변환한다")
+    void convertsErrorEventWithNonStringMessage() throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, "data: {\"event\":\"error\",\"data\":{\"message\":{\"code\":1}}}\n\n");
+            endChunks(out);
+        });
+
+        var thrown = failure(new ArrayList<>());
+
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
     }
 

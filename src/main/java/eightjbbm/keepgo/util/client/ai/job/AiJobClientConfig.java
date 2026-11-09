@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
-@EnableConfigurationProperties({AiServerApiClientProperties.class, AiCallProperties.class})
+@EnableConfigurationProperties(AiServerApiClientProperties.class)
 public class AiJobClientConfig {
     @Bean(destroyMethod = "close")
     VideoAnalysisJobClient videoAnalysisJobClient(AiServerApiClientProperties properties, ObjectMapper mapper) {
