@@ -76,10 +76,7 @@ public class DefaultAiCallGateway implements AiCallGateway {
 
     @Override
     public CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
-            long syncId,
-            List<String> videoIds,
-            Map<String, VideoMeta> metas,
-            UnaryOperator<List<String>> beforeSend) {
+            long syncId, List<String> videoIds, Map<String, VideoMeta> metas, UnaryOperator<List<String>> beforeSend) {
         List<String> requested = List.copyOf(videoIds);
         UnaryOperator<List<String>> select = beforeSend == null ? UnaryOperator.identity() : beforeSend;
         AtomicReference<List<String>> toSend = new AtomicReference<>(requested);

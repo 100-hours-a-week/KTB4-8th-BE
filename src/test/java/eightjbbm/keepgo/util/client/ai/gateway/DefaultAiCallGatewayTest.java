@@ -244,7 +244,8 @@ class DefaultAiCallGatewayTest {
     @DisplayName("beforeSend가 없으면 요청한 영상을 모두 보낸다")
     void sendsAllRequestedVideosWithoutBeforeSend() {
         givenSlots(1);
-        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class))).thenReturn(new VideoAnalysisResponse(List.of()));
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class)))
+                .thenReturn(new VideoAnalysisResponse(List.of()));
         gateway = startedGateway();
 
         gateway.submitVideoAnalysis(1, List.of("a", "b"), Map.of(), null).join();

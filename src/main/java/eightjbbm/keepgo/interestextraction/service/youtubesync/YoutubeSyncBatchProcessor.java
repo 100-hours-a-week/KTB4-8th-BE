@@ -66,7 +66,8 @@ public class YoutubeSyncBatchProcessor {
         }
 
         Map<String, VideoMeta> metas = targets.stream()
-                .collect(Collectors.toMap(Video::getId, YoutubeSyncBatchProcessor::metaOf, (first, duplicate) -> first));
+                .collect(
+                        Collectors.toMap(Video::getId, YoutubeSyncBatchProcessor::metaOf, (first, duplicate) -> first));
         BlockingQueue<Completion> completed = new LinkedBlockingQueue<>();
         List<CompletableFuture<VideoAnalysisResponse>> submitted = new ArrayList<>();
         try {
