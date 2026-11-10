@@ -266,8 +266,7 @@ class VideoAnalysisJobClientTest {
     void verifiesActualServerContractWhenExplicitlyConfigured() {
         var ids = List.of(System.getenv("AI_ANALYSIS_CONTRACT_VIDEO_IDS").split(","));
         client = new VideoAnalysisJobClient(URI.create(System.getenv("AI_ANALYSIS_CONTRACT_URL")), new ObjectMapper());
-        var metas = Map.of(ids.getFirst(), new VideoMeta(LocalDate.of(2026, 11, 2), "제목", "설명"));
-        var response = client.analyzeVideo(ids, metas, Duration.ofSeconds(130));
+        var response = client.analyzeVideo(ids, Map.of(), Duration.ofSeconds(130));
         assertThat(response.results().stream()
                         .map(VideoAnalysisResponse.Result::videoId)
                         .collect(java.util.stream.Collectors.toSet()))
