@@ -158,6 +158,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         Long syncId = runSync(processor, second, "instance-a", "video-a", "video-b");
 
         assertThat(AI_STUB.analysisRequestCount()).isEqualTo(2);
+        assertThat(AI_STUB.analysisV3RequestCount()).isEqualTo(2);
         assertThat(analysisCount()).isEqualTo(2);
         assertThat(analyzedCount(syncId)).isEqualTo(2);
         assertThat(failedCount(syncId)).isEqualTo(1);

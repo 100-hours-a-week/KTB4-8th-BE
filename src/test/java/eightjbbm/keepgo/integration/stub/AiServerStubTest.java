@@ -94,6 +94,32 @@ class AiServerStubTest {
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("https://youtube.com/shorts/video-a");
+        assertThat(stub.analysisV3RequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("/v3/analyze-video는 구계약 video_urls 본문을 400으로 거절한다")
+    void rejectsLegacyBodyOnV3() throws Exception {
+        HttpResponse<String> response = post("/v3/analyze-video", requestBody("video-a"));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(stub.analysisV3RequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("/v1 요청은 v3 요청 수에 세지 않고 합산 요청 수에는 센다")
+    void countsV1SeparatelyFromV3() throws Exception {
+        assertThat(post("/v1/analyze-video", requestBody("video-a")).statusCode())
+                .isEqualTo(200);
+        assertThat(stub.analysisRequestCount()).isEqualTo(1);
+        assertThat(stub.analysisV3RequestCount()).isZero();
+
+        post("/v3/analyze-video", "{\"videos\":[{\"video_url\":\"https://youtube.com/shorts/video-a\"}]}");
+        assertThat(stub.analysisRequestCount()).isEqualTo(2);
+        assertThat(stub.analysisV3RequestCount()).isEqualTo(1);
+
+        stub.reset();
+        assertThat(stub.analysisV3RequestCount()).isZero();
     }
 
     @Test
