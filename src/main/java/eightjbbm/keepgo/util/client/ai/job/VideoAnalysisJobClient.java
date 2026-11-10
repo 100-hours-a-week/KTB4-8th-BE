@@ -60,7 +60,8 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
                 .build();
     }
 
-    public VideoAnalysisResponse analyzeVideo(List<String> videoIds, Duration remainingJobTime) {
+    public VideoAnalysisResponse analyzeVideo(
+            List<String> videoIds, Map<String, VideoMeta> metas, Duration remainingJobTime) {
         long started = System.nanoTime();
         if (remainingJobTime == null || remainingJobTime.isNegative() || remainingJobTime.isZero()) {
             throw new AiRequestException(TIMEOUT, null, null, null);
@@ -74,8 +75,14 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
         }
         Duration budget = remainingJobTime.compareTo(ANALYSIS_TIMEOUT) < 0 ? remainingJobTime : ANALYSIS_TIMEOUT;
         var urls = new LinkedHashMap<String, String>();
-        videoIds.forEach(id -> urls.put("https://youtube.com/shorts/" + id, id));
-        var body = mapper.writeValueAsString(Map.of("video_urls", urls.keySet()));
+        var videos = new ArrayList<RequestVideo>();
+        for (String id : videoIds) {
+            String url = "https://youtube.com/shorts/" + id;
+            var meta = metas == null ? VideoMeta.EMPTY : metas.getOrDefault(id, VideoMeta.EMPTY);
+            urls.put(url, id);
+            videos.add(new RequestVideo(url, meta.uploadDate(), meta.title(), meta.description()));
+        }
+        var body = mapper.writeValueAsString(Map.of("videos", videos));
         long remainingNanos = budget.toNanos() - (System.nanoTime() - started);
         if (remainingNanos <= 0) throw new AiRequestException(TIMEOUT, null, null, null);
         var request = new HttpPost(endpoint);
@@ -227,6 +234,8 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
     private static void require(boolean condition) {
         if (!condition) throw new IllegalArgumentException("분석 응답 구조 위반");
     }
+
+    private record RequestVideo(String videoUrl, LocalDate uploadDate, String title, String description) {}
 
     private record WireCandidate(
             String placeName,

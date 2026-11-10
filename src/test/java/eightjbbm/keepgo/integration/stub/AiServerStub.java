@@ -31,15 +31,18 @@ public final class AiServerStub implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(AiServerStub.class);
     private static final String ANALYZE_PATH = "/v1/analyze-video";
+    private static final String ANALYZE_V3_PATH = "/v3/analyze-video";
     private static final String EMBED_PATH = "/v3/embed-places";
     private static final Pattern PLACE_ID = Pattern.compile("\"place_id\"\\s*:\\s*(\\d+)");
     private static final Pattern VIDEO_URL = Pattern.compile("https://youtube\\.com/shorts/[A-Za-z0-9_-]+");
+    private static final Pattern V3_VIDEOS = Pattern.compile("\"videos\"\\s*:\\s*\\[");
     private static final Pattern VIDEO_ID = Pattern.compile("https://youtube\\.com/shorts/([A-Za-z0-9_-]+)");
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicInteger inFlight = new AtomicInteger();
     private final AtomicInteger maxInFlight = new AtomicInteger();
     private final AtomicInteger analysisRequests = new AtomicInteger();
+    private final AtomicInteger analysisV3Requests = new AtomicInteger();
     private final AtomicInteger embeddingRequests = new AtomicInteger();
     private final List<String> analysisRequestBodies = new CopyOnWriteArrayList<>();
     private final List<String> embeddingRequestBodies = new CopyOnWriteArrayList<>();
@@ -66,8 +69,9 @@ public final class AiServerStub implements AutoCloseable {
         } catch (IOException exception) {
             throw new IllegalStateException("AI 스텁 서버를 시작하지 못했습니다", exception);
         }
-        server.createContext(ANALYZE_PATH, exchange -> handle(exchange, true));
-        server.createContext(EMBED_PATH, exchange -> handle(exchange, false));
+        server.createContext(ANALYZE_PATH, exchange -> handle(exchange, true, false));
+        server.createContext(ANALYZE_V3_PATH, exchange -> handle(exchange, true, true));
+        server.createContext(EMBED_PATH, exchange -> handle(exchange, false, false));
         server.createContext("/__admin/stats", exchange -> write(exchange, new StubResponse(200, statsJson(), false)));
         server.createContext("/__admin/reset", exchange -> {
             resetStats();
@@ -89,6 +93,7 @@ public final class AiServerStub implements AutoCloseable {
     /// k6 측정 사이에 요청 수만 초기화한다. 지연·오류 주입 설정은 유지한다.
     public void resetStats() {
         analysisRequests.set(0);
+        analysisV3Requests.set(0);
         embeddingRequests.set(0);
         analysisRequestBodies.clear();
         embeddingRequestBodies.clear();
@@ -175,6 +180,11 @@ public final class AiServerStub implements AutoCloseable {
         return analysisRequests.get();
     }
 
+    /// `analysisRequestCount()` 중 `/v3/analyze-video`로 들어온 요청 수.
+    public int analysisV3RequestCount() {
+        return analysisV3Requests.get();
+    }
+
     public int embeddingRequestCount() {
         return embeddingRequests.get();
     }
@@ -196,9 +206,10 @@ public final class AiServerStub implements AutoCloseable {
                 .flatMap(body -> VIDEO_ID.matcher(body).results().map(match -> match.group(1)))
                 .toList();
         return """
-                {"analysis_requests":%d,"embedding_requests":%d,"request_count":%d,"max_concurrent_requests":%d,"in_flight":%d,"submitted_videos":%d,"duplicate_videos":%d}
+                {"analysis_requests":%d,"analysis_v3_requests":%d,"embedding_requests":%d,"request_count":%d,"max_concurrent_requests":%d,"in_flight":%d,"submitted_videos":%d,"duplicate_videos":%d}
                 """.formatted(
                         analysisRequests.get(),
+                        analysisV3Requests.get(),
                         embeddingRequests.get(),
                         requestCount(),
                         maxInFlight.get(),
@@ -207,7 +218,7 @@ public final class AiServerStub implements AutoCloseable {
                         submitted.size() - new HashSet<>(submitted).size());
     }
 
-    private void handle(HttpExchange exchange, boolean analysis) throws IOException {
+    private void handle(HttpExchange exchange, boolean analysis, boolean v3) throws IOException {
         int active = inFlight.incrementAndGet();
         maxInFlight.accumulateAndGet(active, Math::max);
         try {
@@ -215,6 +226,13 @@ public final class AiServerStub implements AutoCloseable {
             if (analysis) {
                 analysisRequests.incrementAndGet();
                 analysisRequestBodies.add(requestBody);
+                if (v3) {
+                    analysisV3Requests.incrementAndGet();
+                    if (!V3_VIDEOS.matcher(requestBody).find()) {
+                        write(exchange, new StubResponse(400, "{\"message\":\"videos required\"}", false));
+                        return;
+                    }
+                }
             } else {
                 embeddingRequests.incrementAndGet();
                 embeddingRequestBodies.add(requestBody);

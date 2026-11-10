@@ -12,6 +12,6 @@ import tools.jackson.databind.ObjectMapper;
 public class AiJobClientConfig {
     @Bean(destroyMethod = "close")
     VideoAnalysisJobClient videoAnalysisJobClient(AiServerApiClientProperties properties, ObjectMapper mapper) {
-        return new VideoAnalysisJobClient(URI.create(properties.address()).resolve("/v1/analyze-video"), mapper);
+        return new VideoAnalysisJobClient(URI.create(properties.address()).resolve("/v3/analyze-video"), mapper);
     }
 }
