@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Slf4j
 @Service
@@ -51,10 +53,19 @@ public class AiServerService {
 
         long startNanos = System.nanoTime();
         try {
-            var response = request.retrieve().body(EmbedPlaceResponse.class);
+            var entity = request.retrieve().toEntity(EmbedPlaceResponse.class);
+            var response = entity.getBody();
             if (response == null || !Boolean.TRUE.equals(response.success())) {
-                throw new AiRequestException(AiRequestException.Kind.INVALID_AI_RESPONSE, 200, null, null);
+                throw new AiRequestException(
+                        AiRequestException.Kind.INVALID_AI_RESPONSE,
+                        entity.getStatusCode().value(),
+                        null,
+                        null);
             }
+        } catch (RestClientResponseException e) {
+            throw e;
+        } catch (RestClientException e) {
+            throw new AiRequestException(AiRequestException.Kind.INVALID_AI_RESPONSE, null, null, e);
         } finally {
             long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             log.info("AI /v3/embed-places 호출 소요 시간: {}ms", elapsedMillis);

@@ -103,6 +103,29 @@ class AiServerServiceTest {
         assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
     }
 
+    @Test
+    @DisplayName("응답 JSON이 깨졌으면 INVALID_AI_RESPONSE로 실패한다")
+    void failsWhenBodyMalformed() {
+        responseBody = "{";
+
+        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L))))
+                .isInstanceOfSatisfying(AiRequestException.class, e -> {
+                    assertThat(e.kind()).isEqualTo(AiRequestException.Kind.INVALID_AI_RESPONSE);
+                    assertThat(e.getCause()).isNotNull();
+                });
+    }
+
+    @Test
+    @DisplayName("실패 예외에 실제 응답 상태 코드를 담는다")
+    void keepsActualStatusCode() {
+        responseBody = "{\"success\":false,\"place_id\":7}";
+
+        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L))))
+                .isInstanceOfSatisfying(
+                        AiRequestException.class,
+                        e -> assertThat(e.statusCode()).isEqualTo(200));
+    }
+
     private static OutingPlace guide(long id) {
         var guide = new OutingPlace(
                 "카페", "성수 A카페", "대화 소음 적음", "상세", "서울특별시 성동구 A로 1", new Coordinate(37.5f, 127.0f), null);
