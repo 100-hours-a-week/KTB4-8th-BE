@@ -334,9 +334,9 @@ class AiSseClientTest {
         serve((socket, out) -> {
             streamHead(out);
             chunk(out, DELTA_1);
-            Thread.sleep(250);
+            Thread.sleep(100);
             chunk(out, DELTA_2);
-            Thread.sleep(250);
+            Thread.sleep(100);
             chunk(out, DONE);
             endChunks(out);
         });
