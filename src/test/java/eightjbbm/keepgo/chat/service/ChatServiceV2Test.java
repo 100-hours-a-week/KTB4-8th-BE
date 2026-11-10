@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.chat.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -145,38 +146,37 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat-v3");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.delta", "chat-reply.delta", "chat-reply.success"),
-                events.stream().map(Event::name).toList());
-        assertEquals("강남 ", events.get(1).data().path("text").asText());
-        assertEquals("카페를 찾아볼게요.", events.get(2).data().path("text").asText());
-        assertEquals("/v3/extract/stream", aiPath.get());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(
+                        List.of("chat-reply.accepted", "chat-reply.delta", "chat-reply.delta", "chat-reply.success"));
+        assertThat(events.get(1).data().path("text").asText()).isEqualTo("강남 ");
+        assertThat(events.get(2).data().path("text").asText()).isEqualTo("카페를 찾아볼게요.");
+        assertThat(aiPath.get()).isEqualTo("/v3/extract/stream");
 
         var success = events.get(3).data();
-        assertEquals(REPLY, success.path("chat").path("content").asText());
-        assertTrue(success.path("chat").path("is_by_bot").asBoolean());
+        assertThat(success.path("chat").path("content").asText()).isEqualTo(REPLY);
+        assertThat(success.path("chat").path("is_by_bot").asBoolean()).isTrue();
 
         var slot = success.path("slot");
-        assertEquals(37.5, slot.path("coordinate").path("lat").asDouble(), 0.001);
-        assertEquals("강남", slot.path("location_name_requested").asText());
-        assertEquals("2026-10-21 14:00:00", slot.path("time_requested_datetime").asText());
-        assertEquals(3, slot.path("time_available_hours").asInt());
-        assertEquals("카페", slot.path("categories").get(0).asText());
+        assertThat(slot.path("coordinate").path("lat").asDouble()).isCloseTo(37.5, within(0.001));
+        assertThat(slot.path("location_name_requested").asText()).isEqualTo("강남");
+        assertThat(slot.path("time_requested_datetime").asText()).isEqualTo("2026-10-21 14:00:00");
+        assertThat(slot.path("time_available_hours").asInt()).isEqualTo(3);
+        assertThat(slot.path("categories").get(0).asText()).isEqualTo("카페");
 
         var chats = ArgumentCaptor.forClass(Chat.class);
         verify(chatRepository, times(2)).save(chats.capture());
-        assertEquals(CONTENT, chats.getAllValues().get(0).getContent());
-        assertEquals(REPLY, chats.getAllValues().get(1).getContent());
-        assertTrue(chats.getAllValues().get(1).getIsByBot());
-        assertSame(member, chats.getAllValues().get(1).getMember());
+        assertThat(chats.getAllValues().get(0).getContent()).isEqualTo(CONTENT);
+        assertThat(chats.getAllValues().get(1).getContent()).isEqualTo(REPLY);
+        assertThat(chats.getAllValues().get(1).getIsByBot()).isTrue();
+        assertThat(chats.getAllValues().get(1).getMember()).isSameAs(member);
 
         var saved = ArgumentCaptor.forClass(OutingCriteria.class);
         verify(outingCriteriaRepository).save(saved.capture());
-        assertEquals(180, saved.getValue().getUserAvailableTimeMinutes());
-        assertEquals(
-                datetime.atZone(ZoneId.of("Asia/Seoul")).toInstant(),
-                saved.getValue().getRequestedDatetime());
-        assertEquals("카페 선호", saved.getValue().getUserPreferenceSummary());
+        assertThat(saved.getValue().getUserAvailableTimeMinutes()).isEqualTo(180);
+        assertThat(saved.getValue().getRequestedDatetime())
+                .isEqualTo(datetime.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        assertThat(saved.getValue().getUserPreferenceSummary()).isEqualTo("카페 선호");
     }
 
     @Test
@@ -186,14 +186,14 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.success"),
-                events.stream().map(Event::name).toList());
-        assertEquals("100", events.get(0).id());
-        assertEquals(events.get(0).id(), events.get(1).id());
-        assertEquals(CONTENT, events.get(0).data().path("chat").path("content").asText());
-        assertFalse(events.get(0).data().path("chat").path("is_by_bot").asBoolean());
-        assertEquals(REPLY, events.get(1).data().path("chat").path("content").asText());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.success"));
+        assertThat(events.get(0).id()).isEqualTo("100");
+        assertThat(events.get(1).id()).isEqualTo(events.get(0).id());
+        assertThat(events.get(0).data().path("chat").path("content").asText()).isEqualTo(CONTENT);
+        assertThat(events.get(0).data().path("chat").path("is_by_bot").asBoolean())
+                .isFalse();
+        assertThat(events.get(1).data().path("chat").path("content").asText()).isEqualTo(REPLY);
         verify(outingCriteriaRepository).save(any(OutingCriteria.class));
     }
 
@@ -206,17 +206,17 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat-v3");
 
-        assertEquals("chat-reply.success", events.get(1).name());
+        assertThat(events.get(1).name()).isEqualTo("chat-reply.success");
 
         var prevSlot = aiRequest.get().path("prev_slot");
-        assertEquals(CONTENT, aiRequest.get().path("chat").asText());
-        assertTrue(prevSlot.path("datetime").isNull());
-        assertTrue(prevSlot.path("available_time").isNull());
-        assertTrue(prevSlot.path("category").isEmpty());
+        assertThat(aiRequest.get().path("chat").asText()).isEqualTo(CONTENT);
+        assertThat(prevSlot.path("datetime").isNull()).isTrue();
+        assertThat(prevSlot.path("available_time").isNull()).isTrue();
+        assertThat(prevSlot.path("category").isEmpty()).isTrue();
 
         var slot = events.get(1).data().path("slot");
-        assertTrue(slot.path("time_requested_datetime").isNull());
-        assertTrue(slot.path("time_available_hours").isNull());
+        assertThat(slot.path("time_requested_datetime").isNull()).isTrue();
+        assertThat(slot.path("time_available_hours").isNull()).isTrue();
     }
 
     @Test
@@ -240,19 +240,19 @@ class ChatServiceV2Test {
         requestEvents("/test/chat-v3");
 
         var prevSlot = aiRequest.get().path("prev_slot");
-        assertEquals("2026-10-21 14:00:00", prevSlot.path("datetime").asText());
-        assertEquals("180", prevSlot.path("available_time").asText());
-        assertEquals("강남", prevSlot.path("region").asText());
-        assertEquals("기존 취향", aiRequest.get().path("prev_query").asText());
+        assertThat(prevSlot.path("datetime").asText()).isEqualTo("2026-10-21 14:00:00");
+        assertThat(prevSlot.path("available_time").asText()).isEqualTo("180");
+        assertThat(prevSlot.path("region").asText()).isEqualTo("강남");
+        assertThat(aiRequest.get().path("prev_query").asText()).isEqualTo("기존 취향");
 
         var saved = ArgumentCaptor.forClass(OutingCriteria.class);
         verify(outingCriteriaRepository).save(saved.capture());
 
-        assertEquals(criteria.getUserCoordinate(), saved.getValue().getUserCoordinate());
-        assertEquals("강남", saved.getValue().getRequestedLocationName());
-        assertEquals(criteria.getRequestedDatetime(), saved.getValue().getRequestedDatetime());
-        assertEquals(180, saved.getValue().getUserAvailableTimeMinutes());
-        assertEquals(Set.of("카페", "전시"), saved.getValue().getCategories());
+        assertThat(saved.getValue().getUserCoordinate()).isEqualTo(criteria.getUserCoordinate());
+        assertThat(saved.getValue().getRequestedLocationName()).isEqualTo("강남");
+        assertThat(saved.getValue().getRequestedDatetime()).isEqualTo(criteria.getRequestedDatetime());
+        assertThat(saved.getValue().getUserAvailableTimeMinutes()).isEqualTo(180);
+        assertThat(saved.getValue().getCategories()).isEqualTo(Set.of("카페", "전시"));
     }
 
     @Test
@@ -262,10 +262,10 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat-v3");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.delta", "chat-reply.delta", "chat-reply.bad-gateway"),
-                events.stream().map(Event::name).toList());
-        assertEquals(502, events.get(3).data().path("status").asInt());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of(
+                        "chat-reply.accepted", "chat-reply.delta", "chat-reply.delta", "chat-reply.bad-gateway"));
+        assertThat(events.get(3).data().path("status").asInt()).isEqualTo(502);
         assertNothingSaved();
     }
 
@@ -276,10 +276,9 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat-v3");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.service-unavailable"),
-                events.stream().map(Event::name).toList());
-        assertEquals(503, events.get(1).data().path("status").asInt());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.service-unavailable"));
+        assertThat(events.get(1).data().path("status").asInt()).isEqualTo(503);
         assertNothingSaved();
     }
 
@@ -290,10 +289,9 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.service-unavailable"),
-                events.stream().map(Event::name).toList());
-        assertEquals(503, events.get(1).data().path("status").asInt());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.service-unavailable"));
+        assertThat(events.get(1).data().path("status").asInt()).isEqualTo(503);
         assertNothingSaved();
     }
 
@@ -304,13 +302,12 @@ class ChatServiceV2Test {
 
         var v3 = requestEvents("/test/chat-v3");
 
-        assertEquals(
-                List.of(
+        assertThat(v3.stream().map(Event::name).toList())
+                .isEqualTo(List.of(
                         "chat-reply.accepted",
                         "chat-reply.delta",
                         "chat-reply.delta",
-                        "chat-reply.service-unavailable"),
-                v3.stream().map(Event::name).toList());
+                        "chat-reply.service-unavailable"));
         assertNothingSaved();
     }
 
@@ -321,7 +318,9 @@ class ChatServiceV2Test {
 
         mvc.perform(post("/test/chat-v3")).andExpect(status().isBadGateway());
 
-        assertTrue(released.await(5, TimeUnit.SECONDS), "실패해도 실행 권한을 해제해야 합니다.");
+        assertThat(released.await(5, TimeUnit.SECONDS))
+                .as("실패해도 실행 권한을 해제해야 합니다.")
+                .isTrue();
         assertNothingSaved();
     }
 
@@ -332,9 +331,8 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.service-unavailable"),
-                events.stream().map(Event::name).toList());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.service-unavailable"));
         assertNothingSaved();
     }
 
@@ -345,7 +343,7 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat-v3");
 
-        assertEquals("chat-reply.service-unavailable", events.get(1).name());
+        assertThat(events.get(1).name()).isEqualTo("chat-reply.service-unavailable");
         assertNothingSaved();
     }
 
@@ -356,7 +354,7 @@ class ChatServiceV2Test {
 
         var events = requestEvents("/test/chat-v3");
 
-        assertEquals("chat-reply.service-unavailable", events.get(1).name());
+        assertThat(events.get(1).name()).isEqualTo("chat-reply.service-unavailable");
         assertNothingSaved();
     }
 
@@ -396,7 +394,9 @@ class ChatServiceV2Test {
 
         // 가상 스레드가 SSE 처리를 끝낼 때까지 기다립니다.
         pending.getAsyncResult(5_000);
-        assertTrue(released.await(5, TimeUnit.SECONDS), "작업 종료 후 실행 권한을 해제해야 합니다.");
+        assertThat(released.await(5, TimeUnit.SECONDS))
+                .as("작업 종료 후 실행 권한을 해제해야 합니다.")
+                .isTrue();
 
         var requestId = ArgumentCaptor.forClass(String.class);
         verify(requestStore).acquire(eq(MEMBER_ID), requestId.capture());
