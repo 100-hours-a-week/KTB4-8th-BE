@@ -16,7 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequiredArgsConstructor
-public class ChatControllerV3 {
+public class ChatStreamController {
 
     private final ChatServiceV2 chatService;
 

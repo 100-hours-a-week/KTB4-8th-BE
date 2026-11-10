@@ -770,5 +770,5 @@ DELETE /api/v1/user/chat-messages
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
 | [v1 11행](chat.md#backend-v1-row-11) | 지역 변동 시 200 및 user_location_name 객체 | [ChatController](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatController.java)는 지역명이 있으면 String 본문, 없으면 204. 시트의 객체 형태와 다르다. |
-| [v3 채팅 전송](chat.md#backend-v3-chat-stream) | 시트에 없음. #354에서 추가 | [ChatControllerV3](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatControllerV3.java)가 `/api/v3/member/chat-messages`를 제공한다. 스트림 시작 전 AI 오류는 HTTP 오류로, 스트림 중 오류는 `chat-reply.service-unavailable`/`chat-reply.bad-gateway` 이벤트로 응답한다. v2 이벤트·오류(`service-unavailable`)는 그대로다. |
+| [v3 채팅 전송](chat.md#backend-v3-chat-stream) | 시트에 없음. #354에서 추가 | [ChatStreamController](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatStreamController.java)가 `/api/v3/member/chat-messages`를 제공한다. 스트림 시작 전 AI 오류는 HTTP 오류로, 스트림 중 오류는 `chat-reply.service-unavailable`/`chat-reply.bad-gateway` 이벤트로 응답한다. v2 이벤트·오류(`service-unavailable`)는 그대로다. |
 | [v2 채팅 전송](chat.md#backend-v2-row-8) | `chat-reply.success`와 `service-unavailable` | AI 호출만 /v3/extract/stream 수신으로 바뀌었다. delta는 중계하지 않고, AI의 모든 실패를 `chat-reply.service-unavailable`로 보낸다. |
