@@ -12,6 +12,7 @@ import eightjbbm.keepgo.chat.dto.SendChatResult;
 import eightjbbm.keepgo.chat.service.ChatService;
 import eightjbbm.keepgo.chat.service.ChatServiceV2;
 import eightjbbm.keepgo.util.exception.GlobalExceptionHandler;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("채팅 전송 content 검증")
 class ChatContentValidationTest {
@@ -34,6 +36,7 @@ class ChatContentValidationTest {
     private static final String MAX_CONTENT = "a".repeat(255);
     private static final String TOO_LONG_CONTENT = "a".repeat(256);
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final ChatService chatService = mock(ChatService.class);
     private final ChatServiceV2 chatServiceV2 = mock(ChatServiceV2.class);
     private MockMvc mvc;
@@ -105,7 +108,8 @@ class ChatContentValidationTest {
     }
 
     private ResultActions send(String url, String content) throws Exception {
-        return mvc.perform(
-                post(url).contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"" + content + "\"}"));
+        return mvc.perform(post(url)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("content", content))));
     }
 }
