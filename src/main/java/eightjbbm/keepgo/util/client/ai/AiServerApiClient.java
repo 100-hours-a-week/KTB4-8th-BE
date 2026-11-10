@@ -85,6 +85,7 @@ public class AiServerApiClient {
         return response;
     }
 
+    /// 분석용 읽기 제한(analysisTimeout)을 공유한다.
     public WarmUpChatbotResponse warmUp() {
         return aiServerRestClient.post().uri("/v3/warmup").retrieve().body(WarmUpChatbotResponse.class);
     }
