@@ -19,8 +19,8 @@ class RequestRecommendationResultTest {
     @Test
     @DisplayName("순번은 1부터 시작하고 좌표와 장소 설명을 장소에서 가져옴")
     void mapsSequenceCoordinateAndDescription() {
-        var first = place("카페", "카페 설명", new Coordinate(37.5f, 127.0f));
-        var second = place("식당", "식당 설명", new Coordinate(37.6f, 127.1f));
+        var first = outingPlace("카페", "카페 설명", new Coordinate(37.5f, 127.0f));
+        var second = outingPlace("식당", "식당 설명", new Coordinate(37.6f, 127.1f));
 
         var detail = RecommendationDetail.from(
                 course(recommendPlace("1", "카페", 10), recommendPlace("2", "식당", 20)),
@@ -38,8 +38,8 @@ class RequestRecommendationResultTest {
     @Test
     @DisplayName("좌표가 없는 장소는 lat과 lng를 null로 응답")
     void returnsNullCoordinateWhenPlaceHasNoCoordinate() {
-        var withoutCoordinate = place("카페", "카페 설명", null);
-        var withNullValues = place("식당", "식당 설명", new Coordinate(null, null));
+        var withoutCoordinate = outingPlace("카페", "카페 설명", null);
+        var withNullValues = outingPlace("식당", "식당 설명", new Coordinate(null, null));
 
         var detail = RecommendationDetail.from(
                 course(recommendPlace("1", "카페", 10), recommendPlace("2", "식당", 20)),
@@ -51,7 +51,7 @@ class RequestRecommendationResultTest {
         });
     }
 
-    private OutingPlace place(String name, String description, Coordinate coordinate) {
+    private OutingPlace outingPlace(String name, String description, Coordinate coordinate) {
         return new OutingPlace("카페", name, description, "1층", "서울", coordinate, null);
     }
 
