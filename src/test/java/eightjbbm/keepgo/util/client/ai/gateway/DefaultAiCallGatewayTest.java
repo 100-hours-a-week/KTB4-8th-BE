@@ -8,12 +8,15 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
@@ -229,6 +232,38 @@ class DefaultAiCallGatewayTest {
     }
 
     @Test
+    @DisplayName("임베딩은 장소마다 AI 호출 하나를 보낸다")
+    void embedsEachGuideWithOwnCall() {
+        givenSlots(1);
+        List<OutingGuide> guides = List.of(guide(1), guide(2), guide(3));
+        gateway = startedGateway();
+
+        gateway.submitEmbedding(guides).join();
+
+        verify(ai, times(3)).embedPlace(any(OutingGuide.class));
+        guides.forEach(guide -> verify(ai).embedPlace(guide));
+    }
+
+    @Test
+    @DisplayName("임베딩 중 한 장소가 실패해도 나머지는 보내고 전체는 실패로 끝낸다")
+    void embedsRemainingGuidesWhenOneFails() {
+        givenSlots(1);
+        List<OutingGuide> guides = List.of(guide(1), guide(2), guide(3));
+        doThrow(new IllegalStateException("AI down")).when(ai).embedPlace(guides.get(1));
+        gateway = startedGateway();
+
+        CompletableFuture<Void> call = gateway.submitEmbedding(guides);
+
+        assertThat(call)
+                .failsWithin(Duration.ofSeconds(2))
+                .withThrowableThat()
+                .havingRootCause()
+                .isInstanceOf(IllegalStateException.class);
+        verify(ai).embedPlace(guides.get(0));
+        verify(ai).embedPlace(guides.get(2));
+    }
+
+    @Test
     @DisplayName("임대가 전체 제한보다 짧은 설정은 거부한다")
     void rejectsLeaseShorterThanTimeout() {
         assertThatThrownBy(() -> new AiCallProperties(
@@ -271,6 +306,12 @@ class DefaultAiCallGatewayTest {
                 .havingRootCause()
                 .isInstanceOf(IllegalStateException.class);
         verify(jobClient, never()).analyzeVideo(anyList(), anyMap(), any(Duration.class));
+    }
+
+    private static OutingGuide guide(long id) {
+        OutingGuide guide = mock(OutingGuide.class);
+        when(guide.getId()).thenReturn(id);
+        return guide;
     }
 
     private DefaultAiCallGateway startedGateway() {

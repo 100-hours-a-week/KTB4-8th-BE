@@ -140,13 +140,23 @@ class AiServerStubTest {
     @DisplayName("임베딩 요청에도 5xx·잘못된 응답·연결 종료를 주입한다")
     void injectsEmbeddingFailures() throws Exception {
         stub.failEmbedding(502, "{\"message\":\"bad\"}");
-        assertThat(post("/v1/embed-places", "{}").statusCode()).isEqualTo(502);
+        assertThat(post("/v3/embed-places", "{}").statusCode()).isEqualTo(502);
 
         stub.returnMalformedEmbedding("{");
-        assertThat(post("/v1/embed-places", "{}").body()).isEqualTo("{");
+        assertThat(post("/v3/embed-places", "{}").body()).isEqualTo("{");
 
         stub.resetEmbeddingConnection();
-        assertThatThrownBy(() -> post("/v1/embed-places", "{}")).isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> post("/v3/embed-places", "{}")).isInstanceOf(IOException.class);
+    }
+
+    @Test
+    @DisplayName("임베딩 기본 응답은 success true와 요청의 place_id를 돌려준다")
+    void returnsSuccessfulEmbeddingByDefault() throws Exception {
+        HttpResponse<String> response =
+                post("/v3/embed-places", "{\"place_id\":7,\"place_name\":\"A\",\"summary\":\"s\"}");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("{\"success\":true,\"place_id\":7}");
     }
 
     @Test
@@ -165,7 +175,7 @@ class AiServerStubTest {
     @DisplayName("k6 측정용 통계 조회와 초기화를 제공한다")
     void exposesStatsAndResetForPerfHarness() throws Exception {
         post("/v1/analyze-video", requestBody("video-a"));
-        post("/v1/embed-places", "{}");
+        post("/v3/embed-places", "{}");
 
         HttpResponse<String> stats = get("/__admin/stats");
         assertThat(stats.statusCode()).isEqualTo(200);
