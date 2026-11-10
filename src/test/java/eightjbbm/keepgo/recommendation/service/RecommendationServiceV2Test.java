@@ -19,6 +19,7 @@ import eightjbbm.keepgo.recommendation.repository.CaffeineRecommendationJobStore
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendOutingCourseResultV2;
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.sse.AiSseClient;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -104,7 +106,16 @@ class RecommendationServiceV2Test {
                 courseService,
                 jobs,
                 executor,
-                new StaticMessageSource());
+                new StaticMessageSource(),
+                new AiCallProperties(
+                        3,
+                        1,
+                        Duration.ofSeconds(3),
+                        Duration.ofMillis(200),
+                        Duration.ofSeconds(1),
+                        Duration.ofMillis(500),
+                        Duration.ofSeconds(2),
+                        Duration.ofMillis(500)));
         mvc = MockMvcBuilders.standaloneSetup(
                         new RecommendationControllerV2(service),
                         new RecommendationControllerV3(mock(HotPlaceServiceV2.class), service))
@@ -290,6 +301,77 @@ class RecommendationServiceV2Test {
         assertThat(cancellation.getStatus()).isEqualTo(204);
         assertThat(names(started)).endsWith("outing-course-recommendation.stopped");
         assertThat(aiConnectionClosed.await(2, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    @DisplayName("스트림 중 AI error 이벤트는 v3에서 bad-gateway 이벤트로 전달한다")
+    void relaysAiErrorEventAsBadGateway() throws Exception {
+        script = exchange -> {
+            stream(exchange);
+            write(exchange, "event: status\ndata: {\"stage\":\"retrieving\"}\n\n");
+            write(exchange, "event: error\ndata: {\"message\":\"llm_timeout\"}\n\n");
+        };
+
+        var response = events(post("/api/v3/member/recommendation"), "recommendation.bad-gateway");
+
+        assertThat(names(response))
+                .containsExactly(
+                        "outing-course-recommendation.accepted",
+                        "outing-course-recommendation.status",
+                        "outing-course-recommendation.bad-gateway");
+        assertThat(response.getContentAsString()).contains("\"code\":\"AI_LLM_TIMEOUT\"");
+    }
+
+    @Test
+    @DisplayName("AI 스트림이 열리기 전에 취소하면 HTTP 오류 없이 stopped를 받는다")
+    void cancelBeforeAiOpenedReturnsStopped() throws Exception {
+        var selecting = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(candidateSelector.select(eq(1L), any())).thenAnswer(invocation -> {
+            selecting.countDown();
+            release.await(5, TimeUnit.SECONDS);
+            return List.of();
+        });
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        var started = CompletableFuture.supplyAsync(() -> {
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            try {
+                return mvc.perform(post("/api/v3/member/recommendation"))
+                        .andReturn()
+                        .getResponse();
+            } catch (Exception error) {
+                throw new IllegalStateException(error);
+            }
+        });
+        assertThat(selecting.await(2, TimeUnit.SECONDS)).isTrue();
+
+        var cancellation = mvc.perform(post("/api/v3/member/recommendation/cancellation"))
+                .andReturn()
+                .getResponse();
+        var response = started.get(2, TimeUnit.SECONDS);
+        release.countDown();
+        awaitJobReleased();
+
+        assertThat(cancellation.getStatus()).isEqualTo(204);
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(names(response)).containsExactly("outing-course-recommendation.stopped");
+    }
+
+    @Test
+    @DisplayName("AI 스트림이 제한 시간 안에 열리지 않으면 503으로 응답하고 작업을 정리한다")
+    void failsWhenAiNotOpenedInTime() throws Exception {
+        var release = new CountDownLatch(1);
+        when(candidateSelector.select(eq(1L), any())).thenAnswer(invocation -> {
+            release.await(5, TimeUnit.SECONDS);
+            return List.of();
+        });
+
+        var response =
+                mvc.perform(post("/api/v3/member/recommendation")).andReturn().getResponse();
+        release.countDown();
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        awaitJobReleased();
     }
 
     private MockHttpServletResponse events(

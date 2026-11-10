@@ -6,16 +6,20 @@ import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.recommendation.repository.RecommendationJobStore;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
 import eightjbbm.keepgo.util.client.ai.AiErrors;
+import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.sse.AiStreamEvent;
 import eightjbbm.keepgo.util.client.ai.sse.AiStreamException;
 import eightjbbm.keepgo.util.exception.*;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
@@ -39,6 +43,7 @@ public class RecommendationServiceV2 {
     private final RecommendationJobStore jobs;
     private final Executor executor;
     private final MessageSource messageSource;
+    private final Duration openTimeout;
 
     private final ConcurrentMap<String, RecommendationConnection> localSseConnections = new ConcurrentHashMap<>();
 
@@ -50,7 +55,8 @@ public class RecommendationServiceV2 {
             RecommendationCourseService recommendationCourseService,
             RecommendationJobStore jobs,
             @Qualifier("recommendationTaskExecutor") Executor executor,
-            MessageSource messageSource) {
+            MessageSource messageSource,
+            AiCallProperties aiCallProperties) {
         this.aiServerService = aiServerService;
         this.criteriaRepository = criteriaRepository;
         this.candidateSelector = candidateSelector;
@@ -59,6 +65,7 @@ public class RecommendationServiceV2 {
         this.jobs = jobs;
         this.executor = executor;
         this.messageSource = messageSource;
+        this.openTimeout = aiCallProperties.analysisTimeout();
     }
 
     public SseEmitter recommendOutingCourse(Long memberId) {
@@ -106,7 +113,15 @@ public class RecommendationServiceV2 {
 
     private void awaitAiOpened(RecommendationConnection connection) {
         try {
-            connection.opened.get();
+            connection.opened.get(openTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException error) {
+            // 작업이 버려졌거나 AI 연결이 지연돼도 요청 스레드가 영구히 막히지 않게 한다.
+            try {
+                fail(connection);
+            } finally {
+                releaseJob(connection);
+            }
+            throw new ServiceUnavailableException();
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             connection.ai.cancel();
@@ -269,6 +284,10 @@ public class RecommendationServiceV2 {
         synchronized (connection) {
             try {
                 connection.finish(event, data);
+                // AI 연결 전 취소는 HTTP 오류가 아니라 stopped가 담긴 emitter로 응답한다. 뒤따르는 fail()의 예외 완료는 무시된다.
+                if ("stopped".equals(event)) {
+                    connection.opened.complete(null);
+                }
             } finally {
                 cleanup(connection);
             }

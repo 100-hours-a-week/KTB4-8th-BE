@@ -352,7 +352,7 @@ POST /api/v3/member/recommendation
 v2와 같은 SSE 계약에 아래가 다르다. v2의 이벤트와 오류는 바뀌지 않는다. 결과 구조(`success`의 `result`)와 `accepted`, `stopped`는 v2와 같다.
 
 - 진행 중인 추천이 있으면 409, 나들이 조건이 없거나 부족하면 404·400 등 일반 HTTP 오류로 응답한다(v2와 같다).
-- **BE가 AI 서버 스트림을 연 뒤에** `accepted`를 보낸다. 그 전에 AI 호출이 실패하면 SSE를 시작하지 않고 일반 HTTP 오류(AI 오류 502 `AI_LLM_*` 또는 503)로 응답한다. 이때 연결을 기다리는 동안 응답이 지연될 수 있다. v2는 이 경우 `service-unavailable` 이벤트를 보낸다.
+- **BE가 AI 서버 스트림을 연 뒤에** `accepted`를 보낸다. 그 전에 AI 호출이 실패하면 SSE를 시작하지 않고 일반 HTTP 오류(AI 오류 502 `AI_LLM_*` 또는 503)로 응답한다. 이때 연결을 기다리는 동안 응답이 지연될 수 있으며, AI 스트림이 `analysisTimeout`(기본 130초) 안에 열리지 않으면 503으로 응답한다. 열리기 전에 취소하면 오류 대신 `stopped`로 응답한다. v2는 이 경우 `service-unavailable` 이벤트를 보낸다.
 - 추천 도중 AI가 단계를 알리면 `status` 이벤트로 전달한다. `stage`는 AI 값을 그대로 전달하며 알 수 없는 값은 FE가 무시한다. 단계는 건너뛸 수 있다.
 - 스트림 중 실패는 `ProblemDetail`을 이벤트로 보낸다. AI LLM 오류(`llm_timeout`·`llm_rate_limited`·`llm_invalid_response`)는 `bad-gateway`(502, `code`는 `AI_LLM_TIMEOUT`·`AI_LLM_RATE_LIMITED`·`AI_LLM_INVALID_RESPONSE`), 그 밖의 AI 오류와 `done` 없이 끊긴 연결은 `service-unavailable`(503)이다. 실패 후에는 바로 다시 요청할 수 있다.
 - 코스는 `done`에서 한 번에 받는다. AI가 `recommend_success`·`recommend_not_found`를 보내면 `success`, `recommend_cancel_accepted`면 `stopped`, `recommend_failed`면 위 오류 이벤트로 전달한다.
@@ -568,7 +568,7 @@ POST /api/v3/member/recommendation/cancellation
 - 요청 본문 없음, 응답은 항상 `204`다.
 - 추천을 어느 버전(v2·v3)으로 시작했는지와 무관하게 회원의 진행 중 추천을 취소하고, 스트림에 `stopped`를 보내 연결을 닫는다.
 - 진행 중인 AI 스트림 연결도 즉시 닫는다. AI의 `/v1` cancel은 호출하지 않는다.
-- v3 추천이 AI 연결을 열기 전에 취소하면 그 추천 요청은 SSE 없이 오류로 응답한다.
+- v3 추천이 AI 연결을 열기 전에 취소하면 그 추천 요청은 오류가 아니라 `accepted` 없이 `stopped`만 담긴 SSE로 응답한다.
 
 <a id="hot"></a>
 
