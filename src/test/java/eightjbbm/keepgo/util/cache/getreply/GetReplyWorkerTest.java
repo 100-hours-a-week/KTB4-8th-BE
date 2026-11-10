@@ -2,6 +2,7 @@ package eightjbbm.keepgo.util.cache.getreply;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +12,7 @@ import eightjbbm.keepgo.chat.service.AiServerExtractSlotApiService;
 import eightjbbm.keepgo.chat.service.dto.ExtractSlotResponseV2;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
+import eightjbbm.keepgo.util.client.ai.sse.AiStreamException;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -60,5 +62,56 @@ class GetReplyWorkerTest {
 
         verify(cache).setStatusAsFail(MEMBER_ID);
         verify(criteriaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("AI 스트림이 실패하면 실패로 표시한다")
+    void failsWhenStreamFails() {
+        when(ai.extractSlot(any(), any(), any())).thenThrow(mock(AiStreamException.class));
+
+        worker.requestGetReply(MEMBER_ID, request).join();
+
+        verify(cache).setStatusAsFail(MEMBER_ID);
+        verify(cache, never()).update(any(), any());
+        verify(criteriaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("done가 null이면 실패로 표시한다")
+    void failsWhenDoneMissing() {
+        when(ai.extractSlot(any(), any(), any())).thenReturn(null);
+
+        worker.requestGetReply(MEMBER_ID, request).join();
+
+        verify(cache).setStatusAsFail(MEMBER_ID);
+        verify(criteriaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("가용 시간을 숫자로 변환하지 못하면 실패로 표시하고 봇 메시지를 캐시하지 않는다")
+    void failsWhenAvailableTimeInvalid() {
+        var slot = new ExtractSlotResponseV2.Slot(null, null, null, "abc", null);
+        when(ai.extractSlot(any(), any(), any())).thenReturn(new ExtractSlotResponseV2(slot, "조용한", "찾아볼게요."));
+        when(criteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.of(previous));
+
+        worker.requestGetReply(MEMBER_ID, request).join();
+
+        verify(cache).setStatusAsFail(MEMBER_ID);
+        verify(cache, never()).update(any(), any());
+        verify(criteriaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("나들이 조건 저장에 실패하면 실패로 표시하고 봇 메시지를 캐시하지 않는다")
+    void failsWhenSaveFails() {
+        var slot = new ExtractSlotResponseV2.Slot(null, "강남", null, "180", null);
+        when(ai.extractSlot(any(), any(), any())).thenReturn(new ExtractSlotResponseV2(slot, "조용한", "찾아볼게요."));
+        when(criteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.of(previous));
+        doThrow(new IllegalStateException("db")).when(criteriaRepository).save(any());
+
+        worker.requestGetReply(MEMBER_ID, request).join();
+
+        verify(cache).setStatusAsFail(MEMBER_ID);
+        verify(cache, never()).update(any(), any());
     }
 }
