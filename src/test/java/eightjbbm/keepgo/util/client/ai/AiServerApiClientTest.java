@@ -54,11 +54,11 @@ class AiServerApiClientTest {
 
     @Test
     @DisplayName("버전 정보는 GET /v3/version을 호출하고 환경과 commit을 해석한다")
-    void versionCallsPathAndReadsEnvironmentAndCommit() throws Exception {
+    void getVersionCallsPathAndReadsEnvironmentAndCommit() throws Exception {
         var client = serve(
                 200, "{\"message\":\"version_success\",\"data\":{\"environment\":\"dev\",\"commit\":\"d5917fc\"}}");
 
-        var response = client.version();
+        var response = client.getVersion();
 
         assertThat(requestLine.get()).isEqualTo("GET /v3/version");
         assertThat(response.message()).isEqualTo("version_success");
