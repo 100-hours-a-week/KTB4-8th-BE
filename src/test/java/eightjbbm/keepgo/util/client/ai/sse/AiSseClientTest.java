@@ -27,8 +27,9 @@ import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("AI SSE 수신 규칙")
 class AiSseClientTest {
-    private static final String ENVELOPE_DELTA_1 = "data: {\"event\":\"delta\",\"data\":{\"text\":\"성수에서 \"}}\n\n";
-    private static final String ENVELOPE_DELTA_2 = "data: {\"event\":\"delta\",\"data\":{\"text\":\"카페\"}}\n\n";
+    private static final String DELTA_1 = "event: delta\ndata: {\"text\":\"성수에서 \"}\n\n";
+    private static final String DELTA_2 = "event: delta\ndata: {\"text\":\"카페\"}\n\n";
+    private static final String DONE = "event: done\ndata: {}\n\n";
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final AtomicReference<String> requestHead = new AtomicReference<>();
@@ -95,10 +96,14 @@ class AiSseClientTest {
     }
 
     private static void httpError(OutputStream out, int status) throws Exception {
-        String body = "{\"message\":\"error\",\"data\":null}";
-        out.write(("HTTP/1.1 " + status + " X\r\nContent-Type: application/json\r\nContent-Length: " + body.length()
-                        + "\r\n\r\n" + body)
+        httpResponse(out, status, "Content-Type: application/json\r\n", "{\"message\":\"error\",\"data\":null}");
+    }
+
+    private static void httpResponse(OutputStream out, int status, String headers, String body) throws Exception {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        out.write(("HTTP/1.1 " + status + " X\r\n" + headers + "Content-Length: " + bytes.length + "\r\n\r\n")
                 .getBytes(StandardCharsets.UTF_8));
+        out.write(bytes);
         out.flush();
     }
 
@@ -112,9 +117,9 @@ class AiSseClientTest {
     void concatenatesDeltaAndEndsOnDone() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, ENVELOPE_DELTA_1);
-            chunk(out, ENVELOPE_DELTA_2);
-            chunk(out, "data: {\"event\":\"done\",\"data\":{\"slot\":{\"category\":[\"카페\"]},\"query\":\"조용한\"}}\n\n");
+            chunk(out, DELTA_1);
+            chunk(out, DELTA_2);
+            chunk(out, "event: done\ndata: {\"slot\":{\"category\":[\"카페\"]},\"query\":\"조용한\"}\n\n");
             endChunks(out);
         });
         var seen = new ArrayList<AiStreamEvent>();
@@ -133,7 +138,7 @@ class AiSseClientTest {
     }
 
     @Test
-    @DisplayName("event 줄로 이름을 보내는 표준 SSE 형식도 읽고 status를 전달한다")
+    @DisplayName("여러 data 줄로 나뉜 이벤트와 keep-alive 주석을 읽고 status를 전달한다")
     void readsNamedEventsAndStatus() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
@@ -165,9 +170,9 @@ class AiSseClientTest {
     void convertsErrorEvent(String message, Class<? extends ErrorResponseException> type, int status) throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, ENVELOPE_DELTA_1);
-            chunk(out, "data: {\"event\":\"error\",\"data\":{\"message\":\"" + message + "\"}}\n\n");
-            chunk(out, "data: {\"event\":\"done\",\"data\":{}}\n\n");
+            chunk(out, DELTA_1);
+            chunk(out, "event: error\ndata: {\"message\":\"" + message + "\"}\n\n");
+            chunk(out, DONE);
             endChunks(out);
         });
         var seen = new ArrayList<AiStreamEvent>();
@@ -185,7 +190,7 @@ class AiSseClientTest {
     void failsWhenSocketClosesWithoutTerminalEvent() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, ENVELOPE_DELTA_1);
+            chunk(out, DELTA_1);
         });
         var seen = new ArrayList<AiStreamEvent>();
 
@@ -201,7 +206,7 @@ class AiSseClientTest {
     void failsWhenBodyEndsCleanlyWithoutTerminalEvent() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, ENVELOPE_DELTA_1);
+            chunk(out, DELTA_1);
             endChunks(out);
         });
 
@@ -212,12 +217,13 @@ class AiSseClientTest {
     }
 
     @Test
-    @DisplayName("알 수 없는 이름의 이벤트는 JSON이 아니어도 무시한다")
+    @DisplayName("이름이 없거나 알 수 없는 이벤트는 JSON이 아니어도 무시한다")
     void ignoresUnknownEventWithoutParsing() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
             chunk(out, "event: ping\ndata: keepalive\n\n");
-            chunk(out, "event: done\ndata: {}\n\n");
+            chunk(out, "data: {\"event\":\"error\",\"data\":{\"message\":\"llm_timeout\"}}\n\n");
+            chunk(out, DONE);
             endChunks(out);
         });
 
@@ -230,15 +236,15 @@ class AiSseClientTest {
     @DisplayName("해석할 수 없는 이벤트는 스트림 도중 실패로 변환한다")
     @ValueSource(
             strings = {
-                "data: {broken\n\n",
-                "data: {\"event\":\"delta\",\"data\":{}}\n\n",
-                "data: {\"event\":\"delta\",\"data\":{\"text\":1}}\n\n"
+                "event: delta\ndata: {broken\n\n",
+                "event: delta\ndata: {}\n\n",
+                "event: delta\ndata: {\"text\":1}\n\n"
             })
     void failsOnMalformedEvent(String event) throws Exception {
         serve((socket, out) -> {
             streamHead(out);
             chunk(out, event);
-            chunk(out, "data: {\"event\":\"done\",\"data\":{}}\n\n");
+            chunk(out, DONE);
             endChunks(out);
         });
 
@@ -253,7 +259,7 @@ class AiSseClientTest {
     void convertsErrorEventWithNonStringMessage() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, "data: {\"event\":\"error\",\"data\":{\"message\":{\"code\":1}}}\n\n");
+            chunk(out, "event: error\ndata: {\"message\":{\"code\":1}}\n\n");
             endChunks(out);
         });
 
@@ -267,7 +273,7 @@ class AiSseClientTest {
     void failsWhenSocketResetsBeforeDoneCompletes() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, "data: {\"event\":\"done\",\"data\":{\"query\":\"조용한\"}}\n");
+            chunk(out, "event: done\ndata: {\"query\":\"조용한\"}\n");
             socket.setSoLinger(true, 0);
         });
 
@@ -282,7 +288,7 @@ class AiSseClientTest {
     void failsWhenStreamStalls() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, ENVELOPE_DELTA_1);
+            chunk(out, DELTA_1);
             Thread.sleep(3000);
         });
 
@@ -297,11 +303,11 @@ class AiSseClientTest {
     void completesSlowStreamWithinLimit() throws Exception {
         serve((socket, out) -> {
             streamHead(out);
-            chunk(out, ENVELOPE_DELTA_1);
+            chunk(out, DELTA_1);
             Thread.sleep(250);
-            chunk(out, ENVELOPE_DELTA_2);
+            chunk(out, DELTA_2);
             Thread.sleep(250);
-            chunk(out, "data: {\"event\":\"done\",\"data\":{}}\n\n");
+            chunk(out, DONE);
             endChunks(out);
         });
 
@@ -331,6 +337,58 @@ class AiSseClientTest {
         assertThat(thrown.error()).isExactlyInstanceOf(type);
         assertThat(thrown.error().getStatusCode().value()).isEqualTo(status);
         assertThat(seen).isEmpty();
+    }
+
+    @ParameterizedTest(name = "HTTP {0}, 본문 {1}")
+    @DisplayName("HTTP 오류 본문의 llm 사유를 상태보다 우선하고, 본문이 없거나 JSON이 아니면 상태로 분류한다")
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "502|{\"message\":\"llm_timeout\",\"data\":null}|eightjbbm.keepgo.util.client.ai.AiLlmTimeoutException",
+                "500|{\"message\":\"llm_rate_limited\",\"data\":null}|eightjbbm.keepgo.util.client.ai.AiLlmRateLimitedException",
+                "502||eightjbbm.keepgo.util.client.ai.AiLlmInvalidResponseException",
+                "502|<html>Bad Gateway</html>|eightjbbm.keepgo.util.client.ai.AiLlmInvalidResponseException",
+                "503|<html>Unavailable</html>|eightjbbm.keepgo.util.exception.ServiceUnavailableException"
+            })
+    void prefersLlmReasonInHttpErrorBody(int httpStatus, String body, Class<? extends ErrorResponseException> type)
+            throws Exception {
+        serve((socket, out) -> httpResponse(out, httpStatus, "", body == null ? "" : body));
+
+        var thrown = failure(new ArrayList<>());
+
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
+        assertThat(thrown.error()).isExactlyInstanceOf(type);
+    }
+
+    @ParameterizedTest(name = "Content-Type 헤더 #{index}")
+    @DisplayName("200이어도 text/event-stream이 아니면 스트림 시작 전 실패로 변환한다")
+    @ValueSource(strings = {"Content-Type: application/json\r\n", "Content-Type: text/event-streaming\r\n", ""})
+    void failsBeforeStreamWhenContentTypeIsNotEventStream(String headers) throws Exception {
+        serve((socket, out) -> httpResponse(out, 200, headers, "{\"message\":\"extract_success\"}"));
+        var seen = new ArrayList<AiStreamEvent>();
+
+        var thrown = failure(seen);
+
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
+        assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
+        assertThat(seen).isEmpty();
+    }
+
+    @Test
+    @DisplayName("text/event-stream에 charset 같은 파라미터가 붙어도 스트림으로 읽는다")
+    void acceptsEventStreamWithParameters() throws Exception {
+        serve((socket, out) -> {
+            out.write(("HTTP/1.1 200 OK\r\nContent-Type: Text/Event-Stream; charset=utf-8\r\n"
+                            + "Transfer-Encoding: chunked\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            chunk(out, DELTA_1);
+            chunk(out, DONE);
+            endChunks(out);
+        });
+
+        var result = client.stream("/v3/extract/stream", Map.of(), event -> {});
+
+        assertThat(result.text()).isEqualTo("성수에서 ");
     }
 
     @Test

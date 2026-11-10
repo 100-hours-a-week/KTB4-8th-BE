@@ -35,7 +35,14 @@ import tools.jackson.databind.ObjectMapper;
 /// `delta`는 순서대로 이어 붙이고, `done` 또는 `error`를 받으면 종료한다. 둘 다 없이 연결이 끊기거나
 /// 이벤트 사이 지연이 `idleTimeout`을 넘으면 실패이며, 자동 재시도 없이 호출자가 새로 요청한다.
 ///
-/// 이벤트는 `event:` 줄과 JSON `data:`로 읽고, `data`가 `{"event": ..., "data": ...}` 봉투이면 봉투를 풀어 읽는다.
+/// 형식은 AI 서버(FastAPI `ServerSentEvent`)가 내보내는 표준 SSE다. 이벤트마다 `event: <이름>` 줄과 JSON `data:` 줄이 오고
+/// `data`는 이벤트 본문 자체다(`delta`는 `{"text"}`, `error`는 `{"message"}`). API 시트의 `{"event", "data"}` 표기는
+/// 이 이름과 본문을 한 객체로 보여 주는 설명이며 전송 형식이 아니다. 이름이 없거나 모르는 이벤트와 `:` 주석(keep-alive)은 무시한다.
+///
+/// 스트림을 시작하기 전 실패(연결 실패, 200이 아닌 상태, `text/event-stream`이 아닌 응답)는 `BEFORE_STREAM`이다.
+/// `done`의 본문은 해석 없이 돌려주므로 추천의 `done.data.error`(`recommend_failed`)는 호출자가 처리한다.
+///
+/// 실패는 이 클래스가 ERROR로 한 번 남긴다. 호출자는 같은 실패를 다시 ERROR로 남기지 않는다.
 @Slf4j
 public final class AiSseClient implements AutoCloseable {
     private static final Set<String> EVENTS = Set.of("delta", "status", "done", "error");
@@ -79,11 +86,19 @@ public final class AiSseClient implements AutoCloseable {
         }
         try {
             if (response.getCode() != 200) {
+                var errorBody = bodyOf(response);
+                var error = AiErrors.fromHttpResponse(response.getCode(), messageOf(errorBody));
+                var logged = errorBody.length() > 200 ? errorBody.substring(0, 200) : errorBody;
+                throw fail(path, Phase.BEFORE_STREAM, error, "http=" + response.getCode() + ", body=" + logged, null);
+            }
+            var contentType = response.getFirstHeader("Content-Type");
+            if (contentType == null
+                    || !contentType.getValue().split(";")[0].strip().equalsIgnoreCase("text/event-stream")) {
                 throw fail(
                         path,
                         Phase.BEFORE_STREAM,
-                        AiErrors.fromHttpStatus(response.getCode()),
-                        "http=" + response.getCode() + ", body=" + bodyOf(response),
+                        new ServiceUnavailableException(),
+                        "content_type=" + (contentType == null ? null : contentType.getValue()),
                         null);
             }
             return read(path, response, onEvent);
@@ -129,18 +144,14 @@ public final class AiSseClient implements AutoCloseable {
 
     private AiStreamResult dispatch(
             String path, String name, String data, StringBuilder text, Consumer<AiStreamEvent> onEvent) {
-        if (name != null && !EVENTS.contains(name)) return null;
+        if (name == null || !EVENTS.contains(name)) return null;
         JsonNode payload;
         try {
             payload = mapper.readTree(data);
-            if (name == null && payload.hasNonNull("event")) {
-                name = payload.get("event").asString();
-                payload = payload.path("data");
-            }
         } catch (JacksonException exception) {
             throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "invalid_json", exception);
         }
-        switch (name == null ? "" : name) {
+        switch (name) {
             case "delta" -> {
                 if (!payload.path("text").isString()) {
                     throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "delta_without_text", null);
@@ -164,10 +175,19 @@ public final class AiSseClient implements AutoCloseable {
 
     private static String bodyOf(ClassicHttpResponse response) {
         try {
-            var body = response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity());
-            return body.length() > 200 ? body.substring(0, 200) : body;
+            return response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity(), 4096);
         } catch (IOException | ParseException exception) {
             return "";
+        }
+    }
+
+    /// HTTP 오류 본문 `{"message": ...}`의 사유. JSON이 아니거나 문자열 사유가 없으면 null.
+    private String messageOf(String body) {
+        try {
+            var message = mapper.readTree(body).path("message");
+            return message.isString() ? message.asString() : null;
+        } catch (JacksonException exception) {
+            return null;
         }
     }
 

@@ -19,6 +19,13 @@ public final class AiErrors {
         };
     }
 
+    /// HTTP 오류 응답을 변환한다. 본문 `message`가 `llm_*` 사유이면 그것을 우선하고, 아니면 상태로 분류한다.
+    /// 본문이 없거나 JSON이 아니면(프록시 응답 등) 상태 매핑을 쓴다.
+    public static ErrorResponseException fromHttpResponse(int status, String message) {
+        var byMessage = fromMessage(message);
+        return byMessage instanceof ServiceUnavailableException ? fromHttpStatus(status) : byMessage;
+    }
+
     /// SSE `error` 이벤트의 `message`를 변환한다.
     public static ErrorResponseException fromMessage(String message) {
         return switch (message == null ? "" : message) {
