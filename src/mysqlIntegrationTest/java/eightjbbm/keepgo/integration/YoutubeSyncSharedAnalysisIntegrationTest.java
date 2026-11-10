@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -157,6 +158,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
         Long syncId = runSync(processor, second, "instance-a", "video-a", "video-b");
 
         assertThat(AI_STUB.analysisRequestCount()).isEqualTo(2);
+        assertThat(AI_STUB.analysisV3RequestCount()).isEqualTo(2);
         assertThat(analysisCount()).isEqualTo(2);
         assertThat(analyzedCount(syncId)).isEqualTo(2);
         assertThat(failedCount(syncId)).isEqualTo(1);
@@ -454,7 +456,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
     @DisplayName("실행권 판정 전 실패는 다른 동기화의 최신 완료 결과를 가리지 않는다")
     void preservesCompletedHistoryWhenGatewayFailsBeforeAcquire() {
         AiCallGateway gateway = mock(AiCallGateway.class);
-        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any())).thenAnswer(call -> {
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), anyMap(), any())).thenAnswer(call -> {
             insertAnalysis(9000, "video-a", "NOT_FOUND", "2026-10-01 00:00:00");
             return CompletableFuture.failedFuture(new IllegalStateException("before acquire"));
         });

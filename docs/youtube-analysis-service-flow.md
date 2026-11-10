@@ -51,7 +51,7 @@ flowchart TD
     B --> C[백엔드 분석 전략 호출]
     C --> D[백엔드 결과 Map에 없는 Video 선별]
     D --> E[최대 10개씩 순차 분할]
-    E --> F[AI POST /v1/analyze-video]
+    E --> F[AI POST /v3/analyze-video]
     F --> G{응답 타입}
     G -- Failure --> H[해당 배치의 추출 결과 없음]
     G -- Success --> I{각 결과 status}

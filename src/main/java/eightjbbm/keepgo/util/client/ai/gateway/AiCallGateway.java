@@ -3,7 +3,9 @@ package eightjbbm.keepgo.util.client.ai.gateway;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
+import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.UnaryOperator;
 
@@ -17,8 +19,9 @@ public interface AiCallGateway {
     ///
     /// `beforeSend`는 슬롯을 얻은 뒤 전송 직전에 실행되며, 요청한 영상 중 실제로 보낼 영상만 돌려준다.
     /// 보낼 영상이 없으면 AI 서버를 호출하지 않고 결과 없는 응답으로 끝낸다.
+    /// `metas`에 없는 영상은 메타 없이(null) 보낸다.
     CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
-            long syncId, List<String> videoIds, UnaryOperator<List<String>> beforeSend);
+            long syncId, List<String> videoIds, Map<String, VideoMeta> metas, UnaryOperator<List<String>> beforeSend);
 
     /// 커밋된 가이드의 임베딩 요청을 제출한다.
     CompletableFuture<Void> submitEmbedding(List<OutingGuide> guides);

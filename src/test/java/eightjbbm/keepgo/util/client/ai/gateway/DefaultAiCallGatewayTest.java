@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -19,6 +20,7 @@ import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -242,12 +244,13 @@ class DefaultAiCallGatewayTest {
     @DisplayName("beforeSend가 없으면 요청한 영상을 모두 보낸다")
     void sendsAllRequestedVideosWithoutBeforeSend() {
         givenSlots(1);
-        when(jobClient.analyzeVideo(anyList(), any(Duration.class))).thenReturn(new VideoAnalysisResponse(List.of()));
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class)))
+                .thenReturn(new VideoAnalysisResponse(List.of()));
         gateway = startedGateway();
 
-        gateway.submitVideoAnalysis(1, List.of("a", "b"), null).join();
+        gateway.submitVideoAnalysis(1, List.of("a", "b"), Map.of(), null).join();
 
-        verify(jobClient).analyzeVideo(eq(List.of("a", "b")), any(Duration.class));
+        verify(jobClient).analyzeVideo(eq(List.of("a", "b")), eq(Map.of()), any(Duration.class));
     }
 
     @Test
@@ -257,14 +260,14 @@ class DefaultAiCallGatewayTest {
         gateway = startedGateway();
 
         CompletableFuture<VideoAnalysisResponse> call =
-                gateway.submitVideoAnalysis(1, List.of("a"), requested -> List.of("a", "other"));
+                gateway.submitVideoAnalysis(1, List.of("a"), Map.of(), requested -> List.of("a", "other"));
 
         assertThat(call)
                 .failsWithin(Duration.ofSeconds(2))
                 .withThrowableThat()
                 .havingRootCause()
                 .isInstanceOf(IllegalStateException.class);
-        verify(jobClient, never()).analyzeVideo(anyList(), any(Duration.class));
+        verify(jobClient, never()).analyzeVideo(anyList(), anyMap(), any(Duration.class));
     }
 
     private DefaultAiCallGateway startedGateway() {
