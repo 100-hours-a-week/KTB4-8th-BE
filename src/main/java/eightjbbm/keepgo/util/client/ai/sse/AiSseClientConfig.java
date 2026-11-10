@@ -18,6 +18,7 @@ public class AiSseClientConfig {
                 URI.create(properties.address()),
                 mapper,
                 callProperties.connectTimeout(),
+                callProperties.streamIdleTimeout(),
                 callProperties.analysisTimeout());
     }
 }

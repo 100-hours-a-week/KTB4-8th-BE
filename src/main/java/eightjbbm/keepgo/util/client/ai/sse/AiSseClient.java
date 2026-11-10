@@ -10,6 +10,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
@@ -33,7 +36,8 @@ import tools.jackson.databind.ObjectMapper;
 /// 추출과 추천이 공유하는 AI SSE 수신 규칙.
 ///
 /// `delta`는 순서대로 이어 붙이고, `done` 또는 `error`를 받으면 종료한다. 둘 다 없이 연결이 끊기거나
-/// 이벤트 사이 지연이 `idleTimeout`을 넘으면 실패이며, 자동 재시도 없이 호출자가 새로 요청한다.
+/// 이벤트 사이 지연이 `idleTimeout`을 넘거나 요청 시작부터 `totalTimeout`이 지나면 실패이며, 자동 재시도 없이 호출자가 새로 요청한다.
+/// `totalTimeout`은 게이트웨이 임대(`leaseDuration`)보다 짧게 주어 임대 안에 호출이 끝나게 한다.
 ///
 /// 형식은 AI 서버(FastAPI `ServerSentEvent`)가 내보내는 표준 SSE다. 이벤트마다 `event: <이름>` 줄과 JSON `data:` 줄이 오고
 /// `data`는 이벤트 본문 자체다(`delta`는 `{"text"}`, `error`는 `{"message"}`). API 시트의 `{"event", "data"}` 표기는
@@ -50,11 +54,16 @@ public final class AiSseClient implements AutoCloseable {
     private final URI baseUri;
     private final ObjectMapper mapper;
     private final CloseableHttpClient httpClient;
+    private final Duration totalTimeout;
+    private final ScheduledThreadPoolExecutor deadlines = new ScheduledThreadPoolExecutor(
+            1, Thread.ofPlatform().daemon().name("ai-sse-deadline").factory());
 
-    // shortcut: 이벤트 사이 지연만 제한하고 스트림 전체 시간은 제한하지 않는다, 전체 상한이 필요해지면 호출자에서 마감 시각을 넘긴다.
-    public AiSseClient(URI baseUri, ObjectMapper mapper, Duration connectTimeout, Duration idleTimeout) {
+    public AiSseClient(
+            URI baseUri, ObjectMapper mapper, Duration connectTimeout, Duration idleTimeout, Duration totalTimeout) {
         this.baseUri = baseUri;
         this.mapper = mapper;
+        this.totalTimeout = totalTimeout;
+        deadlines.setRemoveOnCancelPolicy(true);
         var connections = PoolingHttpClientConnectionManagerBuilder.create()
                 .setDefaultConnectionConfig(ConnectionConfig.custom()
                         .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout.toMillis()))
@@ -78,42 +87,62 @@ public final class AiSseClient implements AutoCloseable {
         var request = new HttpPost(baseUri.resolve(path.startsWith("/") ? path : "/" + path));
         request.setHeader("Accept", "text/event-stream");
         request.setEntity(new StringEntity(mapper.writeValueAsString(body), ContentType.APPLICATION_JSON));
-        ClassicHttpResponse response;
+        // 마감이 되면 연결을 끊어 막힌 읽기를 깨운다. idleTimeout만으로는 이벤트가 계속 오는 스트림을 끝내지 못한다.
+        var expired = new AtomicBoolean();
+        var deadline = deadlines.schedule(
+                () -> {
+                    expired.set(true);
+                    request.cancel();
+                },
+                totalTimeout.toMillis(),
+                TimeUnit.MILLISECONDS);
         try {
-            response = httpClient.executeOpen(null, request, null);
-        } catch (IOException exception) {
-            throw fail(path, Phase.BEFORE_STREAM, new ServiceUnavailableException(), "connect", exception);
-        }
-        try {
-            if (response.getCode() != 200) {
-                var errorBody = bodyOf(response);
-                var error = AiErrors.fromHttpResponse(response.getCode(), messageOf(errorBody));
-                var logged = errorBody.length() > 200 ? errorBody.substring(0, 200) : errorBody;
-                throw fail(path, Phase.BEFORE_STREAM, error, "http=" + response.getCode() + ", body=" + logged, null);
-            }
-            var contentType = response.getFirstHeader("Content-Type");
-            if (contentType == null
-                    || !contentType.getValue().split(";")[0].strip().equalsIgnoreCase("text/event-stream")) {
+            ClassicHttpResponse response;
+            try {
+                response = httpClient.executeOpen(null, request, null);
+            } catch (IOException exception) {
                 throw fail(
                         path,
                         Phase.BEFORE_STREAM,
                         new ServiceUnavailableException(),
-                        "content_type=" + (contentType == null ? null : contentType.getValue()),
-                        null);
+                        expired.get() ? "total_timeout" : "connect",
+                        exception);
             }
-            return read(path, response, onEvent);
-        } finally {
-            // 남은 본문을 기다리지 않도록 연결부터 중단한다.
-            request.cancel();
             try {
-                response.close();
-            } catch (IOException exception) {
-                log.debug("AI 스트림 응답 닫기 실패: path={}", path, exception);
+                if (response.getCode() != 200) {
+                    var errorBody = bodyOf(response);
+                    var error = AiErrors.fromHttpResponse(response.getCode(), messageOf(errorBody));
+                    var logged = errorBody.length() > 200 ? errorBody.substring(0, 200) : errorBody;
+                    throw fail(
+                            path, Phase.BEFORE_STREAM, error, "http=" + response.getCode() + ", body=" + logged, null);
+                }
+                var contentType = response.getFirstHeader("Content-Type");
+                if (contentType == null
+                        || !contentType.getValue().split(";")[0].strip().equalsIgnoreCase("text/event-stream")) {
+                    throw fail(
+                            path,
+                            Phase.BEFORE_STREAM,
+                            new ServiceUnavailableException(),
+                            "content_type=" + (contentType == null ? null : contentType.getValue()),
+                            null);
+                }
+                return read(path, response, onEvent, expired);
+            } finally {
+                // 남은 본문을 기다리지 않도록 연결부터 중단한다.
+                request.cancel();
+                try {
+                    response.close();
+                } catch (IOException exception) {
+                    log.debug("AI 스트림 응답 닫기 실패: path={}", path, exception);
+                }
             }
+        } finally {
+            deadline.cancel(false);
         }
     }
 
-    private AiStreamResult read(String path, ClassicHttpResponse response, Consumer<AiStreamEvent> onEvent) {
+    private AiStreamResult read(
+            String path, ClassicHttpResponse response, Consumer<AiStreamEvent> onEvent, AtomicBoolean expired) {
         var text = new StringBuilder();
         var data = new StringBuilder();
         String name = null;
@@ -136,10 +165,20 @@ public final class AiSseClient implements AutoCloseable {
                 }
             }
         } catch (IOException exception) {
-            throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "io", exception);
+            throw fail(
+                    path,
+                    Phase.IN_STREAM,
+                    new ServiceUnavailableException(),
+                    expired.get() ? "total_timeout" : "io",
+                    exception);
         }
         // 마지막 이벤트가 빈 줄로 끝나지 않은 채 끊긴 경우도 여기로 온다.
-        throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "eof", null);
+        throw fail(
+                path,
+                Phase.IN_STREAM,
+                new ServiceUnavailableException(),
+                expired.get() ? "total_timeout" : "eof",
+                null);
     }
 
     private AiStreamResult dispatch(
@@ -205,6 +244,7 @@ public final class AiSseClient implements AutoCloseable {
 
     @Override
     public void close() {
+        deadlines.shutdownNow();
         httpClient.close(CloseMode.IMMEDIATE);
     }
 }

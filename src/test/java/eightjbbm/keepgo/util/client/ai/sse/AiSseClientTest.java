@@ -45,6 +45,10 @@ class AiSseClientTest {
 
     /// 스크립트가 끝나면 소켓을 닫는다. 마지막 청크를 쓰지 않으면 본문 도중에 연결이 끊긴 것과 같다.
     private void serve(Script script) throws Exception {
+        serve(script, Duration.ofSeconds(10));
+    }
+
+    private void serve(Script script, Duration totalTimeout) throws Exception {
         server = new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress());
         Thread.ofVirtual().start(() -> {
             try (Socket socket = server.accept()) {
@@ -58,7 +62,8 @@ class AiSseClientTest {
                 URI.create("http://127.0.0.1:" + server.getLocalPort()),
                 mapper,
                 Duration.ofSeconds(2),
-                Duration.ofMillis(400));
+                Duration.ofMillis(400),
+                totalTimeout);
     }
 
     private void readRequest(Socket socket) throws Exception {
@@ -299,6 +304,31 @@ class AiSseClientTest {
     }
 
     @Test
+    @DisplayName("이벤트가 제때 와도 전체 상한을 넘으면 실패한다")
+    void failsWhenStreamExceedsTotalTimeout() throws Exception {
+        serve(
+                (socket, out) -> {
+                    streamHead(out);
+                    for (int i = 0; i < 30; i++) {
+                        chunk(out, DELTA_1);
+                        Thread.sleep(100);
+                    }
+                    chunk(out, DONE);
+                    endChunks(out);
+                },
+                Duration.ofMillis(600));
+        var seen = new ArrayList<AiStreamEvent>();
+        long start = System.nanoTime();
+
+        var thrown = failure(seen);
+
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
+        assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(2));
+        assertThat(seen).isNotEmpty().hasSizeLessThan(30);
+    }
+
+    @Test
     @DisplayName("지연이 제한 안이면 느린 스트림도 완료한다")
     void completesSlowStreamWithinLimit() throws Exception {
         serve((socket, out) -> {
@@ -399,7 +429,11 @@ class AiSseClientTest {
             unusedPort = socket.getLocalPort();
         }
         client = new AiSseClient(
-                URI.create("http://127.0.0.1:" + unusedPort), mapper, Duration.ofSeconds(1), Duration.ofSeconds(1));
+                URI.create("http://127.0.0.1:" + unusedPort),
+                mapper,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(5));
 
         assertThatThrownBy(() -> client.stream("/v3/extract/stream", Map.of(), event -> {}))
                 .isInstanceOfSatisfying(AiStreamException.class, thrown -> {

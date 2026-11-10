@@ -39,6 +39,7 @@ class DefaultAiCallGatewayTest {
             Duration.ofMillis(20),
             Duration.ofSeconds(130),
             Duration.ofSeconds(5),
+            Duration.ofSeconds(30),
             Duration.ofSeconds(30));
 
     private final AiServerService ai = mock(AiServerService.class);
@@ -211,7 +212,8 @@ class DefaultAiCallGatewayTest {
                 Duration.ofMillis(20),
                 Duration.ofMillis(200),
                 Duration.ofMillis(100),
-                Duration.ofSeconds(30)));
+                Duration.ofSeconds(30),
+                Duration.ofMillis(100)));
 
         CompletableFuture<AnalyzeVideoResponseV2> call = gateway.submitAnalysis(1, List.of("a"), () -> {});
 
@@ -234,6 +236,7 @@ class DefaultAiCallGatewayTest {
                         Duration.ofMillis(200),
                         Duration.ofSeconds(130),
                         Duration.ofSeconds(5),
+                        Duration.ofSeconds(30),
                         Duration.ofSeconds(30)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
