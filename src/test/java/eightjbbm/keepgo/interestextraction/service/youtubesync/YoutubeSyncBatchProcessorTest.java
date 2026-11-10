@@ -26,6 +26,7 @@ import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysi
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -121,7 +122,7 @@ class YoutubeSyncBatchProcessorTest {
                 .submitVideoAnalysis(
                         eq(1L),
                         eq(List.of("v0", "v1")),
-                        eq(Map.of("v0", new VideoMeta("2026-11-02", "제목", "설명"), "v1", VideoMeta.EMPTY)),
+                        eq(Map.of("v0", new VideoMeta(LocalDate.of(2026, 11, 2), "제목", "설명"), "v1", VideoMeta.EMPTY)),
                         any());
     }
 

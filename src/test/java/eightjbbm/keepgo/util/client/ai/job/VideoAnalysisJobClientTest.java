@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -71,7 +72,7 @@ class VideoAnalysisJobClientTest {
         serve(200, fixture, null, 0);
         var response = client.analyzeVideo(
                 List.of("video-a", "video-b", "video-c"),
-                Map.of("video-a", new VideoMeta("2026-11-02", "제목", "설명")),
+                Map.of("video-a", new VideoMeta(LocalDate.of(2026, 11, 2), "제목", "설명")),
                 Duration.ofMinutes(2));
         assertNotNull(response);
         assertEquals(3, response.results().size());

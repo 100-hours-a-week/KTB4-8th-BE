@@ -9,6 +9,7 @@ import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -98,12 +99,9 @@ public class YoutubeSyncBatchProcessor {
             return VideoMeta.EMPTY;
         }
         DateTime publishedAt = snippet.getPublishedAt();
-        String uploadDate = publishedAt == null
+        LocalDate uploadDate = publishedAt == null
                 ? null
-                : Instant.ofEpochMilli(publishedAt.getValue())
-                        .atZone(SEOUL)
-                        .toLocalDate()
-                        .toString();
+                : Instant.ofEpochMilli(publishedAt.getValue()).atZone(SEOUL).toLocalDate();
         return new VideoMeta(uploadDate, snippet.getTitle(), snippet.getDescription());
     }
 

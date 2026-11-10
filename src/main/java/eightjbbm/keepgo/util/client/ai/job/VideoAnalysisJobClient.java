@@ -235,7 +235,7 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
         if (!condition) throw new IllegalArgumentException("분석 응답 구조 위반");
     }
 
-    private record RequestVideo(String videoUrl, String uploadDate, String title, String description) {}
+    private record RequestVideo(String videoUrl, LocalDate uploadDate, String title, String description) {}
 
     private record WireCandidate(
             String placeName,
