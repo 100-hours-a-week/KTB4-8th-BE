@@ -75,6 +75,7 @@ class YoutubeSyncSharedAnalysisIntegrationTest extends MySqlIntegrationTestSuppo
             Duration.ofMillis(200),
             Duration.ofSeconds(130),
             Duration.ofSeconds(5),
+            Duration.ofSeconds(30),
             Duration.ofSeconds(30));
 
     private final MemberRepository memberRepository;

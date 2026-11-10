@@ -35,6 +35,7 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
             Duration.ofMillis(200),
             Duration.ofSeconds(130),
             Duration.ofSeconds(5),
+            Duration.ofSeconds(30),
             Duration.ofSeconds(30));
 
     private final AiCallSlotRepository slots;
@@ -124,7 +125,8 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
                 Duration.ofMillis(50),
                 Duration.ofSeconds(1),
                 Duration.ofMillis(500),
-                Duration.ofSeconds(30)));
+                Duration.ofSeconds(30),
+                Duration.ofMillis(500)));
 
         List<CompletableFuture<VideoAnalysisResponse>> calls = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
