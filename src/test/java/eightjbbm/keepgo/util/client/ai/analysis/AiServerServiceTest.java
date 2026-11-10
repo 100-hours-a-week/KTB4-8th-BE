@@ -61,14 +61,17 @@ class AiServerServiceTest {
     }
 
     @Test
-    @DisplayName("/v3/embed-places로 정수 place_id를 보내고 success가 true면 성공한다")
-    void sendsIntegerPlaceIdToV3() {
+    @DisplayName("/v3/embed-places로 places 없이 정수 place_id 단일 객체를 보내고 success가 true면 성공한다")
+    void sendsSinglePlaceObjectToV3() {
         responseBody = "{\"success\":true,\"place_id\":7}";
 
-        assertThatCode(() -> service.embedPlaces(List.of(guide(7L)))).doesNotThrowAnyException();
+        assertThatCode(() -> service.embedPlace(guide(7L))).doesNotThrowAnyException();
 
         assertThat(paths).containsExactly("/v3/embed-places");
-        assertThat(bodies.get(0)).contains("\"place_id\":7").doesNotContain("\"place_id\":\"");
+        assertThat(bodies.get(0))
+                .startsWith("{\"place_id\":7,\"place_name\":")
+                .contains("\"summary\":")
+                .doesNotContain("places", "\"place_id\":\"");
     }
 
     @Test
@@ -76,7 +79,7 @@ class AiServerServiceTest {
     void failsWhenSuccessFalse() {
         responseBody = "{\"success\":false,\"place_id\":7}";
 
-        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
+        assertThatThrownBy(() -> service.embedPlace(guide(7L))).isInstanceOf(AiRequestException.class);
     }
 
     @Test
@@ -84,7 +87,7 @@ class AiServerServiceTest {
     void doesNotFallBackToLegacyResponse() {
         responseBody = "{\"message\":\"embed_success\",\"data\":{\"embedded_count\":1}}";
 
-        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
+        assertThatThrownBy(() -> service.embedPlace(guide(7L))).isInstanceOf(AiRequestException.class);
     }
 
     @Test
@@ -92,7 +95,7 @@ class AiServerServiceTest {
     void failsWhenSuccessMissing() {
         responseBody = "{\"place_id\":7}";
 
-        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
+        assertThatThrownBy(() -> service.embedPlace(guide(7L))).isInstanceOf(AiRequestException.class);
     }
 
     @Test
@@ -100,7 +103,7 @@ class AiServerServiceTest {
     void failsWhenBodyEmpty() {
         responseBody = "";
 
-        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L)))).isInstanceOf(AiRequestException.class);
+        assertThatThrownBy(() -> service.embedPlace(guide(7L))).isInstanceOf(AiRequestException.class);
     }
 
     @Test
@@ -108,11 +111,10 @@ class AiServerServiceTest {
     void failsWhenBodyMalformed() {
         responseBody = "{";
 
-        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L))))
-                .isInstanceOfSatisfying(AiRequestException.class, e -> {
-                    assertThat(e.kind()).isEqualTo(AiRequestException.Kind.INVALID_AI_RESPONSE);
-                    assertThat(e.getCause()).isNotNull();
-                });
+        assertThatThrownBy(() -> service.embedPlace(guide(7L))).isInstanceOfSatisfying(AiRequestException.class, e -> {
+            assertThat(e.kind()).isEqualTo(AiRequestException.Kind.INVALID_AI_RESPONSE);
+            assertThat(e.getCause()).isNotNull();
+        });
     }
 
     @Test
@@ -120,7 +122,7 @@ class AiServerServiceTest {
     void keepsActualStatusCode() {
         responseBody = "{\"success\":false,\"place_id\":7}";
 
-        assertThatThrownBy(() -> service.embedPlaces(List.of(guide(7L))))
+        assertThatThrownBy(() -> service.embedPlace(guide(7L)))
                 .isInstanceOfSatisfying(
                         AiRequestException.class,
                         e -> assertThat(e.statusCode()).isEqualTo(200));

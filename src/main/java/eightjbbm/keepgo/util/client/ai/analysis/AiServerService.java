@@ -48,8 +48,8 @@ public class AiServerService {
         return new AnalyzeVideoRequestV2(videoUrls);
     }
 
-    public void embedPlaces(List<OutingGuide> newOutingGuides) {
-        var request = restClient.post().uri("/v3/embed-places").body(EmbedPlaceRequest.from(newOutingGuides));
+    public void embedPlace(OutingGuide outingGuide) {
+        var request = restClient.post().uri("/v3/embed-places").body(EmbedPlaceRequest.from(outingGuide));
 
         long startNanos = System.nanoTime();
         try {

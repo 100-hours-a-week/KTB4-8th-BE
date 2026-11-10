@@ -115,7 +115,7 @@ class AiServerStubTest {
     @DisplayName("임베딩 기본 응답은 success true와 요청의 place_id를 돌려준다")
     void returnsSuccessfulEmbeddingByDefault() throws Exception {
         HttpResponse<String> response =
-                post("/v3/embed-places", "{\"places\":[{\"place_id\":7,\"place_name\":\"A\",\"summary\":\"s\"}]}");
+                post("/v3/embed-places", "{\"place_id\":7,\"place_name\":\"A\",\"summary\":\"s\"}");
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo("{\"success\":true,\"place_id\":7}");

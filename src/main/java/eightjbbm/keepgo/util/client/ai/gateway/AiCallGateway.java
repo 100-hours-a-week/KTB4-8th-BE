@@ -20,6 +20,6 @@ public interface AiCallGateway {
     CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
             long syncId, List<String> videoIds, UnaryOperator<List<String>> beforeSend);
 
-    /// 커밋된 가이드의 임베딩 요청을 제출한다.
+    /// 커밋된 가이드의 임베딩 요청을 제출한다. 가이드마다 AI 호출 하나이며, 모두 끝난 뒤 하나라도 실패했으면 실패로 끝난다.
     CompletableFuture<Void> submitEmbedding(List<OutingGuide> guides);
 }

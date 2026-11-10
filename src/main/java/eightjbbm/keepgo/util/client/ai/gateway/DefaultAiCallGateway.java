@@ -98,15 +98,17 @@ public class DefaultAiCallGateway implements AiCallGateway {
 
     @Override
     public CompletableFuture<Void> submitEmbedding(List<OutingGuide> guides) {
-        List<OutingGuide> copy = List.copyOf(guides);
-        return enqueue(
-                "embedding",
-                AiCallType.EMBEDDING,
-                () -> {
-                    aiServerService.embedPlaces(copy);
-                    return null;
-                },
-                () -> {});
+        // v3는 장소 하나씩 받으므로 장소마다 슬롯·타임아웃을 따로 쓴다. 하나가 실패해도 나머지는 끝까지 보낸다.
+        return CompletableFuture.allOf(List.copyOf(guides).stream()
+                .map(guide -> enqueue(
+                        "embedding",
+                        AiCallType.EMBEDDING,
+                        () -> {
+                            aiServerService.embedPlace(guide);
+                            return (Void) null;
+                        },
+                        () -> {}))
+                .toArray(CompletableFuture[]::new));
     }
 
     private <T> CompletableFuture<T> enqueue(String queueKey, AiCallType type, Supplier<T> call, Runnable beforeSend) {
