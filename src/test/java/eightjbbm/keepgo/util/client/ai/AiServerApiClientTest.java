@@ -41,13 +41,13 @@ class AiServerApiClientTest {
     }
 
     @Test
-    @DisplayName("예열은 POST /v3/warmip을 호출하고 warmup_accepted 응답을 해석한다")
+    @DisplayName("예열은 POST /v3/warmup을 호출하고 warmup_accepted 응답을 해석한다")
     void warmUpCallsPathAndReadsMessage() throws Exception {
         var client = serve(200, "{\"message\":\"warmup_accepted\",\"data\":null}");
 
         var response = client.warmUp();
 
-        assertThat(requestLine.get()).isEqualTo("POST /v3/warmip");
+        assertThat(requestLine.get()).isEqualTo("POST /v3/warmup");
         assertThat(response.message()).isEqualTo("warmup_accepted");
         assertThat(response.data()).isNull();
     }

@@ -86,7 +86,7 @@ public class AiServerApiClient {
     }
 
     public WarmUpChatbotResponse warmUp() {
-        return aiServerRestClient.post().uri("/v3/warmip").retrieve().body(WarmUpChatbotResponse.class);
+        return aiServerRestClient.post().uri("/v3/warmup").retrieve().body(WarmUpChatbotResponse.class);
     }
 
     public GetAiVersionResponse version() {
