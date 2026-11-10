@@ -16,7 +16,7 @@
 
 ## 채팅 전송
 
-v1은 202와 Location을 반환하고 별도 API로 응답을 폴링한다. v2는 같은 기능의 결과를 SSE 이벤트로 전달한다. 각 버전의 요청·응답은 아래 계약을 따른다.
+v1은 202와 Location을 반환하고 별도 API로 응답을 폴링한다. v2는 같은 기능의 결과를 SSE 이벤트로 전달한다. v3는 v2의 이벤트에 AI 응답 조각(`chat-reply.delta`)과 오류 구분(`chat-reply.bad-gateway`)을 더한다. 각 버전의 요청·응답은 아래 계약을 따른다.
 
 다른 버전 탭에는 이 항목이 미기재되어 있다. 지원 중단으로 판단하지 않는다.
 
@@ -238,6 +238,93 @@ data: {
     "categories": List<String>
   }
 }
+```
+
+<a id="backend-v3-chat-stream"></a>
+
+### v3 — FE - BE (v3), 시트 미반영(#354)
+
+시트에 행이 없다. 이슈 #354의 결정으로 추가한 계약이며 시트 반영은 별도 확인이 필요하다. v2는 바뀌지 않는다.
+
+**API 엔드포인트 이름**
+
+```text
+채팅 전송 API (스트리밍, delta 중계)
+```
+
+**API 엔드포인트 주소**
+
+```text
+POST /api/v3/member/chat-messages
+```
+
+**요청 본문**
+
+```text
+{
+  "content": String
+}
+```
+
+**응답 코드**
+
+```text
+200
+(스트림이 시작된 뒤)
+```
+
+**응답 본문**
+
+```text
+event: chat-reply.accepted
+id: 123
+data: {"chat": {"content": String, "is_by_bot": false}}
+
+event: chat-reply.delta
+id: 123
+data: {"text": String}
+
+event: chat-reply.success
+id: 123
+data: {
+  "chat": {"content": String, "is_by_bot": true},
+  "slot": {v2 chat-reply.success의 slot과 같다}
+}
+
+event: chat-reply.service-unavailable
+id: 123
+data: ProblemDetail (503)
+
+event: chat-reply.bad-gateway
+id: 123
+data: ProblemDetail (502, AI_LLM_* code)
+```
+
+**항목 설명**
+
+```text
+delta: AI 응답 조각. 누적은 FE가 한다. 최종 문장은 chat-reply.success의 chat.content에 다시 담긴다.
+스트림 시작 전 실패: AI 서버가 스트림을 시작하기 전(연결 실패, HTTP 오류)에 실패하면 SSE를 열지 않고 일반 HTTP 오류(502 또는 503)로 응답한다.
+스트림 중 실패: AI error 이벤트나 done 없는 끊김은 chat-reply.service-unavailable(503) 또는 chat-reply.bad-gateway(502, LLM 오류)로 보낸다. 이미 보낸 delta는 FE가 버리거나 실패로 표시한다.
+저장: AI가 done을 보낸 경우에만 나들이 조건과 봇 채팅을 저장한다. 부분 응답은 저장하지 않는다. FE 연결이 끊겨도 AI 스트림을 끝까지 받아 done이면 저장한다.
+첫 AI 이벤트가 오기 전까지 응답 헤더가 지연될 수 있다.
+```
+
+**발생할 수 있는 오류 코드**
+
+```text
+400
+401(Access Token 만료)
+409
+422
+502
+503
+```
+
+**외부 통신**
+
+```text
+AI 서버 (/v3/extract/stream)
 ```
 
 <a id="criteria"></a>
@@ -683,3 +770,5 @@ DELETE /api/v1/user/chat-messages
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
 | [v1 11행](chat.md#backend-v1-row-11) | 지역 변동 시 200 및 user_location_name 객체 | [ChatController](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatController.java)는 지역명이 있으면 String 본문, 없으면 204. 시트의 객체 형태와 다르다. |
+| [v3 채팅 전송](chat.md#backend-v3-chat-stream) | 시트에 없음. #354에서 추가 | [ChatControllerV3](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatControllerV3.java)가 `/api/v3/member/chat-messages`를 제공한다. 스트림 시작 전 AI 오류는 HTTP 오류로, 스트림 중 오류는 `chat-reply.service-unavailable`/`chat-reply.bad-gateway` 이벤트로 응답한다. v2 이벤트·오류(`service-unavailable`)는 그대로다. |
+| [v2 채팅 전송](chat.md#backend-v2-row-8) | `chat-reply.success`와 `service-unavailable` | AI 호출만 /v3/extract/stream 수신으로 바뀌었다. delta는 중계하지 않고, AI의 모든 실패를 `chat-reply.service-unavailable`로 보낸다. |
