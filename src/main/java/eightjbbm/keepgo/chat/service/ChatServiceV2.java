@@ -101,7 +101,7 @@ public class ChatServiceV2 {
         try {
             connection.send("accepted", Map.of("chat", new ChatPayload(chat.getContent(), false)));
 
-            var data = aiServerService.extractSlot(command.content(), criteria, text -> {
+            ExtractSlotResponseV2 data = aiServerService.extractSlot(command.content(), criteria, text -> {
                 connection.started();
                 if (v3) {
                     connection.send("delta", Map.of("text", text));
