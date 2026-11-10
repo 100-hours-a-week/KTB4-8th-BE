@@ -5,11 +5,16 @@ import java.time.LocalTime;
 import java.util.List;
 
 public interface RecommendCoursesResponseV2 {
-    record Success(String message, SuccessData data) implements RecommendCoursesResponseV2 {}
+    /// `done` 이벤트 본문. `message`로 업무 결과를 판정한다.
+    record Success(String message, @Nullable SuccessData data) implements RecommendCoursesResponseV2 {}
 
-    record SuccessData(Object error, @Nullable Integer matchScore, List<Course> courses) {}
+    record SuccessData(@Nullable String error, @Nullable List<Course> courses) {}
 
-    record Course(String title, List<Place> places, Integer totalDurationMinutes) {}
+    record Course(
+            String title,
+            List<Place> places,
+            Integer totalDurationMinutes,
+            @Nullable Integer matchScore) {}
 
     record Place(
             String placeId,
@@ -18,6 +23,4 @@ public interface RecommendCoursesResponseV2 {
             LocalTime arrivalTime,
             Integer stayMinutes,
             String reason) {}
-
-    record Failure(String message, Object data) implements RecommendCoursesResponseV2 {}
 }

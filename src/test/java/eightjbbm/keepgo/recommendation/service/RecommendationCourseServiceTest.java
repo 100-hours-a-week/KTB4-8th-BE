@@ -74,6 +74,21 @@ class RecommendationCourseServiceTest {
         verify(stopRepository, never()).saveAll(any());
     }
 
+    @Test
+    @DisplayName("일치도는 코스마다 읽고 없으면 기본값을 쓴다")
+    void readsMatchScorePerCourse() {
+        var first = guide(1L);
+        var second = guide(2L);
+        when(guideRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(first, second));
+        when(courseRepository.save(any(OutingCourse.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var data = new RecommendCoursesResponseV2.SuccessData(
+                null, List.of(course(places("1"), 30, 74), course(places("2"), 30, null)));
+
+        var courses = service.saveCourses(criteria(), data);
+
+        assertThat(courses).extracting(OutingCourse::getRecommendationScore).containsExactly(74, 85);
+    }
+
     private List<OutingStop> capturedStops() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Iterable<OutingStop>> captor = ArgumentCaptor.forClass(Iterable.class);
@@ -94,11 +109,16 @@ class RecommendationCourseServiceTest {
     }
 
     private RecommendCoursesResponseV2.SuccessData data(RecommendCoursesResponseV2.Course course) {
-        return new RecommendCoursesResponseV2.SuccessData(null, 85, List.of(course));
+        return new RecommendCoursesResponseV2.SuccessData(null, List.of(course));
     }
 
     private RecommendCoursesResponseV2.Course course(List<RecommendCoursesResponseV2.Place> places, int minutes) {
-        return new RecommendCoursesResponseV2.Course("코스", places, minutes);
+        return course(places, minutes, 85);
+    }
+
+    private RecommendCoursesResponseV2.Course course(
+            List<RecommendCoursesResponseV2.Place> places, int minutes, Integer matchScore) {
+        return new RecommendCoursesResponseV2.Course("코스", places, minutes, matchScore);
     }
 
     private List<RecommendCoursesResponseV2.Place> places(String... placeIds) {
