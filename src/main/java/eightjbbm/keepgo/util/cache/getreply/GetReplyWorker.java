@@ -1,11 +1,11 @@
 package eightjbbm.keepgo.util.cache.getreply;
 
 import eightjbbm.keepgo.chat.service.AiServerExtractSlotApiService;
-import eightjbbm.keepgo.chat.service.dto.ExtractSlotResponseV2;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
+import eightjbbm.keepgo.util.client.ai.sse.AiStreamException;
 import eightjbbm.keepgo.util.dto.ExtractSlotRequest;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -21,20 +21,29 @@ public class GetReplyWorker {
 
     @Async("httpTaskExecutor")
     public CompletableFuture<Void> requestGetReply(Long memberId, ExtractSlotRequest request) {
-        ExtractSlotResponseV2 response = aiServerApiClient.extractSlot(request.chat(), request.outingCriteria());
-        if (response instanceof ExtractSlotResponseV2.Success successResponse) {
-            getReplyCacheRepository.update(memberId, successResponse.data().botMessage());
+        try {
+            var data = aiServerApiClient.extractSlot(request.chat(), request.outingCriteria(), text -> {});
+            if (data.slot() == null || data.botMessage() == null) {
+                getReplyCacheRepository.setStatusAsFail(memberId);
+                return CompletableFuture.completedFuture(null);
+            }
+            var slot = data.slot();
+            getReplyCacheRepository.update(memberId, data.botMessage());
             OutingCriteria outingCriteria = outingCriteriaRepository
                     .findById(memberId)
                     .orElse(OutingCriteria.emptyOutingCriteriaWithMemberId(memberId));
             outingCriteriaRepository.save(outingCriteria.update(
-                    successResponse.data().slot().origin(),
-                    successResponse.data().slot().region(),
-                    successResponse.data().slot().datetime().toInstant(ZoneOffset.of("Asia/Seoul")),
-                    Integer.valueOf(successResponse.data().slot().availableTime()),
-                    successResponse.data().slot().category(),
-                    successResponse.data().query()));
-        } else {
+                    slot.origin(),
+                    slot.region(),
+                    slot.datetime() == null
+                            ? null
+                            : slot.datetime().atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+                    slot.availableTime() == null
+                            ? null
+                            : Integer.valueOf(slot.availableTime().trim()),
+                    slot.category(),
+                    data.query()));
+        } catch (AiStreamException error) {
             getReplyCacheRepository.setStatusAsFail(memberId);
         }
         return CompletableFuture.completedFuture(null);

@@ -11,6 +11,7 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.client.ai.sse.AiStreamException;
 import eightjbbm.keepgo.util.exception.BadRequestException;
 import eightjbbm.keepgo.util.exception.NotFoundException;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
@@ -19,6 +20,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -38,7 +41,17 @@ public class ChatServiceV2 {
     private final MemberRepository memberRepository;
     private final ChatRequestGuard requestGuard;
 
+    /// v2: AI의 모든 실패를 `service-unavailable` 이벤트로 전달한다.
     public SseEmitter sendChatMessage(SendChatMessageCommandV2 command) {
+        return start(command, false);
+    }
+
+    /// v3: `delta`를 중계하고, AI 스트림이 시작되기 전 실패는 SSE를 열지 않고 예외(HTTP 오류)로 던진다.
+    public SseEmitter streamChatMessage(SendChatMessageCommandV2 command) {
+        return start(command, true);
+    }
+
+    private SseEmitter start(SendChatMessageCommandV2 command, boolean v3) {
         if (command.memberId() == null
                 || command.content() == null
                 || command.content().isBlank()) {
@@ -57,7 +70,11 @@ public class ChatServiceV2 {
             var chat = chatRepository.save(Chat.from(member, command.content()));
             var connection = new ChatConnection(chat.getId().toString());
 
-            Thread.startVirtualThread(() -> reply(command, member, criteria, chat, connection, lease));
+            Thread.startVirtualThread(() -> reply(command, member, criteria, chat, connection, lease, v3));
+
+            if (v3) {
+                connection.awaitStart();
+            }
 
             return connection.emitter;
         } catch (RuntimeException | Error error) {
@@ -76,23 +93,25 @@ public class ChatServiceV2 {
             OutingCriteria criteria,
             Chat chat,
             ChatConnection connection,
-            ChatRequestGuard.Lease lease) {
+            ChatRequestGuard.Lease lease,
+            boolean v3) {
         String event = "service-unavailable";
         Object payload = unavailable();
 
         try {
             connection.send("accepted", Map.of("chat", new ChatPayload(chat.getContent(), false)));
 
-            var response = aiServerService.extractSlot(command.content(), criteria);
+            var data = aiServerService.extractSlot(command.content(), criteria, text -> {
+                connection.started();
+                if (v3) {
+                    connection.send("delta", Map.of("text", text));
+                }
+            });
 
-            if (!(response instanceof ExtractSlotResponseV2.Success success)
-                    || success.data() == null
-                    || success.data().slot() == null
-                    || success.data().botMessage() == null) {
+            if (data == null || data.slot() == null || data.botMessage() == null) {
                 throw new ServiceUnavailableException();
             }
 
-            var data = success.data();
             var updated = updateCriteria(criteria, data);
 
             var successPayload =
@@ -103,9 +122,23 @@ public class ChatServiceV2 {
 
             payload = successPayload;
             event = "success";
+        } catch (AiStreamException error) {
+            // 실패 원인은 AiSseClient가 이미 ERROR로 남겼다.
+            log.warn("채팅 AI 호출 실패: memberId={}, phase={}", command.memberId(), error.phase());
+
+            if (v3) {
+                if (error.phase() == AiStreamException.Phase.BEFORE_STREAM) {
+                    connection.failBeforeStream(error);
+                } else if (error.error().getStatusCode().isSameCodeAs(HttpStatus.BAD_GATEWAY)) {
+                    event = "bad-gateway";
+                    payload = error.error().getBody();
+                }
+            }
         } catch (RuntimeException error) {
             log.warn("채팅 처리 실패: memberId={}", command.memberId(), error);
         } finally {
+            connection.started();
+
             try {
                 lease.close();
             } catch (RuntimeException error) {
@@ -123,7 +156,7 @@ public class ChatServiceV2 {
         return ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
-    private OutingCriteria updateCriteria(OutingCriteria previous, ExtractSlotResponseV2.SuccessData data) {
+    private OutingCriteria updateCriteria(OutingCriteria previous, ExtractSlotResponseV2 data) {
         var slot = data.slot();
 
         // AI availableTime은 분 단위 숫자 문자열이라는 전제입니다.
@@ -154,6 +187,7 @@ public class ChatServiceV2 {
         final SseEmitter emitter = new SseEmitter(180_000L);
 
         private final String eventId;
+        private final CompletableFuture<Void> started = new CompletableFuture<>();
         private boolean closed;
 
         ChatConnection(String eventId) {
@@ -162,6 +196,25 @@ public class ChatServiceV2 {
             emitter.onCompletion(this::close);
             emitter.onError(error -> close());
             emitter.onTimeout(this::fail);
+        }
+
+        void started() {
+            started.complete(null);
+        }
+
+        void failBeforeStream(AiStreamException error) {
+            started.completeExceptionally(error);
+        }
+
+        /// 첫 `delta`나 종료까지 기다린다. 스트림 시작 전 실패면 그 예외를 던져 SSE 대신 HTTP 오류로 응답하게 한다.
+        void awaitStart() {
+            try {
+                started.get();
+            } catch (ExecutionException error) {
+                throw (AiStreamException) error.getCause();
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         synchronized void send(String event, Object data) {
