@@ -62,6 +62,8 @@ public abstract class MySqlIntegrationTestSupport {
         registry.add("keepgo.security.jwt.public-key", () -> PUBLIC_KEY.toUri().toString());
         registry.add(
                 "keepgo.security.jwt.private-key", () -> PRIVATE_KEY.toUri().toString());
+        registry.add("spring.security.oauth2.client.registration.google.client-id", () -> "integration-test");
+        registry.add("spring.security.oauth2.client.registration.google.client-secret", () -> "integration-test");
         registry.add("spring.security.oauth2.client.registration.google-login.client-id", () -> "integration-test");
         registry.add("spring.security.oauth2.client.registration.google-login.client-secret", () -> "integration-test");
         registry.add("logging.level.root", () -> "WARN");
