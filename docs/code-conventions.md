@@ -173,4 +173,3 @@ class OutingWishlistServiceTest {
 | 시간 필드 | `OutingCourse`, `VideoAnalysis`, `MemberLikedVideo`, `OutingWishlistEntry`가 `createDatetime`/`deleteDatetime`을 쓴다. |
 | 테스트 | 한국어 snake_case 메서드 이름, `@DisplayName` 누락, JUnit `assertEquals` 사용이 섞여 있다. `GoogleApiClientUnitTests.test1` |
 | 설정값 | `OutingCriteriaProperties`에 `keepgo.*` 접두사가 없다. |
-| 로깅·주석 | `MemberService`에 `toString()` 로깅과 주석 처리된 코드가 있다. |

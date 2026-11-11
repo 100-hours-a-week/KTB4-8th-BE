@@ -43,48 +43,6 @@ public class AiServerApiClient {
                 .body(Void.class);
     }
 
-    public ExtractSlotResponse extractSlot(ExtractSlotRequest request) {
-        var response = aiServerRestClient
-                .post()
-                .uri("/v1/extract")
-                .body(request)
-                .exchange((_, res) -> {
-                    log.info(res.getStatusCode().toString());
-                    int status = res.getStatusCode().value();
-
-                    return switch (status) {
-                        case 200 -> res.bodyTo(ExtractSlotResponse.Success.class);
-                        case 400, 422, 429, 500, 502, 504 -> res.bodyTo(ExtractSlotResponse.Error.class);
-                        default -> {
-                            throw new IllegalStateException("처리하지 못한 응답 코드: " + status);
-                        }
-                    };
-                });
-        log.info(response.toString());
-        return response;
-    }
-
-    public AnalyzeVideoResponse analyzeVideo(AnalyzeVideoRequest request) {
-        var response = aiServerRestClient
-                .post()
-                .uri("/v1/analyze-video")
-                .body(request)
-                .exchange((_, res) -> {
-                    log.info(res.getStatusCode().toString());
-                    int status = res.getStatusCode().value();
-
-                    return switch (status) {
-                        case 200 -> res.bodyTo(AnalyzeVideoResponse.Success.class);
-                        case 400, 422, 429, 500, 502, 504 -> res.bodyTo(AnalyzeVideoResponse.Error.class);
-                        default -> {
-                            throw new IllegalStateException("처리하지 못한 응답 코드: " + status);
-                        }
-                    };
-                });
-        log.info(response.toString());
-        return response;
-    }
-
     /// 분석용 읽기 제한(analysisTimeout)을 공유한다.
     public WarmUpChatbotResponse warmUp() {
         return aiServerRestClient.post().uri("/v3/warmup").retrieve().body(WarmUpChatbotResponse.class);

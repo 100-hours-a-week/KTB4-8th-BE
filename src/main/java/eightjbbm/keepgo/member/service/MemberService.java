@@ -5,11 +5,6 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
-import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
-import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
-import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
-import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.file.FileUtil;
@@ -26,11 +21,7 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
     private final OAuthAccountRepository oAuthAccountRepository;
-    private final OutingPlaceRepository outingPlaceRepository;
-    private final OutingEventRepository outingEventRepository;
-    private final OutingWishlist outingWishlist;
     private final GoogleApiClient googleApiClient;
-    private final AiServerApiClient aiServerApiClient;
     private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     /// 회원 정보 수정 API
@@ -74,46 +65,6 @@ public class MemberService {
         }
         String oAuth2AccessToken = client.getAccessToken().getTokenValue();
         var likedVideos = googleApiClient.getLikedVideos(oAuth2AccessToken);
-        log.info(likedVideos.toString());
-        likedVideos.items().stream().map(GetLikedVideosResponse.Item::id).forEach(url -> {
-            /*
-            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
-            if (response instanceof AnalyzeVideoResponseV2.Success successResponse) {
-                OutingGuide guide;
-                if (isPlaceOrEvent(successResponse.data())) {
-                    guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
-                            () -> outingPlaceRepository.save(new OutingPlace(
-                                    successResponse.getCategory(),
-                                    successResponse.getName(),
-                                    successResponse.getSummary(),
-                                    null,
-                                    null,
-                                    null
-                            ))
-                    );
-                } else {
-                    guide = outingEventRepository.findByName(successResponse.getName()).orElseGet(
-                            () -> outingEventRepository.save(new OutingEvent(
-                                    successResponse.getCategory(),
-                                    successResponse.getName(),
-                                    successResponse.getSummary(),
-                                    null, //successResponse.data().eventStartDate(),
-                                    null, //successResponse.data().eventEndDate(),
-                                    null,
-                                    null,
-                                    null
-                            ))
-                    );
-                }
-                outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
-            }
-
-             */
-
-        });
-    }
-
-    private boolean isPlaceOrEvent(String category) {
-        return category.equals("팝업") || category.equals("전시");
+        log.info("좋아요한 동영상 조회: count={}", likedVideos.items().size());
     }
 }
