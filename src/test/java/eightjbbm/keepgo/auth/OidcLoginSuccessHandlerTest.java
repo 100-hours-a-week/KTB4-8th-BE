@@ -24,6 +24,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @DisplayName("OIDC 로그인 성공 핸들러")
@@ -58,13 +59,13 @@ class OidcLoginSuccessHandlerTest {
         when(memberRepository.save(any())).thenReturn(member);
         when(oAuthAccountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = login("http://localhost:3000");
+        MockHttpServletResponse response = login("http://localhost:3000");
 
-        var location =
+        UriComponents location =
                 UriComponentsBuilder.fromUriString(response.getRedirectedUrl()).build();
         assertThat(location.getQuery()).isNull();
         assertThat(location.getPath()).isNullOrEmpty();
-        assertThat(fragment(location.getFragment()))
+        assertThat(parseFragment(location.getFragment()))
                 .containsEntry("accessToken", ACCESS_TOKEN)
                 .containsEntry("expiresIn", "1800")
                 .containsEntry("initialLogin", "true");
@@ -76,14 +77,13 @@ class OidcLoginSuccessHandlerTest {
         when(oAuthAccountRepository.findByIssuerAndSubject(any(), any()))
                 .thenReturn(Optional.of(OAuthAccount.create(member, "a@b.c", "https://accounts.google.com", "s", "n")));
 
-        var response = login("http://localhost:3000/login/callback?from=home#stale");
+        MockHttpServletResponse response = login("http://localhost:3000/login/callback?from=home#stale");
 
-        var location =
+        UriComponents location =
                 UriComponentsBuilder.fromUriString(response.getRedirectedUrl()).build();
         assertThat(location.getPath()).isEqualTo("/login/callback");
         assertThat(location.getQuery()).isEqualTo("from=home");
-        assertThat(response.getRedirectedUrl()).doesNotContain("?accessToken").doesNotContain("&accessToken");
-        assertThat(fragment(location.getFragment()))
+        assertThat(parseFragment(location.getFragment()))
                 .containsEntry("accessToken", ACCESS_TOKEN)
                 .containsEntry("expiresIn", "1800")
                 .containsEntry("initialLogin", "false");
@@ -96,7 +96,7 @@ class OidcLoginSuccessHandlerTest {
         when(oAuthAccountRepository.findByIssuerAndSubject(any(), any()))
                 .thenReturn(Optional.of(OAuthAccount.create(member, "a@b.c", "https://accounts.google.com", "s", "n")));
 
-        var response = login("http://localhost:3000");
+        MockHttpServletResponse response = login("http://localhost:3000");
 
         assertThat(response.getHeader(HttpHeaders.SET_COOKIE))
                 .contains("refresh-token=refresh-token")
@@ -120,7 +120,7 @@ class OidcLoginSuccessHandlerTest {
         return response;
     }
 
-    private static Map<String, String> fragment(String fragment) {
+    private static Map<String, String> parseFragment(String fragment) {
         return UriComponentsBuilder.fromUri(URI.create("?" + fragment))
                 .build()
                 .getQueryParams()
