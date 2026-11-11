@@ -77,9 +77,9 @@ class ChatContentValidationTest {
     }
 
     @Test
-    @DisplayName("V1은 256자 content를 400으로 거부하고 서비스를 호출하지 않음")
+    @DisplayName("V1은 256자 content를 422로 거부하고 서비스를 호출하지 않음")
     void v1RejectsTooLongContent() throws Exception {
-        send("/api/v1/user/chat-messages", TOO_LONG_CONTENT).andExpect(status().isBadRequest());
+        send("/api/v1/user/chat-messages", TOO_LONG_CONTENT).andExpect(status().isUnprocessableContent());
 
         verifyNoInteractions(chatService);
     }
@@ -91,18 +91,18 @@ class ChatContentValidationTest {
     }
 
     @Test
-    @DisplayName("V2는 256자 content를 400으로 거부하고 서비스를 호출하지 않음")
+    @DisplayName("V2는 256자 content를 422로 거부하고 서비스를 호출하지 않음")
     void v2RejectsTooLongContent() throws Exception {
-        send("/api/v2/member/chat-messages", TOO_LONG_CONTENT).andExpect(status().isBadRequest());
+        send("/api/v2/member/chat-messages", TOO_LONG_CONTENT).andExpect(status().isUnprocessableContent());
 
         verifyNoInteractions(chatServiceV2);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
-    @DisplayName("V2는 빈 content와 공백 content를 400으로 거부함")
+    @DisplayName("V2는 빈 content와 공백 content를 422로 거부함")
     void v2RejectsBlankContent(String content) throws Exception {
-        send("/api/v2/member/chat-messages", content).andExpect(status().isBadRequest());
+        send("/api/v2/member/chat-messages", content).andExpect(status().isUnprocessableContent());
 
         verifyNoInteractions(chatServiceV2);
     }
