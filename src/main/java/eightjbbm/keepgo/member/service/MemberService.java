@@ -68,6 +68,6 @@ public class MemberService {
         }
         String oAuth2AccessToken = client.getAccessToken().getTokenValue();
         var likedVideos = googleApiClient.getLikedVideos(oAuth2AccessToken);
-        log.info(likedVideos.toString());
+        log.info("좋아요한 동영상 조회: count={}", likedVideos.items().size());
     }
 }
