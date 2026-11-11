@@ -33,8 +33,8 @@ class RequestRecommendationResponseTest {
                         "100",
                         25,
                         List.of(
-                                new RecommendationDetailItem(0, "카페 A", "카페", "15", 37.5f, 127.0f),
-                                new RecommendationDetailItem(1, "전시 B", "전시", "10", 37.6f, 127.1f)))));
+                                new RecommendationDetailItem(1, "카페 A", "카페", "카페 설명", 37.5f, 127.0f),
+                                new RecommendationDetailItem(2, "전시 B", "전시", "전시 설명", 37.6f, 127.1f)))));
 
         JsonNode json = MAPPER.valueToTree(RequestRecommendationResponse.from(result));
 
@@ -46,7 +46,7 @@ class RequestRecommendationResponseTest {
         assertThat(detail.get("total_travel_time").asInt()).isEqualTo(25);
         assertThat(detail.get("items")).hasSize(2);
         assertThat(detail.get("items").get(0).get("name").asString()).isEqualTo("카페 A");
-        assertThat(detail.get("items").get(0).get("description").asString()).isEqualTo("15");
+        assertThat(detail.get("items").get(0).get("description").asString()).isEqualTo("카페 설명");
         assertThat(json.get("snippets").get(0).get("total_place_count").asInt()).isEqualTo(2);
     }
 
