@@ -23,6 +23,8 @@ import org.mapstruct.factory.Mappers;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -33,13 +35,13 @@ class ChatControllerMappingTest {
     @Test
     @DisplayName("전송과 응답 조회 핸들러는 제거된다")
     void removedHandlersAreNotMapped() throws Exception {
-        var mvc = standaloneSetup(new ChatController(mock(ChatService.class), Mappers.getMapper(ChatMapper.class)))
+        MockMvc mvc = standaloneSetup(new ChatController(mock(ChatService.class), Mappers.getMapper(ChatMapper.class)))
                 .build();
 
-        var postResult = mvc.perform(post("/api/v1/user/chat-messages"))
+        MvcResult postResult = mvc.perform(post("/api/v1/user/chat-messages"))
                 .andExpect(status().isMethodNotAllowed())
                 .andReturn();
-        var replyResult = mvc.perform(get("/api/v1/user/chat-messages/1/response"))
+        MvcResult replyResult = mvc.perform(get("/api/v1/user/chat-messages/1/response"))
                 .andExpect(status().isNotFound())
                 .andReturn();
         assertThat(postResult.getHandler()).isNull();
@@ -53,7 +55,7 @@ class ChatControllerMappingTest {
         when(service.getChats(any())).thenReturn(GetChatsResult.from(List.of(), false, -1L));
         when(service.updateSlot(any())).thenReturn(new UpdateSlotResult(null));
         var jwt = Jwt.withTokenValue("token").header("alg", "none").subject("7").build();
-        var mvc = standaloneSetup(new ChatController(service, Mappers.getMapper(ChatMapper.class)))
+        MockMvc mvc = standaloneSetup(new ChatController(service, Mappers.getMapper(ChatMapper.class)))
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
