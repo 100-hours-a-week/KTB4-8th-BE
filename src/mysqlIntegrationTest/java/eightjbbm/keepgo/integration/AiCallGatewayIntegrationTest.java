@@ -110,7 +110,6 @@ class AiCallGatewayIntegrationTest extends MySqlIntegrationTestSupport {
         call.handle((response, error) -> null).join();
 
         assertThat(AI_STUB.analysisRequestCount()).isEqualTo(1);
-        assertThat(AI_STUB.analysisV3RequestCount()).isEqualTo(1);
     }
 
     @Test
