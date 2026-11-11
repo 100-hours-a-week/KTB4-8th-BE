@@ -116,5 +116,5 @@ var member = memberRepository.findById(id).orElseThrow(MemberNotFoundException::
 | 3단계 구조 | base 클래스와 `messageSource` 연결이 없다. `util/exception`의 상태 코드별 예외가 `ErrorResponseException`을 직접 상속하고 `ProblemDetail.forStatus(...)`를 쓴다. `code` 필드가 없다. |
 | 기능별 예외 | `outingwishlist/common`에만 있다. |
 | 던지지 않는 예외 | `IllegalArgumentException`, `ResponseStatusException`, `RuntimeException`이 여러 곳에서 쓰인다. `MemberService`에 인자 없는 `orElseThrow()`가 있다. |
-| 422 처리 | `GlobalExceptionHandler`가 `MethodArgumentNotValidException` 처리기 안에서 `UnprocessableContentException`을 다시 던진다. `HandlerMethodValidationException` 처리가 없다. |
+| 422 처리 | `GlobalExceptionHandler`가 `MethodArgumentNotValidException` 처리기가 `errors[]` 없는 422만 반환한다. `HandlerMethodValidationException` 처리가 없다. |
 | 전역 처리기 | 비어 있는 `BasicExceptionHandler`가 `GlobalExceptionHandler`와 함께 있다. 정리는 별도 PR로 한다. |
