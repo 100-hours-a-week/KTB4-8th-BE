@@ -111,6 +111,25 @@ Refresh Token은 쿠키로 전달
 RT 해시
 ```
 
+<a id="login-redirect"></a>
+
+### 로그인 성공 리다이렉트 (Fragment 계약)
+
+원본 시트에 없는 항목이며 [OidcLoginSuccessHandler](../../../src/main/java/eightjbbm/keepgo/auth/OidcLoginSuccessHandler.java) 구현을 기준으로 한다.
+
+Google OIDC 인증이 성공하면 백엔드는 `keepgo.security.redirection-address`(환경 변수 `FRONTEND_SERVER_ADDRESS`)로 리다이렉트하며, Access Token은 쿼리가 아닌 Fragment로 전달한다.
+
+```text
+{redirection-address}#accessToken=<JWT>&expiresIn=1800&initialLogin=<true|false>
+```
+
+- 목적지의 경로와 기존 쿼리는 보존한다. 목적지에 이미 Fragment가 있으면 위 값으로 대체한다.
+- Access Token을 쿼리에 함께 싣지 않는다. Refresh Token은 기존대로 `HttpOnly`, `Secure`, `SameSite=Lax`, Path `/api/v1/user/auth-session` 쿠키로 전달한다.
+- 프론트엔드는 Fragment에서 세 필드를 파싱하고, 토큰을 읽은 직후 `history.replaceState`로 Fragment를 제거해야 한다.
+- 이전 계약(`?accessToken=...&expiresIn=...&initialLogin=...`)에서 바뀐 호환성 변경이다. 프론트엔드가 새 계약을 처리하는지 확인한 뒤 백엔드를 배포한다.
+
+남는 위험: Fragment는 HTTP 요청 URL과 `Referer` 헤더에는 실리지 않아 요청 로그와 외부 전송 노출을 줄이지만, 방문 기록이나 주소창에 남을 수 있고 페이지 JavaScript와 권한 있는 확장 프로그램이 읽을 수 있다. 백엔드의 `Location` 응답 헤더에는 토큰이 포함되므로 이 헤더를 수집하는 프록시·로그에도 노출될 수 있다. 일회용 코드 교환 방식은 이번 범위에 포함하지 않는다.
+
 <a id="logout"></a>
 
 ## 로그아웃
