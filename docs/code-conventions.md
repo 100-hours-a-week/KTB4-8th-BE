@@ -166,7 +166,7 @@ class OutingWishlistServiceTest {
 | 패키지 구조 | `interestextraction`은 엔티티가 `repository` 아래에, Command/Result가 `service` 루트에 있다. `chat`은 `dto`, `controller/dto`, `service/dto`가 함께 있다. `recommendation`은 일부 Response가 기능 루트에 있다. |
 | 공용 코드 위치 | 공용 `Address`가 `sandbox.ds`에, `QuerydslConfig`가 `outingwishlist` 안에 있다. |
 | 버전 접미사 | `ChatControllerV2`, `ChatServiceV2`, `RecommendationControllerV2/V3`, `InterestExtractionControllerV3`, `InterestExtractionServiceV2/V3`, `YoutubeApiServiceV2`와 관련 DTO |
-| MapStruct | `MemberMapper`, `ChatMapper` 등이 `INSTANCE` 싱글턴으로 사용된다. `InterestExtractionMapper`는 싱글턴 이름도 다르다. |
+| MapStruct | `ChatMapper` 등이 `INSTANCE` 싱글턴으로 사용된다. `InterestExtractionMapper`는 싱글턴 이름도 다르다. |
 | 트랜잭션 | `outingwishlist` 외의 조회 메서드에 `readOnly`가 없다. |
 | 엔티티 생성자 | `Member`, `OAuthAccount`, `Chat`, `MemberLikedVideo`, `File`, `OutingGuide`, `OutingPlace`, `OutingEvent`가 public 기본 생성자를 쓴다. |
 | fetch 전략 | `Member.profileImage`가 기본값 EAGER인 `@OneToOne`이다. |

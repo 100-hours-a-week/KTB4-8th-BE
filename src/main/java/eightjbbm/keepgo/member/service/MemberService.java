@@ -39,11 +39,14 @@ public class MemberService {
     @Transactional
     public UpdateMemberInfoResult updateMemberInfo(UpdateMemberInfoCommand command) {
         Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        member.updateNickname(command.nickname());
+        if (command.nickname() != null) {
+            member.updateNickname(command.nickname());
+        }
 
         String profileImagePath = FileUtil.extractPathFromUrl(command.profileImagePath());
-
-        fileRepository.findByStoragePath(profileImagePath).ifPresent(member::updateProfileImage);
+        if (profileImagePath != null) {
+            fileRepository.findByStoragePath(profileImagePath).ifPresent(member::updateProfileImage);
+        }
         return UpdateMemberInfoResult.from(member);
     }
 
