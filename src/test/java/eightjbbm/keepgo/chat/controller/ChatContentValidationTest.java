@@ -51,7 +51,8 @@ class ChatContentValidationTest {
         mvc = standaloneSetup(
                         new ChatController(chatService, Mappers.getMapper(ChatMapper.class)),
                         new ChatControllerV2(chatServiceV2))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(
+                        new GlobalExceptionHandler(new org.springframework.context.support.StaticMessageSource()))
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {

@@ -109,12 +109,17 @@ var member = memberRepository.findById(id).orElseThrow(MemberNotFoundException::
 - 4xx는 `WARN` 이하로 남기고 스택 트레이스는 남기지 않는다.
 - 5xx(500, 502, 503)는 `ERROR`로 남기고 원인 예외(cause)를 함께 남긴다.
 
+## 회원 조회 오류 계약
+
+- 회원 정보 조회 및 수정에서 회원이 없으면 404, MEMBER_NOT_FOUND, /problems/member-not-found, 회원을 찾을 수 없습니다.를 반환한다.
+- 회원은 있지만 OAuth 계정이 없으면 내부 상태 이상으로 IllegalStateException을 던져 500으로 처리한다. 로그인 시 회원 저장 직후 OAuth 계정을 생성하고 계정만 삭제하는 경로는 없다. 두 저장이 하나의 트랜잭션으로 묶이지 않아 실패로 누락될 수 있다.
+
 ## 알려진 예외
 
 | 규칙 | 현재 코드 |
 | --- | --- |
-| 3단계 구조 | base 클래스와 `messageSource` 연결이 없다. `util/exception`의 상태 코드별 예외가 `ErrorResponseException`을 직접 상속하고 `ProblemDetail.forStatus(...)`를 쓴다. `code` 필드가 없다. |
-| 기능별 예외 | `outingwishlist/common`에만 있다. |
-| 던지지 않는 예외 | `IllegalArgumentException`, `ResponseStatusException`, `RuntimeException`이 여러 곳에서 쓰인다. `MemberService`에 인자 없는 `orElseThrow()`가 있다. |
+| 3단계 구조 | 공용 base 클래스는 없다. `NotFoundException`과 `BadGatewayException`은 기능별 code의 메시지 소스를 연결하지만, 나머지 상태 코드별 예외는 `ErrorResponseException`을 직접 상속하며 기능별 code 연결이 없다. |
+| 기능별 예외 | `outingwishlist/common`의 기능별 예외는 메시지 소스 대신 기존 응답을 사용한다. |
+| 던지지 않는 예외 | `IllegalArgumentException`, `ResponseStatusException`, `RuntimeException`이 여러 곳에서 쓰인다. |
 | 422 처리 | `GlobalExceptionHandler`가 `MethodArgumentNotValidException` 처리기가 `errors[]` 없는 422만 반환한다. `HandlerMethodValidationException` 처리가 없다. |
 | 전역 처리기 | 비어 있는 `BasicExceptionHandler`가 `GlobalExceptionHandler`와 함께 있다. 정리는 별도 PR로 한다. |

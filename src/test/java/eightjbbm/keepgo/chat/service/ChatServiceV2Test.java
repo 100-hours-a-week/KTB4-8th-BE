@@ -105,7 +105,8 @@ class ChatServiceV2Test {
                 memberRepository,
                 new ChatRequestGuard(requestStore));
         mvc = standaloneSetup(new TestController(service))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(
+                        new GlobalExceptionHandler(new org.springframework.context.support.StaticMessageSource()))
                 .build();
 
         member = Member.create("테스터");
