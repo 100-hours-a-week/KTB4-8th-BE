@@ -2,7 +2,7 @@
 
 확인일: 2026-11-11 (Asia/Seoul). 기준: [KTB4-8th-AI](https://github.com/100-hours-a-week/KTB4-8th-AI) `develop` 브랜치 `e355d38`(2026-11-10)의 라우트 정의(`app/api/*.py`). 2026-11-11에도 `develop` 최신 커밋이 같음을 확인했다. [전체 목차](../README.md)
 
-시트의 AI(v3) 탭 명세와 AI 저장소의 실제 라우트, BE의 호출 코드를 비교했다. 코드에 라우트가 없으면 미지원으로 적는다. 배포된 서버가 `develop`과 같다는 보장은 없으므로, 배포 환경은 `GET /v3/version`으로 확인한다.
+시트의 AI(v3) 탭 명세와 AI 저장소의 실제 라우트, BE의 호출 코드를 비교했다. 코드에 라우트가 없으면 미지원으로 적는다. 배포된 서버가 `develop`과 같다는 보장은 없으므로, 배포 환경은 AI 서버에 `GET /v3/version`이 구현된 뒤 확인한다.
 
 ## 지원 현황
 
@@ -20,7 +20,7 @@
 ## 정리
 
 - AI 저장소에서 `/v3`로 동작하는 것은 `POST /v3/extract/stream`, `POST /v3/recommend-course/stream` 두 스트리밍 경로뿐이다.
-- 시트가 v3로 적은 `analyze-video`, `embed-places`, `warmup`, `version`은 아직 AI 저장소에 없다. BE는 이미 이 경로를 호출하므로 AI 서버가 지원하기 전에 배포하면 404가 난다. 호출 전환 시점은 AI 팀과 맞춘다.
+- 시트가 v3로 적은 `analyze-video`, `embed-places`, `warmup`, `version`은 아직 AI 저장소에 없다. BE는 `analyze-video`와 `embed-places`를 이미 호출하므로 AI 서버가 지원하기 전에 배포하면 404가 난다. `warmup`과 `version`은 클라이언트 메서드만 있고 호출하는 서비스 코드가 없다. 호출 전환 시점은 AI 팀과 맞춘다.
 - 조건 추출·영상 분석·임베딩 저장은 `/v1` fallback이 없다. AI 서버가 v3 경로를 지원하지 않으면 해당 기능이 실패한다.
 - 코스 추천은 `/api/v1/user/recommendation`만 `/v1/recommend-courses`를 호출한다. 이 호출은 FE가 v1 API를 쓰는 동안 남으며 `RecommendationService`, `AiServerApiClient`, `util/dto/RecommendCourse*`가 함께 남는다. `done` 본문의 `match_score` 위치(코스 단위인지 `data` 단위인지)는 AI 팀의 실제 샘플로 확인한다. [코스 추천 명세](course-recommendation.md)
 - 시트에서 `cancel`과 `embed-places/delete`는 v3 탭에서도 `/v1` 경로다. v3로 옮긴 것이 아니다.
