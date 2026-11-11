@@ -1,8 +1,5 @@
 package eightjbbm.keepgo.recommendation.controller;
 
-import eightjbbm.keepgo.recommendation.RecommendationMapper;
-import eightjbbm.keepgo.recommendation.dto.*;
-import eightjbbm.keepgo.recommendation.service.RecommendationService;
 import eightjbbm.keepgo.util.dto.stub.AdvertisementListResponse;
 import eightjbbm.keepgo.util.dto.stub.UnimplementedResponse;
 import lombok.RequiredArgsConstructor;
@@ -10,8 +7,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/api/v1")
@@ -19,31 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class RecommendationController {
 
-    private final RecommendationService recommendationService;
-    private final RecommendationMapper recommendationMapper;
     private final MessageSource messageSource;
-
-    /// 여정 코스 추천 요청 API
-    /// @param jwt
-    /// @return {@link RequestRecommendationResponse}
-    @PostMapping("/user/recommendation")
-    public ResponseEntity<RequestRecommendationResponse> requestRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        var command = recommendationMapper.toRequestRecommendationCommand(Long.valueOf(jwt.getSubject()));
-
-        return ResponseEntity.status(HttpStatus.OK)
-                .body(RequestRecommendationResponse.from(recommendationService.requestRecommendation(command)));
-    }
-
-    /// 여정 코스 추천 중단 API
-    /// @param jwt
-    @PostMapping("/user/recommendation/cancellation")
-    public ResponseEntity<Void> stopRecommendation(@AuthenticationPrincipal Jwt jwt) {
-        var command = recommendationMapper.toStopRecommendationCommand(Long.valueOf(jwt.getSubject()));
-
-        recommendationService.stopRecommendation(command);
-
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-    }
 
     /// 장소 상세 조회 API
     ///

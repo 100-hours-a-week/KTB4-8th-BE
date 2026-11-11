@@ -19,159 +19,15 @@
 
 ## 코스 추천 요청
 
-v1은 일반 HTTP 응답으로 추천 결과를 반환하고, v2는 SSE로 접수·성공·중단을 전달한다. v3는 v2에 진행 단계(`status`)와 오류 종류별 이벤트를 더한다. 결과 구조와 오류는 각 버전 계약에서 확인한다.
+v1 추천 API는 지원을 종료했으며, v2는 SSE로 접수·성공·중단을 전달한다. v3는 v2에 진행 단계(`status`)와 오류 종류별 이벤트를 더한다. 결과 구조와 오류는 각 버전 계약에서 확인한다.
 
 다른 버전 탭에는 이 항목이 미기재되어 있다. 지원 중단으로 판단하지 않는다.
 
 <a id="backend-v1-row-17"></a>
 
-### v1 — FE - BE, 원본 17행
+### v1 — 지원 종료
 
-[원본 시트](https://docs.google.com/spreadsheets/d/1ui37GlGUVHzM5lS3ZZE8TauRGyU035JWdjBCJ16TUOk/edit?gid=1284625682#gid=1284625682&range=A17)
-
-원본 메타데이터: B1: 최종 수정일 / D1: 260926 1349.
-
-**번호**
-
-```text
-13
-```
-
-**도메인**
-
-```text
-추천
-```
-
-**API 엔드포인트 이름**
-
-```text
-여정 코스 추천 요청
-```
-
-**비고**
-
-```text
-구현 완료
-```
-
-**API 엔드포인트 주소**
-
-```text
-POST /api/v1/user/recommendation
-```
-
-**요청 본문**
-
-```text
-없음
-```
-
-**항목 설명 (G열)**
-
-미기재
-
-**응답 코드 (H열)**
-
-```text
-200
-```
-
-**응답 본문**
-
-```text
-{
-    "metadata": {
-        "total_course_count": Integer,
-        "location": String,
-        "scheduled_time": String
-    },
-    "snippets": [
-        {
-            "title": String,
-            "recommendation_score": String,
-            "total_place_count": Integer,
-            "total_travel_time": Integer
-        },
-        ...
-    ],
-    "details": [
-        {
-            "title": String,
-            "recommendation_score": String,
-            "total_travel_time": Integer
-            "items": [
-                {
-                    "sequence": Integer,
-                    "name": String,
-                    "category": String,
-                    "description": String,
-                    "lat": Float,
-                    "lng": Float
-                },
-                ...
-            ]
-        },
-        ...
-    ]
-}
-```
-
-**항목 설명 (J열)**
-
-```text
-metadata:
-total_course_count:
-location:
-scheduled_time:
-
-snippets: 코스 후보 목록 표시용
-details: 코스 후보 상세 표시용
-
- - snippet, detail 공통 항목
-title:
-recommendation_score: 추천도
-total_travel_time: 총 소요시간
-
- - snippet 고유 항목
-total_place_count:
-
- - detail 고유 항목
-items:
-sequence: 순서
-name:
-category:
-description: ex) "출발지에서 12분 이동"
-lat:
-lng:
-
-```
-
-**발생할 수 있는 오류 코드 (K열)**
-
-```text
-400
-401(Access Token 만료)
-409
-422
-429
-500
-502
-503
-
-```
-
-**외부 통신**
-
-```text
-AI 서버
-```
-
-**캐시**
-
-```text
-추천 요청 작업
-```
+코스 추천 API는 제거되었다. v2 또는 v3 API를 사용한다.
 
 <a id="backend-v2-row-10"></a>
 
@@ -385,88 +241,9 @@ data: {"status": 502, "code": "AI_LLM_TIMEOUT", "type": "/problems/ai-llm-timeou
 
 <a id="backend-v1-row-18"></a>
 
-### v1 — FE - BE, 원본 18행
+### v1 — 지원 종료
 
-[원본 시트](https://docs.google.com/spreadsheets/d/1ui37GlGUVHzM5lS3ZZE8TauRGyU035JWdjBCJ16TUOk/edit?gid=1284625682#gid=1284625682&range=A18)
-
-원본 메타데이터: B1: 최종 수정일 / D1: 260926 1349.
-
-**번호**
-
-```text
-14
-```
-
-**도메인**
-
-```text
-추천
-```
-
-**API 엔드포인트 이름**
-
-```text
-여정 코스 추천 중단
-```
-
-**비고**
-
-```text
-구현 완료
-```
-
-**API 엔드포인트 주소**
-
-```text
-POST /api/v1/user/recommendation/cancellation
-```
-
-**요청 본문**
-
-```text
-없음
-```
-
-**항목 설명 (G열)**
-
-미기재
-
-**응답 코드 (H열)**
-
-```text
-204
-```
-
-**응답 본문**
-
-```text
-없음
-```
-
-**항목 설명 (J열)**
-
-미기재
-
-**발생할 수 있는 오류 코드 (K열)**
-
-```text
-400
-401(Access Token 만료)
-404
-500
-```
-
-**외부 통신**
-
-```text
-AI 서버
-```
-
-**캐시**
-
-```text
-추천 요청 작업
-```
+코스 추천 중단 API는 제거되었다. v2 또는 v3 API를 사용한다.
 
 <a id="backend-v2-row-13"></a>
 

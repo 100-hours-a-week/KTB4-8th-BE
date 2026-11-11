@@ -1,47 +1,17 @@
 package eightjbbm.keepgo.util.client.ai;
 
-import eightjbbm.keepgo.util.dto.*;
+import eightjbbm.keepgo.util.dto.GetAiVersionResponse;
+import eightjbbm.keepgo.util.dto.WarmUpChatbotResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AiServerApiClient {
     @Qualifier("aiServerRestClient")
     private final RestClient aiServerRestClient;
-
-    public RecommendCourseResponse recommendCourse(RecommendCourseRequest request) {
-        var response = aiServerRestClient
-                .post()
-                .uri("/v1/recommend-courses")
-                .body(request)
-                .exchange((_, res) -> {
-                    log.info(res.getStatusCode().toString());
-                    int status = res.getStatusCode().value();
-
-                    return switch (status) {
-                        case 200 -> res.bodyTo(RecommendCourseResponse.Success.class);
-                        case 400, 422, 429, 500, 502, 504 -> res.bodyTo(RecommendCourseResponse.Error.class);
-                        default -> {
-                            throw new IllegalStateException("처리하지 못한 응답 코드: " + status);
-                        }
-                    };
-                });
-        log.info(response.toString());
-        return response;
-    }
-
-    public void stopRecommendation(Long jobId) {
-        aiServerRestClient
-                .post()
-                .uri("/v1/recommend-courses/{jobId}/cancel", jobId)
-                .retrieve()
-                .body(Void.class);
-    }
 
     /// 분석용 읽기 제한(analysisTimeout)을 공유한다.
     public WarmUpChatbotResponse warmUp() {
