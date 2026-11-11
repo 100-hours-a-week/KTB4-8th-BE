@@ -3,6 +3,7 @@ package eightjbbm.keepgo.member.controller;
 import eightjbbm.keepgo.member.MemberMapper;
 import eightjbbm.keepgo.member.dto.*;
 import eightjbbm.keepgo.member.service.MemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,7 @@ public class MemberController {
     /// @return {@link UpdateMemberInfoResponse}
     @PatchMapping
     public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(
-            @AuthenticationPrincipal Jwt jwt, @RequestBody UpdateMemberInfoRequest request) {
+            @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid UpdateMemberInfoRequest request) {
         var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(Long.valueOf(jwt.getSubject()), request);
 
         return ResponseEntity.status(HttpStatus.OK)
