@@ -1,8 +1,12 @@
 package eightjbbm.keepgo.member.service;
 
-import eightjbbm.keepgo.member.dto.*;
+import eightjbbm.keepgo.member.dto.GetMemberInfoCommand;
+import eightjbbm.keepgo.member.dto.GetMemberInfoResult;
+import eightjbbm.keepgo.member.dto.UpdateMemberInfoCommand;
+import eightjbbm.keepgo.member.dto.UpdateMemberInfoResult;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
+import eightjbbm.keepgo.member.exception.MemberNotFoundException;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.util.file.FileRepository;
@@ -23,7 +27,7 @@ public class MemberService {
     /// @return {@link UpdateMemberInfoResult}
     @Transactional
     public UpdateMemberInfoResult updateMemberInfo(UpdateMemberInfoCommand command) {
-        Member member = memberRepository.findById(command.memberId()).orElseThrow();
+        Member member = memberRepository.findById(command.memberId()).orElseThrow(MemberNotFoundException::new);
         if (command.nickname() != null) {
             member.updateNickname(command.nickname());
         }
@@ -37,12 +41,14 @@ public class MemberService {
 
     /// 회원 정보 조회 API
     ///
-    /// 상태: 구현 완료
     /// @param command {@link GetMemberInfoCommand}
-    /// @result {@link GetMemberInfoResult}
+    /// @return {@link GetMemberInfoResult}
+    @Transactional(readOnly = true)
     public GetMemberInfoResult getMemberInfo(GetMemberInfoCommand command) {
-        Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        OAuthAccount oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
+        Member member = memberRepository.findById(command.memberId()).orElseThrow(MemberNotFoundException::new);
+        OAuthAccount oAuthAccount = oAuthAccountRepository
+                .findByMember(member)
+                .orElseThrow(() -> new IllegalStateException("회원의 OAuth 계정이 없습니다: " + command.memberId()));
         return GetMemberInfoResult.from(member, oAuthAccount);
     }
 }
