@@ -1,7 +1,6 @@
 package eightjbbm.keepgo.member;
 
 import eightjbbm.keepgo.member.dto.GetMemberInfoCommand;
-import eightjbbm.keepgo.member.dto.SynchronizeYoutubeLikeVideosCommand;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoCommand;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoRequest;
 import org.mapstruct.Mapper;
@@ -12,8 +11,6 @@ import org.mapstruct.ReportingPolicy;
 public interface MemberMapper {
 
     GetMemberInfoCommand toGetMemberInfoCommand(Long memberId);
-
-    SynchronizeYoutubeLikeVideosCommand toSynchronizeYoutubeLikeVideosCommand(Long memberId);
 
     @Mapping(source = "request.profileImageUrl", target = "profileImagePath")
     UpdateMemberInfoCommand toUpdateMemberInfoCommand(Long memberId, UpdateMemberInfoRequest request);

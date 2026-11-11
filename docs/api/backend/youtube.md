@@ -687,6 +687,7 @@ GET /api/v2/member/external-connections
 
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
+| [v1 8행](youtube.md#backend-v1-row-8) | `POST /api/v1/user/youtube-analyze`, 비고 보류 | 엔드포인트와 서비스 구현을 제거했다(#371). 제거 전에도 AI 호출과 DB 저장 없이 Google 좋아요 목록의 건수만 로그로 남기던 no-op이었다. 동기화는 v2·v3의 `youtube-sync`를 사용한다. |
 | [v2 17행](youtube.md#backend-v2-row-17) | YouTube 연동 302 + Location | [InterestExtractionControllerV2](../../../src/main/java/eightjbbm/keepgo/interestextraction/controller/v2/InterestExtractionControllerV2.java)는 200 + LinkYoutubeAccountResponse 본문을 반환한다. |
 | [v2 23행](youtube.md#backend-v2-row-23) | services_connected | 같은 컨트롤러의 연결 서비스 응답은 service_connected다. 원문 필드명과 다르며 복수형만으로 배열을 추정하지 않는다. |
 | [v3 3행](youtube.md#backend-v3-row-3) | accepted/progress/success만 기재 | [YoutubeSyncConnection](../../../src/main/java/eightjbbm/keepgo/interestextraction/service/youtubesync/YoutubeSyncConnection.java)과 [YoutubeSyncCoordinator](../../../src/main/java/eightjbbm/keepgo/interestextraction/service/youtubesync/YoutubeSyncCoordinator.java)가 실패 종료·재접속 및 진행 집계를 추가로 처리한다. 아래 설명 참조. |

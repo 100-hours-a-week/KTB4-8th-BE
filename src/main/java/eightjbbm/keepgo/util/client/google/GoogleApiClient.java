@@ -50,20 +50,4 @@ public class GoogleApiClient {
                 .retrieve()
                 .body(RetrieveLikedVideosResponse.class);
     }
-
-    public GetLikedVideosResponse getLikedVideos(String oAuth2AccessToken) {
-        return googleRestClient
-                .get()
-                .uri(uriBuilder -> {
-                    UriBuilder builder = uriBuilder
-                            .path("/youtube/v3/videos")
-                            .queryParam("part", "id")
-                            .queryParam("myRating", "like");
-
-                    return builder.build();
-                })
-                .headers(headers -> headers.setBearerAuth(oAuth2AccessToken))
-                .retrieve()
-                .body(GetLikedVideosResponse.class);
-    }
 }

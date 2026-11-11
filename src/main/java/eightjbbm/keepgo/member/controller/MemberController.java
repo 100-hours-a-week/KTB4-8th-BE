@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -43,17 +42,5 @@ public class MemberController {
 
         return ResponseEntity.status(HttpStatus.OK)
                 .body(UpdateMemberInfoResponse.from(memberService.updateMemberInfo(command)));
-    }
-
-    /// 유튜브 동기화 API
-    /// @param jwt
-    @PostMapping("/youtube-analyze")
-    public ResponseEntity<Void> synchronizeYoutubeLikeVideos(
-            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        var command = memberMapper.toSynchronizeYoutubeLikeVideosCommand(Long.valueOf(jwt.getSubject()));
-
-        memberService.synchronizeYoutubeLikeVideos(command);
-
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
