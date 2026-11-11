@@ -124,7 +124,7 @@ public class RecommendationServiceV2 {
             throw new ServiceUnavailableException();
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
-            connection.ai.cancel();
+            connection.aiStream.cancel();
             throw new ServiceUnavailableException();
         } catch (ExecutionException error) {
             throw error.getCause() instanceof ErrorResponseException response
@@ -162,7 +162,7 @@ public class RecommendationServiceV2 {
             }
 
             var response = aiServerService.recommendCourses(
-                    criteria, candidates, connection.ai, event -> relay(connection, event));
+                    criteria, candidates, connection.aiStream, event -> relay(connection, event));
 
             if (!checkRunning(connection)) {
                 return;
@@ -301,7 +301,7 @@ public class RecommendationServiceV2 {
         }
 
         // 취소·연결 종료 시 진행 중인 AI 스트림을 즉시 끊는다. 이미 끝난 호출에는 영향이 없다.
-        connection.ai.cancel();
+        connection.aiStream.cancel();
     }
 
     private void releaseJob(RecommendationConnection connection) {
@@ -312,7 +312,7 @@ public class RecommendationServiceV2 {
         }
     }
 
-    private RecommendCoursesResponseV2.SuccessData requireSuccess(RecommendCoursesResponseV2.Success response) {
+    private RecommendCoursesResponseV2.SuccessData requireSuccess(RecommendCoursesResponseV2.Done response) {
         var data = response.data();
 
         if (data != null

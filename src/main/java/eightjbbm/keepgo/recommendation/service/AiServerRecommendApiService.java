@@ -21,7 +21,7 @@ public class AiServerRecommendApiService {
     private final ObjectMapper mapper;
 
     /// 스트림을 `done`까지 읽고 그 본문을 돌려준다. 업무 결과는 호출자가 `message`로 판정한다.
-    public RecommendCoursesResponseV2.Success recommendCourses(
+    public RecommendCoursesResponseV2.Done recommendCourses(
             OutingCriteria outingCriteria,
             List<OutingGuide> outingGuides,
             AiStreamHandle handle,
@@ -31,6 +31,6 @@ public class AiServerRecommendApiService {
                 RecommendCoursesRequestV2.from(outingCriteria, outingGuides),
                 onEvent,
                 handle);
-        return mapper.treeToValue(result.done(), RecommendCoursesResponseV2.Success.class);
+        return mapper.treeToValue(result.done(), RecommendCoursesResponseV2.Done.class);
     }
 }

@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface RecommendCoursesResponseV2 {
     /// `done` 이벤트 본문. `message`로 업무 결과를 판정한다.
-    record Success(String message, @Nullable SuccessData data) implements RecommendCoursesResponseV2 {}
+    record Done(String message, @Nullable SuccessData data) {}
 
     record SuccessData(@Nullable String error, @Nullable List<Course> courses) {}
 

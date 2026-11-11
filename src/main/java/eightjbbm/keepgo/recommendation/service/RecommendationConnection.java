@@ -19,7 +19,7 @@ final class RecommendationConnection {
     /// v3에서 AI 스트림이 열리면 완료되고, 열리기 전에 실패하면 예외로 완료된다. 이때까지 FE 응답은 시작하지 않는다.
     final CompletableFuture<Void> opened = new CompletableFuture<>();
 
-    final AiStreamHandle ai = new AiStreamHandle(this::onAiOpened);
+    final AiStreamHandle aiStream = new AiStreamHandle(this::onAiOpened);
 
     private boolean closed;
 
