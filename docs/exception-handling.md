@@ -118,8 +118,8 @@ var member = memberRepository.findById(id).orElseThrow(MemberNotFoundException::
 
 | 규칙 | 현재 코드 |
 | --- | --- |
-| 3단계 구조 | base 클래스와 `messageSource` 연결이 없다. `util/exception`의 상태 코드별 예외가 `ErrorResponseException`을 직접 상속하고 `ProblemDetail.forStatus(...)`를 쓴다. `code` 필드가 없다. |
-| 기능별 예외 | `outingwishlist/common`과 `member/exception`에 있다. 회원 예외는 메시지 소스 대신 응답 필드를 직접 설정한다. |
+| 3단계 구조 | 공용 base 클래스는 없다. `NotFoundException`과 `BadGatewayException`은 기능별 code의 메시지 소스를 연결하지만, 나머지 상태 코드별 예외는 `ErrorResponseException`을 직접 상속하며 기능별 code 연결이 없다. |
+| 기능별 예외 | `outingwishlist/common`의 기능별 예외는 메시지 소스 대신 기존 응답을 사용한다. |
 | 던지지 않는 예외 | `IllegalArgumentException`, `ResponseStatusException`, `RuntimeException`이 여러 곳에서 쓰인다. |
 | 422 처리 | `GlobalExceptionHandler`가 `MethodArgumentNotValidException` 처리기가 `errors[]` 없는 422만 반환한다. `HandlerMethodValidationException` 처리가 없다. |
 | 전역 처리기 | 비어 있는 `BasicExceptionHandler`가 `GlobalExceptionHandler`와 함께 있다. 정리는 별도 PR로 한다. |

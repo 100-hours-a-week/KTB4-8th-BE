@@ -6,14 +6,23 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import eightjbbm.keepgo.member.MemberMapper;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoCommand;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoResult;
+import eightjbbm.keepgo.member.entity.Member;
+import eightjbbm.keepgo.member.exception.MemberNotFoundException;
+import eightjbbm.keepgo.member.repository.MemberRepository;
+import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
 import eightjbbm.keepgo.member.service.MemberService;
 import eightjbbm.keepgo.util.exception.GlobalExceptionHandler;
+import eightjbbm.keepgo.util.file.FileRepository;
+import java.util.Locale;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +31,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -41,8 +51,11 @@ class MemberControllerTest {
                     new MemberController(memberService, Mappers.getMapper(MemberMapper.class)))
             .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
                     .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                    .addMixIn(
+                            org.springframework.http.ProblemDetail.class,
+                            org.springframework.http.converter.json.ProblemDetailJacksonMixin.class)
                     .build()))
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(new GlobalExceptionHandler(messageSource()))
             .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
             .build();
 
@@ -100,6 +113,78 @@ class MemberControllerTest {
         mvc.perform(patchBody("{\"nickname\":\"홍길동\",\"profile_image_url\":\"" + url + "\"}"))
                 .andExpect(status().isUnprocessableContent());
         verify(memberService, never()).updateMemberInfo(any());
+    }
+
+    @Test
+    @DisplayName("회원이 없으면 조회와 수정에서 404 오류 계약을 반환한다")
+    void missingMemberReturnsProblem() throws Exception {
+        var members = mock(MemberRepository.class);
+        MockMvc actualMvc = actualServiceMvc(members, mock(OAuthAccountRepository.class));
+        actualMvc
+                .perform(get("/api/v1/user"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"))
+                .andExpect(jsonPath("$.type").value("/problems/member-not-found"))
+                .andExpect(jsonPath("$.title").value("회원을 찾을 수 없습니다."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/user"));
+        actualMvc
+                .perform(patchBody(nicknameJson("홍길동")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"))
+                .andExpect(jsonPath("$.type").value("/problems/member-not-found"))
+                .andExpect(jsonPath("$.title").value("회원을 찾을 수 없습니다."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/user"));
+    }
+
+    @Test
+    @DisplayName("OAuth 계정이 없으면 내부 메시지를 숨긴 500을 반환한다")
+    void missingOAuthReturnsSafeProblem() throws Exception {
+        var members = mock(MemberRepository.class);
+        when(members.findById(7L)).thenReturn(Optional.of(Member.create("secret-member-7")));
+        MockMvc actualMvc = actualServiceMvc(members, mock(OAuthAccountRepository.class));
+        actualMvc
+                .perform(get("/api/v1/user"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("https://keepgo.kr/internal-server-error"))
+                .andExpect(jsonPath("$.title").value("서버 내부 오류입니다."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/user"))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                        .doesNotContain("secret-member-7", "OAuth"));
+    }
+
+    @Test
+    @DisplayName("회원 예외는 메시지 소스에서 type과 title을 조회한다")
+    void memberProblemUsesMessageSource() {
+        var source = new ResourceBundleMessageSource();
+        source.setBasename("messages");
+        source.setDefaultEncoding("UTF-8");
+        var exception = new MemberNotFoundException();
+        assertThat(exception.getTypeMessageCode()).isEqualTo("problem.MEMBER_NOT_FOUND.type");
+        assertThat(exception.getTitleMessageCode()).isEqualTo("problem.MEMBER_NOT_FOUND.title");
+        var body = exception.updateAndGetBody(source, Locale.KOREA);
+        assertThat(body.getType()).hasToString("/problems/member-not-found");
+        assertThat(body.getTitle()).isEqualTo("회원을 찾을 수 없습니다.");
+    }
+
+    private static MockMvc actualServiceMvc(MemberRepository members, OAuthAccountRepository accounts) {
+        var service = new MemberService(members, mock(FileRepository.class), accounts);
+        return MockMvcBuilders.standaloneSetup(new MemberController(service, Mappers.getMapper(MemberMapper.class)))
+                .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
+                        .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                        .addMixIn(
+                                org.springframework.http.ProblemDetail.class,
+                                org.springframework.http.converter.json.ProblemDetailJacksonMixin.class)
+                        .build()))
+                .setControllerAdvice(new GlobalExceptionHandler(messageSource()))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .build();
+    }
+
+    private static ResourceBundleMessageSource messageSource() {
+        var source = new ResourceBundleMessageSource();
+        source.setBasename("messages");
+        source.setDefaultEncoding("UTF-8");
+        return source;
     }
 
     private static String nicknameJson(String nickname) {

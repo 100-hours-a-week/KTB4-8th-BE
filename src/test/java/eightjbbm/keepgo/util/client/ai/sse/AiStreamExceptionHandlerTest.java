@@ -33,7 +33,8 @@ class AiStreamExceptionHandlerTest {
     }
 
     private final MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new ThrowingController())
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(
+                    new GlobalExceptionHandler(new org.springframework.context.support.StaticMessageSource()))
             .build();
 
     @Test

@@ -8,7 +8,6 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.exception.MemberNotFoundException;
 import eightjbbm.keepgo.member.repository.*;
 import eightjbbm.keepgo.util.file.FileRepository;
-import java.net.URI;
 import java.util.Optional;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,8 +38,6 @@ class MemberLookupTest {
                 .isInstanceOfSatisfying(MemberNotFoundException.class, ex -> {
                     assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
                     assertThat(ex.getBody().getProperties()).containsEntry("code", "MEMBER_NOT_FOUND");
-                    assertThat(ex.getBody().getType()).isEqualTo(URI.create("/problems/member-not-found"));
-                    assertThat(ex.getBody().getTitle()).isEqualTo("회원을 찾을 수 없습니다.");
                 });
     }
 
@@ -51,8 +48,6 @@ class MemberLookupTest {
                 .isInstanceOfSatisfying(MemberNotFoundException.class, ex -> {
                     assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
                     assertThat(ex.getBody().getProperties()).containsEntry("code", "MEMBER_NOT_FOUND");
-                    assertThat(ex.getBody().getType()).isEqualTo(URI.create("/problems/member-not-found"));
-                    assertThat(ex.getBody().getTitle()).isEqualTo("회원을 찾을 수 없습니다.");
                 });
     }
 

@@ -121,7 +121,9 @@ class RecommendationServiceV2Test {
         mvc = MockMvcBuilders.standaloneSetup(
                         new RecommendationControllerV2(service),
                         new RecommendationControllerV3(mock(HotPlaceServiceV2.class), service))
-                .setControllerAdvice(new BasicExceptionHandler(), new GlobalExceptionHandler())
+                .setControllerAdvice(
+                        new BasicExceptionHandler(),
+                        new GlobalExceptionHandler(new org.springframework.context.support.StaticMessageSource()))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
 
