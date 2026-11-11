@@ -91,7 +91,7 @@ class MemberControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "   "})
+    @ValueSource(strings = {"", "   ", "\u3000"})
     @DisplayName("profile_image_url 값이 비어 있으면 거부된다")
     void rejectsBlankProfileImageUrl(String url) throws Exception {
         mvc.perform(patchBody("{\"nickname\":\"홍길동\",\"profile_image_url\":\"" + url + "\"}"))
