@@ -85,6 +85,8 @@ public final class PerfHarnessApplication {
         properties.put(
                 "keepgo.security.jwt.private-key",
                 keyDirectory.resolve("private_key.pem").toUri().toString());
+        properties.put("spring.security.oauth2.client.registration.google.client-id", "perf");
+        properties.put("spring.security.oauth2.client.registration.google.client-secret", "perf");
         properties.put("spring.security.oauth2.client.registration.google-login.client-id", "perf");
         properties.put("spring.security.oauth2.client.registration.google-login.client-secret", "perf");
 

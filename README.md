@@ -31,6 +31,12 @@
 |DB_PASSWORD|DB에 접속할 계정의 비밀번호|0000|
 |DB_DRIVER|DB에 해당하는 JDBC 드라이버 이름|com.mysql.cj.jdbc.Driver|
 |DB_DIALECT|DB에 해당하는 SQL 방언|MySQL|
+|GOOGLE_CLIENT_ID|Google OAuth(YouTube 연동) 클라이언트 ID. 없으면 애플리케이션 기동이 실패합니다|없음(필수)|
+|GOOGLE_CLIENT_SECRET|Google OAuth(YouTube 연동) 클라이언트 시크릿. 없으면 애플리케이션 기동이 실패합니다|없음(필수)|
+|GOOGLE_LOGIN_CLIENT_ID|Google 로그인용 OAuth 클라이언트 ID|없음|
+|GOOGLE_LOGIN_CLIENT_SECRET|Google 로그인용 OAuth 클라이언트 시크릿|없음|
+
+로컬에서는 `.env.example`을 참고해 환경 변수를 주입합니다. 기동 시점에 값을 검증하는 대상은 현재 `GOOGLE_CLIENT_ID`와 `GOOGLE_CLIENT_SECRET`뿐입니다.
 
 ## 제품 문서
 
