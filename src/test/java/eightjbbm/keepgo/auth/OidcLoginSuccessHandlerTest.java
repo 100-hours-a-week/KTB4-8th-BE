@@ -77,7 +77,7 @@ class OidcLoginSuccessHandlerTest {
         when(oAuthAccountRepository.findByIssuerAndSubject(any(), any()))
                 .thenReturn(Optional.of(OAuthAccount.create(member, "a@b.c", "https://accounts.google.com", "s", "n")));
 
-        MockHttpServletResponse response = login("http://localhost:3000/login/callback?from=home#stale");
+        MockHttpServletResponse response = login("http://localhost:3000/login/callback?from=home");
 
         UriComponents location =
                 UriComponentsBuilder.fromUriString(response.getRedirectedUrl()).build();
@@ -87,7 +87,6 @@ class OidcLoginSuccessHandlerTest {
                 .containsEntry("accessToken", ACCESS_TOKEN)
                 .containsEntry("expiresIn", "1800")
                 .containsEntry("initialLogin", "false");
-        assertThat(location.getFragment()).doesNotContain("stale");
     }
 
     @Test

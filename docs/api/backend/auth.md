@@ -115,6 +115,8 @@ RT 해시
 
 ### 로그인 성공 리다이렉트 (Fragment 계약)
 
+확인: 2026-11-11, 로컬 소스 정적 대조. 배포·실서버 검증은 아니다.
+
 원본 시트에 없는 항목이며 [OidcLoginSuccessHandler](../../../src/main/java/eightjbbm/keepgo/auth/OidcLoginSuccessHandler.java) 구현을 기준으로 한다.
 
 Google OIDC 인증이 성공하면 백엔드는 `keepgo.security.redirection-address`(환경 변수 `FRONTEND_SERVER_ADDRESS`)로 리다이렉트하며, Access Token은 쿼리가 아닌 Fragment로 전달한다.
@@ -123,7 +125,7 @@ Google OIDC 인증이 성공하면 백엔드는 `keepgo.security.redirection-add
 {redirection-address}#accessToken=<JWT>&expiresIn=1800&initialLogin=<true|false>
 ```
 
-- 목적지의 경로와 기존 쿼리는 보존한다. 목적지에 이미 Fragment가 있으면 위 값으로 대체한다.
+- 목적지의 경로와 기존 쿼리는 보존한다. `redirection-address`에 Fragment(`#`)가 있으면 기동 시 `LoginProperties`가 거부한다. 해시 라우터 주소는 쓸 수 없다.
 - Access Token을 쿼리에 함께 싣지 않는다. Refresh Token은 기존대로 `HttpOnly`, `Secure`, `SameSite=Lax`, Path `/api/v1/user/auth-session` 쿠키로 전달한다.
 - 프론트엔드는 Fragment에서 세 필드를 파싱하고, 토큰을 읽은 직후 `history.replaceState`로 Fragment를 제거해야 한다.
 - 이전 계약(`?accessToken=...&expiresIn=...&initialLogin=...`)에서 바뀐 호환성 변경이다. 프론트엔드가 새 계약을 처리하는지 확인한 뒤 백엔드를 배포한다.
@@ -321,4 +323,4 @@ Refresh Token은 쿠키로 전달
 
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
-| [v1 3행](auth.md#backend-v1-row-3) | 로그인 201, 토큰 본문 | [AuthController](../../../src/main/java/eightjbbm/keepgo/auth/AuthController.java)의 로그인은 303과 Location: /oauth2/authorization/google. 최종 OAuth 성공 응답과 최초 로그인 요청을 구분해야 한다. |
+| [v1 3행](auth.md#backend-v1-row-3) | 로그인 201, 토큰 본문 | [AuthController](../../../src/main/java/eightjbbm/keepgo/auth/AuthController.java)의 로그인은 303과 Location: /oauth2/authorization/google. 최종 OAuth 성공 응답과 최초 로그인 요청을 구분해야 한다. 성공 리다이렉트는 [Fragment 계약](auth.md#login-redirect)을 따른다. |
