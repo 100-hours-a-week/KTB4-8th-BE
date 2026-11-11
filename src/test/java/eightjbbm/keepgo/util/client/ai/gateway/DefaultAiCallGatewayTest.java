@@ -74,7 +74,7 @@ class DefaultAiCallGatewayTest {
             } finally {
                 inFlight.decrementAndGet();
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
@@ -104,7 +104,7 @@ class DefaultAiCallGatewayTest {
                 firstStarted.countDown();
                 releaseFirst.await(5, TimeUnit.SECONDS);
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
@@ -134,7 +134,7 @@ class DefaultAiCallGatewayTest {
                 firstStarted.countDown();
                 releaseFirst.await(5, TimeUnit.SECONDS);
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
@@ -166,7 +166,7 @@ class DefaultAiCallGatewayTest {
                 firstStarted.countDown();
                 releaseFirst.await(5, TimeUnit.SECONDS);
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
@@ -213,7 +213,7 @@ class DefaultAiCallGatewayTest {
             } catch (InterruptedException error) {
                 interrupted.countDown();
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway(new AiCallProperties(
                 1,
@@ -349,7 +349,7 @@ class DefaultAiCallGatewayTest {
                 .release(any(AiCallType.class), anyString());
     }
 
-    private static VideoAnalysisResponse failure() {
+    private static VideoAnalysisResponse emptyResponse() {
         return new VideoAnalysisResponse(List.of());
     }
 }
