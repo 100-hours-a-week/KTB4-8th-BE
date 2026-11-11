@@ -24,4 +24,4 @@
 - 조건 추출·영상 분석·임베딩 저장은 `/v1` fallback이 없다. AI 서버가 v3 경로를 지원하지 않으면 해당 기능이 실패한다.
 - 코스 추천은 `/api/v1/user/recommendation`만 `/v1/recommend-courses`를 아직 호출하고, 취소는 `/api/v1/user/recommendation/cancellation`만 `/v1/recommend-courses/{jobId}/cancel`을 아직 호출한다. 이 호출은 FE가 v1 API를 쓰는 동안 남으며 `RecommendationService`, `AiServerApiClient`, `util/dto/RecommendCourse*`가 함께 남는다. #356이 AI 취소 연동을 채택하지 않고 `.out-of-scope`에 기록한 것과 이 v1 취소 호출은 어긋나며, 제거는 [#370](https://github.com/100-hours-a-week/KTB4-8th-BE/issues/370)에서 추적한다. `done` 본문의 `match_score` 위치(코스 단위인지 `data` 단위인지)는 AI 팀의 실제 샘플로 확인한다. [코스 추천 명세](course-recommendation.md)
 - 시트에서 `cancel`과 `embed-places/delete`는 v3 탭에서도 `/v1` 경로다. v3로 옮긴 것이 아니다.
-- 시트 경로 표기가 일관되지 않다: `v3/recommend-course/stream`은 선행 `/`가 없다. 원문은 [각 명세](video-analysis.md)에 보존한다.
+- 시트 경로 표기가 일관되지 않다: `v3/recommend-course/stream`은 선행 `/`가 없고, 시트 원문은 예열을 `/v3/warmip`, 버전을 `v3/version`으로 적었다. 둘은 선행 `/`가 없거나 오타 가능성이 있다. 위 표의 `v3 시트 경로` 열에는 BE가 호출하는 `/v3/warmup`·`/v3/version`을 적었으며, 시트가 실제로 `warmip`인지는 AI 팀에 확인한다. 원문은 [각 명세](video-analysis.md)에 보존한다.
