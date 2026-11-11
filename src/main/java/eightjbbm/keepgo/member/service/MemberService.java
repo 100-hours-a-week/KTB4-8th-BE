@@ -5,9 +5,6 @@ import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
-import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
-import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
 import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.file.FileUtil;
@@ -24,9 +21,6 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
     private final OAuthAccountRepository oAuthAccountRepository;
-    private final OutingPlaceRepository outingPlaceRepository;
-    private final OutingEventRepository outingEventRepository;
-    private final OutingWishlist outingWishlist;
     private final GoogleApiClient googleApiClient;
     private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
