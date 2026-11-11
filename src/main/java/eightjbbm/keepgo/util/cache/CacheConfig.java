@@ -17,14 +17,6 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         var cacheManager = new SimpleCacheManager();
-        var replyJob = new CaffeineCache(
-                "replyJob",
-                Caffeine.newBuilder()
-                        .maximumSize(1000)
-                        .expireAfterWrite(Duration.ofSeconds(600))
-                        .recordStats()
-                        .build());
-
         var recommendationJob = new CaffeineCache(
                 "recommendationJob",
                 Caffeine.newBuilder()
@@ -49,7 +41,7 @@ public class CacheConfig {
                         .recordStats()
                         .build());
 
-        cacheManager.setCaches(List.of(replyJob, recommendationJob, slot, atBlacklist));
+        cacheManager.setCaches(List.of(recommendationJob, slot, atBlacklist));
         return cacheManager;
     }
 }
