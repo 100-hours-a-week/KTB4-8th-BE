@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.chat.service.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.util.Coordinate;
 import java.time.LocalDate;
@@ -9,7 +10,11 @@ import java.util.Set;
 
 public record ExtractSlotRequestV2(String chat, LocalDate date, PrevSlot prevSlot, String prevQuery) {
     public record PrevSlot(
-            Coordinate origin, String region, LocalDateTime datetime, String availableTime, Set<String> category) {}
+            Coordinate origin,
+            String region,
+            @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime datetime,
+            String availableTime,
+            Set<String> category) {}
 
     public static ExtractSlotRequestV2 from(String content, OutingCriteria criteria) {
         var zone = ZoneId.of("Asia/Seoul");

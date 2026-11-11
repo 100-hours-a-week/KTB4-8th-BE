@@ -1,15 +1,16 @@
 package eightjbbm.keepgo.chat.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
+import com.sun.net.httpserver.HttpServer;
 import eightjbbm.keepgo.chat.entity.Chat;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
-import eightjbbm.keepgo.chat.service.dto.ExtractSlotResponseV2;
 import eightjbbm.keepgo.chat.service.dto.SendChatMessageCommandV2;
 import eightjbbm.keepgo.chat.service.requeststore.ChatRequestGuard;
 import eightjbbm.keepgo.chat.service.requeststore.ChatRequestStore;
@@ -18,7 +19,13 @@ import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.util.Coordinate;
+import eightjbbm.keepgo.util.client.ai.sse.AiSseClient;
+import eightjbbm.keepgo.util.exception.GlobalExceptionHandler;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -26,7 +33,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,14 +49,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
+@DisplayName("채팅 전송 SSE (AI 서버 /v3/extract/stream 스텁)")
 @ExtendWith(MockitoExtension.class)
 class ChatServiceV2Test {
 
     private static final Long MEMBER_ID = 1L;
     private static final String CONTENT = "내일 강남에서 3시간 카페 가고 싶어";
     private static final String REPLY = "강남 카페를 찾아볼게요.";
+    private static final String DELTAS = sse("delta", "{\"text\":\"강남 \"}") + sse("delta", "{\"text\":\"카페를 찾아볼게요.\"}");
 
     @Mock
     ChatRepository chatRepository;
@@ -55,30 +68,45 @@ class ChatServiceV2Test {
     OutingCriteriaRepository outingCriteriaRepository;
 
     @Mock
-    AiServerExtractSlotApiService aiServerService;
-
-    @Mock
     MemberRepository memberRepository;
 
     @Mock
     ChatRequestStore requestStore;
 
-    private final JsonMapper json = JsonMapper.builder().build();
+    private final JsonMapper json = JsonMapper.builder()
+            .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .build();
 
+    private final AtomicReference<JsonNode> aiRequest = new AtomicReference<>();
+    private final AtomicReference<String> aiPath = new AtomicReference<>();
+
+    private HttpServer ai;
+    private AiSseClient sseClient;
     private MockMvc mvc;
     private Member member;
     private OutingCriteria criteria;
     private CountDownLatch released;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        ai = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        ai.start();
+        sseClient = new AiSseClient(
+                URI.create("http://127.0.0.1:" + ai.getAddress().getPort()),
+                json,
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(10));
+
         var service = new ChatServiceV2(
                 chatRepository,
                 outingCriteriaRepository,
-                aiServerService,
+                new AiServerExtractSlotApiService(sseClient, json),
                 memberRepository,
                 new ChatRequestGuard(requestStore));
-        mvc = standaloneSetup(new TestController(service)).build();
+        mvc = standaloneSetup(new TestController(service))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
 
         member = Member.create("테스터");
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
@@ -101,82 +129,99 @@ class ChatServiceV2Test {
         });
     }
 
+    @AfterEach
+    void tearDown() {
+        sseClient.close();
+        ai.stop(0);
+    }
+
     @Test
-    void 정상_처리하면_accepted_다음_success를_보내고_채팅과_슬롯을_저장한다() throws Exception {
+    @DisplayName("v3는 delta를 도착하는 대로 중계하고 done의 값을 저장한다")
+    void v3RelaysDeltaAndSavesDone() throws Exception {
         var datetime = LocalDateTime.of(2026, 10, 21, 14, 0);
-        var coordinate = new Coordinate(37.5f, 127.0f);
 
-        givenSuccess(new ExtractSlotResponseV2.Slot(coordinate, "강남", datetime, "180", Set.of("카페")));
+        stubAi(200, DELTAS + done("""
+                                {"origin":{"lat":37.5,"lng":127.0},"region":"강남","datetime":"2026-10-21 14:00:00",
+                                 "available_time":"180","category":["카페"]}"""));
 
-        var events = requestEvents();
+        var events = requestEvents("/test/chat-v3");
 
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.success"),
-                events.stream().map(Event::name).toList());
-        assertEquals("100", events.get(0).id());
-        assertEquals(events.get(0).id(), events.get(1).id());
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(
+                        List.of("chat-reply.accepted", "chat-reply.delta", "chat-reply.delta", "chat-reply.success"));
+        assertThat(events.get(1).data().path("text").asText()).isEqualTo("강남 ");
+        assertThat(events.get(2).data().path("text").asText()).isEqualTo("카페를 찾아볼게요.");
+        assertThat(aiPath.get()).isEqualTo("/v3/extract/stream");
 
-        var accepted = events.get(0).data().path("chat");
-        assertEquals(CONTENT, accepted.path("content").asText());
-        assertFalse(accepted.path("is_by_bot").asBoolean());
-
-        var success = events.get(1).data();
-        assertEquals(REPLY, success.path("chat").path("content").asText());
-        assertTrue(success.path("chat").path("is_by_bot").asBoolean());
+        var success = events.get(3).data();
+        assertThat(success.path("chat").path("content").asText()).isEqualTo(REPLY);
+        assertThat(success.path("chat").path("is_by_bot").asBoolean()).isTrue();
 
         var slot = success.path("slot");
-        assertEquals(37.5, slot.path("coordinate").path("lat").asDouble(), 0.001);
-        assertEquals(127.0, slot.path("coordinate").path("lng").asDouble(), 0.001);
-        assertEquals("강남", slot.path("location_name_requested").asText());
-        assertEquals("2026-10-21 14:00:00", slot.path("time_requested_datetime").asText());
-        assertEquals(3, slot.path("time_available_hours").asInt());
-        assertEquals("카페", slot.path("categories").get(0).asText());
+        assertThat(slot.path("coordinate").path("lat").asDouble()).isCloseTo(37.5, within(0.001));
+        assertThat(slot.path("location_name_requested").asText()).isEqualTo("강남");
+        assertThat(slot.path("time_requested_datetime").asText()).isEqualTo("2026-10-21 14:00:00");
+        assertThat(slot.path("time_available_hours").asInt()).isEqualTo(3);
+        assertThat(slot.path("categories").get(0).asText()).isEqualTo("카페");
 
         var chats = ArgumentCaptor.forClass(Chat.class);
         verify(chatRepository, times(2)).save(chats.capture());
-
-        assertEquals(CONTENT, chats.getAllValues().get(0).getContent());
-        assertFalse(chats.getAllValues().get(0).getIsByBot());
-        assertEquals(REPLY, chats.getAllValues().get(1).getContent());
-        assertTrue(chats.getAllValues().get(1).getIsByBot());
-        assertSame(member, chats.getAllValues().get(1).getMember());
+        assertThat(chats.getAllValues().get(0).getContent()).isEqualTo(CONTENT);
+        assertThat(chats.getAllValues().get(1).getContent()).isEqualTo(REPLY);
+        assertThat(chats.getAllValues().get(1).getIsByBot()).isTrue();
+        assertThat(chats.getAllValues().get(1).getMember()).isSameAs(member);
 
         var saved = ArgumentCaptor.forClass(OutingCriteria.class);
         verify(outingCriteriaRepository).save(saved.capture());
-
-        assertEquals(MEMBER_ID, saved.getValue().getMemberId());
-        assertEquals(180, saved.getValue().getUserAvailableTimeMinutes());
-        assertEquals(
-                datetime.atZone(ZoneId.of("Asia/Seoul")).toInstant(),
-                saved.getValue().getRequestedDatetime());
-        assertEquals("카페 선호", saved.getValue().getUserPreferenceSummary());
+        assertThat(saved.getValue().getUserAvailableTimeMinutes()).isEqualTo(180);
+        assertThat(saved.getValue().getRequestedDatetime())
+                .isEqualTo(datetime.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        assertThat(saved.getValue().getUserPreferenceSummary()).isEqualTo("카페 선호");
     }
 
     @Test
-    void 첫_대화라면_빈_슬롯으로_AI를_호출하고_null_필드를_응답한다() throws Exception {
+    @DisplayName("v2는 delta를 중계하지 않고 이벤트 계약을 유지한다")
+    void v2KeepsEventsWithoutDelta() throws Exception {
+        stubAi(200, DELTAS + done("{\"region\":\"강남\"}"));
+
+        var events = requestEvents("/test/chat");
+
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.success"));
+        assertThat(events.get(0).id()).isEqualTo("100");
+        assertThat(events.get(1).id()).isEqualTo(events.get(0).id());
+        assertThat(events.get(0).data().path("chat").path("content").asText()).isEqualTo(CONTENT);
+        assertThat(events.get(0).data().path("chat").path("is_by_bot").asBoolean())
+                .isFalse();
+        assertThat(events.get(1).data().path("chat").path("content").asText()).isEqualTo(REPLY);
+        verify(outingCriteriaRepository).save(any(OutingCriteria.class));
+    }
+
+    @Test
+    @DisplayName("첫 대화는 빈 나들이 조건으로 요청하고 null 필드를 응답한다")
+    void firstChatSendsEmptyCriteria() throws Exception {
         when(outingCriteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
 
-        givenSuccess(new ExtractSlotResponseV2.Slot(null, null, null, null, null));
+        stubAi(200, done("{}"));
 
-        var events = requestEvents();
+        var events = requestEvents("/test/chat-v3");
 
-        assertEquals("chat-reply.success", events.get(1).name());
+        assertThat(events.get(1).name()).isEqualTo("chat-reply.success");
 
-        var previous = ArgumentCaptor.forClass(OutingCriteria.class);
-        verify(aiServerService).extractSlot(eq(CONTENT), previous.capture());
-
-        assertEquals(MEMBER_ID, previous.getValue().getMemberId());
-        assertNull(previous.getValue().getRequestedDatetime());
-        assertNull(previous.getValue().getUserAvailableTimeMinutes());
-        assertTrue(previous.getValue().getCategories().isEmpty());
+        var prevSlot = aiRequest.get().path("prev_slot");
+        assertThat(aiRequest.get().path("chat").asText()).isEqualTo(CONTENT);
+        assertThat(prevSlot.path("datetime").isNull()).isTrue();
+        assertThat(prevSlot.path("available_time").isNull()).isTrue();
+        assertThat(prevSlot.path("category").isEmpty()).isTrue();
 
         var slot = events.get(1).data().path("slot");
-        assertTrue(slot.path("time_requested_datetime").isNull());
-        assertTrue(slot.path("time_available_hours").isNull());
+        assertThat(slot.path("time_requested_datetime").isNull()).isTrue();
+        assertThat(slot.path("time_available_hours").isNull()).isTrue();
     }
 
     @Test
-    void 추출되지_않은_값은_유지하고_카테고리는_기존_값과_합친다() throws Exception {
+    @DisplayName("이전 나들이 조건의 일시를 공백 구분으로 보내고, 추출되지 않은 값은 유지하며 카테고리는 합친다")
+    void sendsPrevSlotDatetimeAndMergesCriteria() throws Exception {
         var datetime = LocalDateTime.of(2026, 10, 21, 14, 0);
 
         criteria = new OutingCriteria(
@@ -190,77 +235,168 @@ class ChatServiceV2Test {
 
         when(outingCriteriaRepository.findById(MEMBER_ID)).thenReturn(Optional.of(criteria));
 
-        givenSuccess(new ExtractSlotResponseV2.Slot(null, null, null, null, Set.of("전시")));
+        stubAi(200, done("{\"category\":[\"전시\"]}"));
 
-        requestEvents();
+        requestEvents("/test/chat-v3");
+
+        var prevSlot = aiRequest.get().path("prev_slot");
+        assertThat(prevSlot.path("datetime").asText()).isEqualTo("2026-10-21 14:00:00");
+        assertThat(prevSlot.path("available_time").asText()).isEqualTo("180");
+        assertThat(prevSlot.path("region").asText()).isEqualTo("강남");
+        assertThat(aiRequest.get().path("prev_query").asText()).isEqualTo("기존 취향");
 
         var saved = ArgumentCaptor.forClass(OutingCriteria.class);
         verify(outingCriteriaRepository).save(saved.capture());
 
-        assertEquals(criteria.getUserCoordinate(), saved.getValue().getUserCoordinate());
-        assertEquals("강남", saved.getValue().getRequestedLocationName());
-        assertEquals(criteria.getRequestedDatetime(), saved.getValue().getRequestedDatetime());
-        assertEquals(180, saved.getValue().getUserAvailableTimeMinutes());
-        assertEquals(Set.of("카페", "전시"), saved.getValue().getCategories());
+        assertThat(saved.getValue().getUserCoordinate()).isEqualTo(criteria.getUserCoordinate());
+        assertThat(saved.getValue().getRequestedLocationName()).isEqualTo("강남");
+        assertThat(saved.getValue().getRequestedDatetime()).isEqualTo(criteria.getRequestedDatetime());
+        assertThat(saved.getValue().getUserAvailableTimeMinutes()).isEqualTo(180);
+        assertThat(saved.getValue().getCategories()).isEqualTo(Set.of("카페", "전시"));
     }
 
     @Test
-    void AI가_실패_응답을_반환하면_오류_이벤트로_종료한다() throws Exception {
-        when(aiServerService.extractSlot(eq(CONTENT), any(OutingCriteria.class)))
-                .thenReturn(new ExtractSlotResponseV2.Failure("failed", null));
+    @DisplayName("v3에서 error 이벤트를 받으면 llm 오류는 bad-gateway 이벤트로 보내고 저장하지 않는다")
+    void v3ErrorEventBecomesBadGateway() throws Exception {
+        stubAi(200, DELTAS + sse("error", "{\"message\":\"llm_timeout\"}"));
 
-        assertFailure(requestEvents());
+        var events = requestEvents("/test/chat-v3");
+
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of(
+                        "chat-reply.accepted", "chat-reply.delta", "chat-reply.delta", "chat-reply.bad-gateway"));
+        assertThat(events.get(3).data().path("status").asInt()).isEqualTo(502);
+        assertNothingSaved();
     }
 
     @Test
-    void AI_호출에서_예외가_발생하면_오류_이벤트로_종료한다() throws Exception {
-        when(aiServerService.extractSlot(eq(CONTENT), any(OutingCriteria.class)))
-                .thenThrow(new IllegalStateException("AI connection failed"));
+    @DisplayName("v3에서 llm이 아닌 error 이벤트는 service-unavailable 이벤트로 보내고 저장하지 않는다")
+    void v3OtherErrorEventBecomesServiceUnavailable() throws Exception {
+        stubAi(200, sse("error", "{\"message\":\"internal_server_error\"}"));
 
-        assertFailure(requestEvents());
+        var events = requestEvents("/test/chat-v3");
+
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.service-unavailable"));
+        assertThat(events.get(1).data().path("status").asInt()).isEqualTo(503);
+        assertNothingSaved();
     }
 
     @Test
-    void AI_성공_응답의_필수_데이터가_없으면_오류_이벤트로_종료한다() throws Exception {
-        when(aiServerService.extractSlot(eq(CONTENT), any(OutingCriteria.class)))
-                .thenReturn(new ExtractSlotResponseV2.Success("success", null));
+    @DisplayName("v2는 error 이벤트도 service-unavailable로 유지한다")
+    void v2ErrorEventStaysServiceUnavailable() throws Exception {
+        stubAi(200, DELTAS + sse("error", "{\"message\":\"llm_timeout\"}"));
 
-        assertFailure(requestEvents());
+        var events = requestEvents("/test/chat");
+
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.service-unavailable"));
+        assertThat(events.get(1).data().path("status").asInt()).isEqualTo(503);
+        assertNothingSaved();
     }
 
     @Test
-    void 가용_시간이_정수_시간으로_변환되지_않으면_저장하지_않는다() throws Exception {
-        givenSuccess(new ExtractSlotResponseV2.Slot(null, null, null, "90", Set.of()));
+    @DisplayName("done 없이 스트림이 끊기면 부분 응답을 저장하지 않는다")
+    void streamEndingWithoutDoneSavesNothing() throws Exception {
+        stubAi(200, DELTAS);
 
-        assertFailure(requestEvents());
+        var v3 = requestEvents("/test/chat-v3");
+
+        assertThat(v3.stream().map(Event::name).toList())
+                .isEqualTo(List.of(
+                        "chat-reply.accepted",
+                        "chat-reply.delta",
+                        "chat-reply.delta",
+                        "chat-reply.service-unavailable"));
+        assertNothingSaved();
     }
 
-    private void givenSuccess(ExtractSlotResponseV2.Slot slot) {
-        when(aiServerService.extractSlot(eq(CONTENT), any(OutingCriteria.class)))
-                .thenReturn(new ExtractSlotResponseV2.Success(
-                        "success", new ExtractSlotResponseV2.SuccessData(slot, "카페 선호", REPLY)));
+    @Test
+    @DisplayName("v3는 스트림 시작 전 AI HTTP 오류를 SSE 없이 HTTP 오류로 응답한다")
+    void v3BeforeStreamErrorIsHttpError() throws Exception {
+        stubAi(504, "{\"message\":\"llm_timeout\"}", "application/json");
+
+        mvc.perform(post("/test/chat-v3")).andExpect(status().isBadGateway());
+
+        assertThat(released.await(5, TimeUnit.SECONDS))
+                .as("실패해도 실행 권한을 해제해야 합니다.")
+                .isTrue();
+        assertNothingSaved();
     }
 
-    private void assertFailure(List<Event> events) {
-        assertEquals(
-                List.of("chat-reply.accepted", "chat-reply.service-unavailable"),
-                events.stream().map(Event::name).toList());
-        assertEquals(events.get(0).id(), events.get(1).id());
-        assertEquals(503, events.get(1).data().path("status").asInt());
+    @Test
+    @DisplayName("v2는 스트림 시작 전 AI HTTP 오류도 service-unavailable 이벤트로 보낸다")
+    void v2BeforeStreamErrorStaysEvent() throws Exception {
+        stubAi(504, "{\"message\":\"llm_timeout\"}", "application/json");
 
-        // 실패해도 사용자 메시지는 남기고, 봇 메시지와 슬롯은 저장하지 않습니다.
+        var events = requestEvents("/test/chat");
+
+        assertThat(events.stream().map(Event::name).toList())
+                .isEqualTo(List.of("chat-reply.accepted", "chat-reply.service-unavailable"));
+        assertNothingSaved();
+    }
+
+    @Test
+    @DisplayName("done에 나들이 조건이나 봇 메시지가 없으면 저장하지 않는다")
+    void doneWithoutRequiredDataSavesNothing() throws Exception {
+        stubAi(200, sse("done", "{\"slot\":{},\"query\":\"q\"}"));
+
+        var events = requestEvents("/test/chat-v3");
+
+        assertThat(events.get(1).name()).isEqualTo("chat-reply.service-unavailable");
+        assertNothingSaved();
+    }
+
+    @Test
+    @DisplayName("가용 시간이 정수 시간으로 변환되지 않으면 저장하지 않는다")
+    void invalidAvailableTimeSavesNothing() throws Exception {
+        stubAi(200, done("{\"available_time\":\"90\"}"));
+
+        var events = requestEvents("/test/chat-v3");
+
+        assertThat(events.get(1).name()).isEqualTo("chat-reply.service-unavailable");
+        assertNothingSaved();
+    }
+
+    private void assertNothingSaved() {
+        // 실패해도 사용자 메시지는 남기고, 봇 메시지와 나들이 조건은 저장하지 않습니다.
         verify(chatRepository, times(1)).save(any(Chat.class));
         verify(outingCriteriaRepository, never()).save(any(OutingCriteria.class));
     }
 
-    private List<Event> requestEvents() throws Exception {
-        var pending = mvc.perform(post("/test/chat"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
+    private static String sse(String event, String data) {
+        return "event: " + event + "\ndata: " + data.replace("\n", "") + "\n\n";
+    }
+
+    private static String done(String slot) {
+        return sse("done", "{\"slot\":" + slot + ",\"query\":\"카페 선호\",\"bot_message\":\"" + REPLY + "\"}");
+    }
+
+    private void stubAi(int status, String body) {
+        stubAi(status, body, "text/event-stream");
+    }
+
+    private void stubAi(int status, String body, String contentType) {
+        ai.createContext("/", exchange -> {
+            aiPath.set(exchange.getRequestURI().getPath());
+            aiRequest.set(json.readTree(exchange.getRequestBody().readAllBytes()));
+            var bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", contentType);
+            exchange.sendResponseHeaders(status, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+    }
+
+    private List<Event> requestEvents(String path) throws Exception {
+        var pending =
+                mvc.perform(post(path)).andExpect(request().asyncStarted()).andReturn();
 
         // 가상 스레드가 SSE 처리를 끝낼 때까지 기다립니다.
         pending.getAsyncResult(5_000);
-        assertTrue(released.await(5, TimeUnit.SECONDS), "작업 종료 후 실행 권한을 해제해야 합니다.");
+        assertThat(released.await(5, TimeUnit.SECONDS))
+                .as("작업 종료 후 실행 권한을 해제해야 합니다.")
+                .isTrue();
 
         var requestId = ArgumentCaptor.forClass(String.class);
         verify(requestStore).acquire(eq(MEMBER_ID), requestId.capture());
@@ -313,6 +449,11 @@ class ChatServiceV2Test {
         @PostMapping(value = "/test/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
         SseEmitter send() {
             return service.sendChatMessage(new SendChatMessageCommandV2(MEMBER_ID, CONTENT));
+        }
+
+        @PostMapping(value = "/test/chat-v3", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        SseEmitter stream() {
+            return service.streamChatMessage(new SendChatMessageCommandV2(MEMBER_ID, CONTENT));
         }
     }
 }

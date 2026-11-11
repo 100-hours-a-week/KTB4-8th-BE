@@ -124,5 +124,5 @@ data: {
 **항목 설명 (K열)**
 
 ```text
-event 예시: chat-reply.service-unavailable
+event 예시: chat-reply.service-unavailable, chat-reply.bad-gateway(v3 채팅, AI LLM 오류)
 ```
