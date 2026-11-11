@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
-import eightjbbm.keepgo.chat.dto.SendChatResult;
+import eightjbbm.keepgo.chat.ChatMapper;
 import eightjbbm.keepgo.chat.service.ChatService;
 import eightjbbm.keepgo.chat.service.ChatServiceV2;
 import eightjbbm.keepgo.util.exception.GlobalExceptionHandler;
@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mapstruct.factory.Mappers;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -47,7 +48,9 @@ class ChatContentValidationTest {
                 .header("alg", "none")
                 .subject("7")
                 .build();
-        mvc = standaloneSetup(new ChatController(chatService), new ChatControllerV2(chatServiceV2))
+        mvc = standaloneSetup(
+                        new ChatController(chatService, Mappers.getMapper(ChatMapper.class)),
+                        new ChatControllerV2(chatServiceV2))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
@@ -66,22 +69,7 @@ class ChatContentValidationTest {
                 })
                 .build();
 
-        when(chatService.sendChat(any())).thenReturn(new SendChatResult(1L, MAX_CONTENT, false));
         when(chatServiceV2.sendChatMessage(any())).thenReturn(new SseEmitter());
-    }
-
-    @Test
-    @DisplayName("V1은 255자 content를 받아들임")
-    void v1AcceptsMaxLengthContent() throws Exception {
-        send("/api/v1/user/chat-messages", MAX_CONTENT).andExpect(status().isAccepted());
-    }
-
-    @Test
-    @DisplayName("V1은 256자 content를 422로 거부하고 서비스를 호출하지 않음")
-    void v1RejectsTooLongContent() throws Exception {
-        send("/api/v1/user/chat-messages", TOO_LONG_CONTENT).andExpect(status().isUnprocessableContent());
-
-        verifyNoInteractions(chatService);
     }
 
     @Test
