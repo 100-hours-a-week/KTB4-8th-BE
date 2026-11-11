@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import eightjbbm.keepgo.member.MemberMapper;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoCommand;
 import eightjbbm.keepgo.member.dto.UpdateMemberInfoResult;
 import eightjbbm.keepgo.member.service.MemberService;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
@@ -35,7 +37,8 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("회원 정보 수정 요청 검증")
 class MemberControllerTest {
     private final MemberService memberService = mock(MemberService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new MemberController(memberService))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
+                    new MemberController(memberService, Mappers.getMapper(MemberMapper.class)))
             .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
                     .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                     .build()))

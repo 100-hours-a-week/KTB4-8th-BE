@@ -18,13 +18,14 @@ import org.springframework.web.bind.annotation.*;
 public class MemberController {
 
     private final MemberService memberService;
+    private final MemberMapper memberMapper;
 
     /// 회원 정보 조회 API
     /// @param jwt
     /// @return {@link GetMemberInfoResponse}
     @GetMapping
     public ResponseEntity<GetMemberInfoResponse> getMemberInfo(@AuthenticationPrincipal Jwt jwt) {
-        var command = MemberMapper.INSTANCE.toGetMemberInfoCommand(Long.valueOf(jwt.getSubject()));
+        var command = memberMapper.toGetMemberInfoCommand(Long.valueOf(jwt.getSubject()));
 
         GetMemberInfoResult result = memberService.getMemberInfo(command);
 
@@ -38,7 +39,7 @@ public class MemberController {
     @PatchMapping
     public ResponseEntity<UpdateMemberInfoResponse> updateMemberInfo(
             @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid UpdateMemberInfoRequest request) {
-        var command = MemberMapper.INSTANCE.toUpdateMemberInfoCommand(Long.valueOf(jwt.getSubject()), request);
+        var command = memberMapper.toUpdateMemberInfoCommand(Long.valueOf(jwt.getSubject()), request);
 
         return ResponseEntity.status(HttpStatus.OK)
                 .body(UpdateMemberInfoResponse.from(memberService.updateMemberInfo(command)));
@@ -49,7 +50,7 @@ public class MemberController {
     @PostMapping("/youtube-analyze")
     public ResponseEntity<Void> synchronizeYoutubeLikeVideos(
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        var command = MemberMapper.INSTANCE.toSynchronizeYoutubeLikeVideosCommand(Long.valueOf(jwt.getSubject()));
+        var command = memberMapper.toSynchronizeYoutubeLikeVideosCommand(Long.valueOf(jwt.getSubject()));
 
         memberService.synchronizeYoutubeLikeVideos(command);
 
