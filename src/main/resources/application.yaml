@@ -122,4 +122,4 @@ management:
 
 logging:
   level:
-    root: ${LOGGING_LEVEL:TRACE}
+    root: ${LOGGING_LEVEL:INFO}
