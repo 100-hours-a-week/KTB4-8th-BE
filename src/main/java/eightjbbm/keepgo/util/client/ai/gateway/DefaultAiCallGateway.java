@@ -2,7 +2,6 @@ package eightjbbm.keepgo.util.client.ai.gateway;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
@@ -64,14 +63,6 @@ public class DefaultAiCallGateway implements AiCallGateway {
     public void start() {
         long intervalMillis = Math.max(1L, properties.retryInterval().toMillis());
         dispatcher.scheduleWithFixedDelay(this::dispatchSafely, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    public CompletableFuture<AnalyzeVideoResponseV2> submitAnalysis(
-            long syncId, List<String> videoIds, Runnable beforeSend) {
-        List<String> ids = List.copyOf(videoIds);
-        Runnable start = beforeSend == null ? () -> {} : beforeSend;
-        return enqueue("sync:" + syncId, AiCallType.ANALYSIS, () -> aiServerService.analyzeVideoV2(ids), start);
     }
 
     @Override
