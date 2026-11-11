@@ -21,6 +21,8 @@ import eightjbbm.keepgo.recommendation.service.dto.RecommendOutingCourseResultV2
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.sse.AiSseClient;
+import eightjbbm.keepgo.util.exception.BasicExceptionHandler;
+import eightjbbm.keepgo.util.exception.GlobalExceptionHandler;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -119,6 +121,7 @@ class RecommendationServiceV2Test {
         mvc = MockMvcBuilders.standaloneSetup(
                         new RecommendationControllerV2(service),
                         new RecommendationControllerV3(mock(HotPlaceServiceV2.class), service))
+                .setControllerAdvice(new BasicExceptionHandler(), new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
 
@@ -270,7 +273,10 @@ class RecommendationServiceV2Test {
         var v2 = events(post("/api/v2/member/recommendation"), "recommendation.service-unavailable");
 
         assertThat(v3.getStatus()).isEqualTo(502);
-        assertThat(v3.getContentAsString()).doesNotContain("accepted");
+        assertThat(v3.getContentType()).startsWith("application/problem+json");
+        assertThat(v3.getContentAsString())
+                .contains("\"code\":\"AI_LLM_TIMEOUT\"")
+                .doesNotContain("accepted");
         assertThat(names(v2))
                 .containsExactly(
                         "outing-course-recommendation.accepted", "outing-course-recommendation.service-unavailable");
