@@ -21,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -28,11 +29,16 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("회원 정보 수정 요청 검증")
 class MemberControllerTest {
     private final MemberService memberService = mock(MemberService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new MemberController(memberService))
+            .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
+                    .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                    .build()))
             .setControllerAdvice(new GlobalExceptionHandler())
             .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
             .build();
@@ -75,7 +81,7 @@ class MemberControllerTest {
     }
 
     @Test
-    @DisplayName("profileImageUrl 없이 닉네임만 보내면 사진 변경 없이 수정된다")
+    @DisplayName("profile_image_url 없이 닉네임만 보내면 사진 변경 없이 수정된다")
     void acceptsNicknameOnly() throws Exception {
         mvc.perform(patchBody(nicknameJson("홍길동"))).andExpect(status().isOk());
 
@@ -86,9 +92,9 @@ class MemberControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
-    @DisplayName("profileImageUrl 값이 비어 있으면 거부된다")
+    @DisplayName("profile_image_url 값이 비어 있으면 거부된다")
     void rejectsBlankProfileImageUrl(String url) throws Exception {
-        mvc.perform(patchBody("{\"nickname\":\"홍길동\",\"profileImageUrl\":\"" + url + "\"}"))
+        mvc.perform(patchBody("{\"nickname\":\"홍길동\",\"profile_image_url\":\"" + url + "\"}"))
                 .andExpect(status().isUnprocessableContent());
         verify(memberService, never()).updateMemberInfo(any());
     }
