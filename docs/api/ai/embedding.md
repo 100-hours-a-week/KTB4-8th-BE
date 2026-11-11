@@ -387,5 +387,5 @@ place_ids: String 리스트 (최대 100개)
 
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
-| 임베딩 저장 | place_id 기준 upsert, embedded_count 응답 | [AiServerService](../../../src/main/java/eightjbbm/keepgo/util/client/ai/analysis/AiServerService.java)는 성공 본문을 버리므로 embedded_count를 검증한다는 뜻은 아니다. 실제 저장 완료 의미는 2026-10-29 사용자 확인 기록을 보존한다. |
+| 임베딩 저장 | place_id 기준 upsert, embedded_count 응답 | [AiServerService](../../../src/main/java/eightjbbm/keepgo/util/client/ai/analysis/AiServerService.java)가 `POST /v3/embed-places`로 장소 하나씩 보내고 응답의 `success`만 확인한다(#360). 시트 예시의 `/v1/embed-places`·`places[]`·`embedded_count`와 다르며, 구계약 응답은 성공으로 보지 않는다. 실제 저장 완료 의미는 2026-10-29 사용자 확인 기록을 보존한다. |
 | 임베딩 삭제 | POST /v1/embed-places/delete | 원문에는 있으나 해당 HTTP 경로를 호출하는 운영 클라이언트는 이번 검색에서 확인하지 못했다. 구현·배포 여부 확인 필요. |

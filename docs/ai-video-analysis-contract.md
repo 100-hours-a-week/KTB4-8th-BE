@@ -27,7 +27,7 @@
 
 ## Wire 형식과 내부 결과
 
-`POST /v3/analyze-video`, 요청·응답은 JSON이다. 전용 `VideoAnalysisJobClient`는 `keepgo.clients.ai.address`를 서버 주소로 사용한다. 기존 채팅·추천 및 분석 클라이언트와 별도의 HTTP 클라이언트를 사용하며, 기존 분석 진입점의 호출 경로는 이 작업에서 전환하지 않는다.
+`POST /v3/analyze-video`, 요청·응답은 JSON이다. 전용 `VideoAnalysisJobClient`는 `keepgo.clients.ai.address`를 서버 주소로 사용한다. 채팅·추천 클라이언트와 별도의 HTTP 클라이언트를 사용한다. `/v1/analyze-video`·`video_urls`를 호출하던 구형 분석 클라이언트와 진입점은 제거했다(#357).
 
 ```json
 {"videos":[{"video_url":"https://youtube.com/shorts/aaaa","upload_date":"2026-11-02","title":"제목","description":"설명"}]}
@@ -114,7 +114,7 @@ bash gradlew test --tests '*VideoAnalysisJobClientTest.verifiesActualServerContr
 
 | 확인 항목 | 확인 결과 | 판정 |
 |---|---|---|
-| 새 분석 계약의 URL·필드 | 응답 `data.results[]`. 같은 `video_url`의 성공 행 반복이 복수 Guide이고, 각 행의 `place_type`이 `장소`/`이벤트`다. 요청은 당시 `POST /v1/analyze-video`·`video_urls`로 확인했으나 현재 구현은 `POST /v3/analyze-video`·`videos[]`를 보내며, 실제 서버의 `/v3` 지원은 확인하지 않았다. | 응답 확인, `/v3` 요청 확인 필요 |
+| 새 분석 계약의 URL·필드 | 응답 `data.results[]`. 같은 `video_url`의 성공 행 반복이 복수 Guide이고, 각 행의 `place_type`이 `장소`/`이벤트`다. 요청은 당시 `POST /v1/analyze-video`·`video_urls`로 확인했으나 현재 구현은 `POST /v3/analyze-video`·`videos[]`만 보내며 `/v1` 호출 코드는 없다. 실제 서버의 `/v3` 지원은 확인하지 않았다. | 응답 확인, `/v3` 요청 확인 필요 |
 | 새 분석 계약의 배포 여부·일정 | 이미 배포됐다. 별도 예정 일정은 없다. | 확인 |
 | 영상 분석(`analyze-video`) 최대 동시 처리 수 | 3건이다. | 확인 |
 | 임베딩의 Guide ID 기준 upsert | `POST /v1/embed-places`는 같은 `place_id`로 재호출하면 덮어쓴다. | 확인 |

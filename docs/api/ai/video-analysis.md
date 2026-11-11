@@ -642,6 +642,6 @@ summary: String
 
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
-| 영상 분석 | AI는 video_url 단일 요청, v2·v3는 video_urls 배열과 data.results. v3는 place_type 추가 | [VideoAnalysisJobClient](../../../src/main/java/eightjbbm/keepgo/util/client/ai/job/VideoAnalysisJobClient.java)가 새 평탄 행 응답을 내부 영상별 결과로 묶는다. 구형 [AiServerApiClient](../../../src/main/java/eightjbbm/keepgo/util/client/ai/AiServerApiClient.java)도 존재하므로 클래스 존재만으로 모든 경로가 새 계약이라고 판단하지 않는다. 상세 검증·운영 증거는 [기존 계약 문서](../../ai-video-analysis-contract.md) 참조. |
+| 영상 분석 | AI는 video_url 단일 요청, v2·v3는 video_urls 배열과 data.results. v3는 place_type 추가 | [VideoAnalysisJobClient](../../../src/main/java/eightjbbm/keepgo/util/client/ai/job/VideoAnalysisJobClient.java)가 새 평탄 행 응답을 내부 영상별 결과로 묶는다. [DefaultAiCallGateway](../../../src/main/java/eightjbbm/keepgo/util/client/ai/gateway/DefaultAiCallGateway.java)가 `POST /v3/analyze-video`·`videos[]`로 호출하며, `/v1/analyze-video`·`video_urls`를 호출하던 구형 클라이언트는 제거했다(#357). 상세 검증·운영 증거는 [기존 계약 문서](../../ai-video-analysis-contract.md) 참조. |
 
 영상 분석 후주의 잘린 문장을 추측해 완성하지 않는다. 내부 변환·검증·운영 확인은 [AI 영상 분석 HTTP 계약](../../ai-video-analysis-contract.md)을 참고한다.
