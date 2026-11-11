@@ -24,6 +24,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Slf4j
 @Component
@@ -78,7 +79,9 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
                 .build()
                 .toString();
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie);
-        response.sendRedirect(loginProperties.redirectionAddress() + "?accessToken=" + accessToken
-                + "&expiresIn=1800&initialLogin=" + initialLogin);
+        response.sendRedirect(UriComponentsBuilder.fromUriString(loginProperties.redirectionAddress())
+                .fragment("accessToken=" + accessToken + "&expiresIn=1800&initialLogin=" + initialLogin)
+                .build()
+                .toUriString());
     }
 }
