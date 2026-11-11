@@ -4,32 +4,33 @@ import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesRequestV2;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.util.client.ai.sse.AiSseClient;
+import eightjbbm.keepgo.util.client.ai.sse.AiStreamEvent;
+import eightjbbm.keepgo.util.client.ai.sse.AiStreamHandle;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Qualifier;
+import java.util.function.Consumer;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
+@RequiredArgsConstructor
 public class AiServerRecommendApiService {
 
-    private final RestClient restClient;
+    private final AiSseClient aiSseClient;
+    private final ObjectMapper mapper;
 
-    public AiServerRecommendApiService(@Qualifier("aiServerRestClient") RestClient restClient) {
-        this.restClient = restClient;
-    }
-
-    public RecommendCoursesResponseV2 recommendCourses(OutingCriteria outingCriteria, List<OutingGuide> outingGuides) {
-        return restClient
-                .post()
-                .uri("/v1/recommend-courses")
-                .body(RecommendCoursesRequestV2.from(outingCriteria, outingGuides))
-                .exchange((_, res) -> {
-                    int status = res.getStatusCode().value();
-                    return switch (status) {
-                        case 200 -> res.bodyTo(RecommendCoursesResponseV2.Success.class);
-                        case 400, 422, 429, 500, 502, 504 -> res.bodyTo(RecommendCoursesResponseV2.Failure.class);
-                        default -> throw new RuntimeException();
-                    };
-                });
+    /// 스트림을 `done`까지 읽고 그 본문을 돌려준다. 업무 결과는 호출자가 `message`로 판정한다.
+    public RecommendCoursesResponseV2.Done recommendCourses(
+            OutingCriteria outingCriteria,
+            List<OutingGuide> outingGuides,
+            AiStreamHandle handle,
+            Consumer<AiStreamEvent> onEvent) {
+        var result = aiSseClient.stream(
+                "/v3/recommend-course/stream",
+                RecommendCoursesRequestV2.from(outingCriteria, outingGuides),
+                onEvent,
+                handle);
+        return mapper.treeToValue(result.done(), RecommendCoursesResponseV2.Done.class);
     }
 }

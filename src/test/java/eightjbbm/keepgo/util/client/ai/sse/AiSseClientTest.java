@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -440,6 +441,45 @@ class AiSseClientTest {
                     assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
                     assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
                 });
+    }
+
+    @Test
+    @DisplayName("취소 핸들을 부르면 이벤트가 계속 와도 AI 연결을 즉시 끊는다")
+    void cancelHandleClosesOpenConnection() throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            while (true) {
+                chunk(out, DELTA_1);
+                Thread.sleep(50);
+            }
+        });
+        var opened = new AtomicInteger();
+        var handle = new AiStreamHandle(opened::incrementAndGet);
+        var started = System.nanoTime();
+
+        var thrown = catchThrowableOfType(
+                AiStreamException.class,
+                () -> client.stream("/v3/recommend-course/stream", Map.of(), event -> handle.cancel(), handle));
+
+        assertThat(opened).hasValue(1);
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
+    }
+
+    @Test
+    @DisplayName("스트림을 열기 전에 취소해도 요청을 보내지 않고 실패한다")
+    void cancelBeforeStartFailsBeforeStream() throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, DONE);
+        });
+        var handle = new AiStreamHandle();
+        handle.cancel();
+
+        var thrown = catchThrowableOfType(
+                AiStreamException.class, () -> client.stream("/v3/recommend-course/stream", Map.of(), e -> {}, handle));
+
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
     }
 
     @FunctionalInterface

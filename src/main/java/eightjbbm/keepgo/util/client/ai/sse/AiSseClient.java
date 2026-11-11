@@ -80,13 +80,19 @@ public final class AiSseClient implements AutoCloseable {
                 .build();
     }
 
+    public AiStreamResult stream(String path, Object body, Consumer<AiStreamEvent> onEvent) {
+        return stream(path, body, onEvent, new AiStreamHandle());
+    }
+
     /// `path`로 `body`를 POST하고 스트림이 `done`으로 끝날 때까지 읽는다. `delta`·`status`는 도착하는 대로 `onEvent`에 전달한다.
+    /// `handle.cancel()`을 부르면 연결을 즉시 끊는다.
     ///
     /// @throws AiStreamException `done` 없이 끝났거나 `error`·HTTP 오류를 받은 경우
-    public AiStreamResult stream(String path, Object body, Consumer<AiStreamEvent> onEvent) {
+    public AiStreamResult stream(String path, Object body, Consumer<AiStreamEvent> onEvent, AiStreamHandle handle) {
         var request = new HttpPost(baseUri.resolve(path.startsWith("/") ? path : "/" + path));
         request.setHeader("Accept", "text/event-stream");
         request.setEntity(new StringEntity(mapper.writeValueAsString(body), ContentType.APPLICATION_JSON));
+        handle.bind(request);
         // 마감이 되면 연결을 끊어 막힌 읽기를 깨운다. idleTimeout만으로는 이벤트가 계속 오는 스트림을 끝내지 못한다.
         var expired = new AtomicBoolean();
         var deadline = deadlines.schedule(
@@ -100,12 +106,13 @@ public final class AiSseClient implements AutoCloseable {
             ClassicHttpResponse response;
             try {
                 response = httpClient.executeOpen(null, request, null);
-            } catch (IOException exception) {
+            } catch (IOException | IllegalStateException exception) {
+                // 연결을 맺는 도중 취소되면 HttpClient가 IllegalStateException을 던질 수 있다.
                 throw fail(
                         path,
                         Phase.BEFORE_STREAM,
                         new ServiceUnavailableException(),
-                        expired.get() ? "total_timeout" : "connect",
+                        reason(expired, handle, "connect"),
                         exception);
             }
             try {
@@ -126,7 +133,8 @@ public final class AiSseClient implements AutoCloseable {
                             "content_type=" + (contentType == null ? null : contentType.getValue()),
                             null);
                 }
-                return read(path, response, onEvent, expired);
+                handle.opened();
+                return read(path, response, onEvent, expired, handle);
             } finally {
                 // 남은 본문을 기다리지 않도록 연결부터 중단한다.
                 request.cancel();
@@ -142,7 +150,11 @@ public final class AiSseClient implements AutoCloseable {
     }
 
     private AiStreamResult read(
-            String path, ClassicHttpResponse response, Consumer<AiStreamEvent> onEvent, AtomicBoolean expired) {
+            String path,
+            ClassicHttpResponse response,
+            Consumer<AiStreamEvent> onEvent,
+            AtomicBoolean expired,
+            AiStreamHandle handle) {
         var text = new StringBuilder();
         var data = new StringBuilder();
         String name = null;
@@ -166,19 +178,14 @@ public final class AiSseClient implements AutoCloseable {
             }
         } catch (IOException exception) {
             throw fail(
-                    path,
-                    Phase.IN_STREAM,
-                    new ServiceUnavailableException(),
-                    expired.get() ? "total_timeout" : "io",
-                    exception);
+                    path, Phase.IN_STREAM, new ServiceUnavailableException(), reason(expired, handle, "io"), exception);
         }
         // 마지막 이벤트가 빈 줄로 끝나지 않은 채 끊긴 경우도 여기로 온다.
-        throw fail(
-                path,
-                Phase.IN_STREAM,
-                new ServiceUnavailableException(),
-                expired.get() ? "total_timeout" : "eof",
-                null);
+        throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), reason(expired, handle, "eof"), null);
+    }
+
+    private static String reason(AtomicBoolean expired, AiStreamHandle handle, String fallback) {
+        return expired.get() ? "total_timeout" : handle.isCancelled() ? "cancelled" : fallback;
     }
 
     private AiStreamResult dispatch(
@@ -232,13 +239,17 @@ public final class AiSseClient implements AutoCloseable {
 
     private static AiStreamException fail(
             String path, Phase phase, ErrorResponseException error, String reason, Throwable cause) {
-        log.error(
-                "AI 스트림 실패: path={}, phase={}, status={}, reason={}",
-                path,
-                phase,
-                error.getStatusCode().value(),
-                reason,
-                cause);
+        if ("cancelled".equals(reason)) {
+            log.info("AI 스트림 취소: path={}, phase={}", path, phase);
+        } else {
+            log.error(
+                    "AI 스트림 실패: path={}, phase={}, status={}, reason={}",
+                    path,
+                    phase,
+                    error.getStatusCode().value(),
+                    reason,
+                    cause);
+        }
         return new AiStreamException(phase, error, cause);
     }
 

@@ -97,12 +97,12 @@ class RecommendationCourseServiceIntegrationTest {
                         null);
         var data = new RecommendCoursesResponseV2.SuccessData(
                 null,
-                90,
                 List.of(new RecommendCoursesResponseV2.Course(
                         "북촌 코스",
                         List.of(new RecommendCoursesResponseV2.Place(
                                 String.valueOf(guide.getId()), "북촌한옥마을", 7, null, 30, "한옥 골목")),
-                        60)));
+                        60,
+                        90)));
 
         List<OutingCourse> courses = courseService.saveCourses(criteria, data);
         // 실제 호출부(RecommendationServiceV2.recommend)는 별도 실행 스레드에서 DTO를 만든다.

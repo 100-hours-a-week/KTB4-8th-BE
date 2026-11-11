@@ -1,12 +1,14 @@
 package eightjbbm.keepgo.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import eightjbbm.keepgo.recommendation.controller.RecommendationControllerV3;
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.service.HotPlaceServiceV2;
+import eightjbbm.keepgo.recommendation.service.RecommendationServiceV2;
 import eightjbbm.keepgo.util.Coordinate;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -43,7 +45,8 @@ class HotPlaceListIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new RecommendationControllerV3(new HotPlaceServiceV2(repository)))
+        mvc = MockMvcBuilders.standaloneSetup(new RecommendationControllerV3(
+                        new HotPlaceServiceV2(repository), mock(RecommendationServiceV2.class)))
                 .build();
     }
 
