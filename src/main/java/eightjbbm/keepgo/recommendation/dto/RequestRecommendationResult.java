@@ -2,6 +2,7 @@ package eightjbbm.keepgo.recommendation.dto;
 
 import eightjbbm.keepgo.recommendation.entity.OutingPlace;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
+import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.dto.RecommendCourseResponse;
 import java.util.List;
 import java.util.function.Function;
@@ -38,7 +39,7 @@ public record RequestRecommendationResult(
                             .sum(),
                     IntStream.range(0, course.places().size())
                             .mapToObj(k -> RecommendationDetailItem.from(
-                                    k,
+                                    k + 1,
                                     course.places().get(k),
                                     extractor.apply(course.places().get(k))))
                             .toList());
@@ -49,18 +50,14 @@ public record RequestRecommendationResult(
             Integer sequence, String name, String category, String description, Float lat, Float lng) {
         public static RecommendationDetailItem from(
                 int sequence, RecommendCourseResponse.RecommendPlace place, OutingPlace outingPlace) {
+            Coordinate coordinate = outingPlace.getCoordinate();
             return new RecommendationDetailItem(
                     sequence,
                     place.placeName(),
                     outingPlace.getCategory(),
-                    place.travelMinutes().toString(),
-                    /*
-                    outingPlace.getLat(),
-                    outingPlace.getLng()
-
-                     */
-                    0.0f,
-                    0.0f);
+                    outingPlace.getDescription(),
+                    coordinate == null ? null : coordinate.lat(),
+                    coordinate == null ? null : coordinate.lng());
         }
     }
 
