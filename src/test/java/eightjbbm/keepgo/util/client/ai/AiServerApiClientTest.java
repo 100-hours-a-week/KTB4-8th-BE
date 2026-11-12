@@ -80,7 +80,7 @@ class AiServerApiClientTest {
     void logsPartialBodyOnTimeout(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         slowBody = true;
         serve(503, "{\"message\":\"late\"}");
-        var rest =
+        RestClient rest =
                 configuredClient("http://127.0.0.1:" + server.getAddress().getPort(), java.time.Duration.ofMillis(300));
         long start = System.nanoTime();
         assertThatThrownBy(() ->
@@ -97,7 +97,8 @@ class AiServerApiClientTest {
     @DisplayName("실제 설정에서 임베딩 요청과 전체 응답을 남기고 반환 동작을 보존한다")
     void logsEmbedding(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         serve(200, "{\"success\":true,\"place_id\":7}");
-        var rest = configuredClient("http://127.0.0.1:" + server.getAddress().getPort());
+        RestClient rest =
+                configuredClient("http://127.0.0.1:" + server.getAddress().getPort());
         var guide = new eightjbbm.keepgo.recommendation.entity.OutingPlace(
                 "카페", "성수 카페", "조용한 장소", "상세", "서울특별시 성동구", new eightjbbm.keepgo.util.Coordinate(37.5f, 127.0f), null);
         org.springframework.test.util.ReflectionTestUtils.setField(guide, "id", 7L);
@@ -120,15 +121,17 @@ class AiServerApiClientTest {
         var client = new AiServerApiClient(configuredClient("http://USER_SECRET:PASS_SECRET@127.0.0.1:"
                 + server.getAddress().getPort()));
         try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-            var one = executor.submit(client::warmUp);
-            var two = executor.submit(client::warmUp);
+            java.util.concurrent.Future<eightjbbm.keepgo.util.dto.WarmUpChatbotResponse> one =
+                    executor.submit(client::warmUp);
+            java.util.concurrent.Future<eightjbbm.keepgo.util.dto.WarmUpChatbotResponse> two =
+                    executor.submit(client::warmUp);
             assertThat(one.get().message()).isEqualTo("warmup_accepted");
             assertThat(two.get().message()).isEqualTo("warmup_accepted");
         }
-        var lines =
+        java.util.List<String> lines =
                 output.getOut().lines().filter(line -> line.contains("AI HTTP")).toList();
         assertThat(lines).hasSize(8);
-        var groups = lines.stream()
+        java.util.Map<String, java.util.List<String>> groups = lines.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
                         line -> line.split("callId=")[1].split(",")[0]));
         assertThat(groups).hasSize(2);
@@ -149,7 +152,8 @@ class AiServerApiClientTest {
     void logsErrorWithSafeUri(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         String body = "한글\n".repeat(3000) + "끝\r\t";
         serve(503, body);
-        var rest = configuredClient("http://127.0.0.1:" + server.getAddress().getPort());
+        RestClient rest =
+                configuredClient("http://127.0.0.1:" + server.getAddress().getPort());
         assertThatThrownBy(() -> rest.get()
                         .uri("/v3/version?api_key=QUERY_SECRET&token=TOKEN_SECRET")
                         .retrieve()

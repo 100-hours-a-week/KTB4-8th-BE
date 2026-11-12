@@ -124,7 +124,7 @@ public final class AiSseClient implements AutoCloseable {
                 call.status(response.getCode());
                 if (response.getCode() != 200) {
                     responseBody = true;
-                    var errorBody = bodyOf(response, call);
+                    String errorBody = bodyOf(response, call);
                     var error = AiErrors.fromHttpResponse(response.getCode(), messageOf(errorBody));
                     throw fail(call, path, Phase.BEFORE_STREAM, error, "http=" + response.getCode(), null);
                 }

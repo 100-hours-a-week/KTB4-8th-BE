@@ -25,7 +25,7 @@ public class AiServerApiClientConfig {
     @Bean
     RestClient aiServerRestClient(RestClient.Builder builder) {
         // JDK HttpClient는 자동 재시도를 하지 않는다. 분석 실패는 호출자가 한 번만 시도한다.
-        var httpClient = HttpClient.newBuilder()
+        HttpClient httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(callProperties.connectTimeout())
                 .build();
@@ -37,20 +37,21 @@ public class AiServerApiClientConfig {
                 .baseUrl(properties.address())
                 .requestInterceptor((request, body, execution) -> {
                     MediaType requestType = request.getHeaders().getContentType();
-                    var requestCharset = requestType != null && requestType.getCharset() != null
+                    java.nio.charset.Charset requestCharset = requestType != null && requestType.getCharset() != null
                             ? requestType.getCharset()
                             : StandardCharsets.UTF_8;
                     var call = new AiHttpLog(
                             request.getMethod().name(), request.getURI(), new String(body, requestCharset));
                     String reason = "io";
                     try {
-                        var response = execution.execute(request, body);
-                        call.status(response.getStatusCode().value());
-                        MediaType responseType = response.getHeaders().getContentType();
-                        var responseCharset = responseType != null && responseType.getCharset() != null
-                                ? responseType.getCharset()
-                                : StandardCharsets.UTF_8;
+                        org.springframework.http.client.ClientHttpResponse response = execution.execute(request, body);
                         try {
+                            call.status(response.getStatusCode().value());
+                            MediaType responseType = response.getHeaders().getContentType();
+                            java.nio.charset.Charset responseCharset =
+                                    responseType != null && responseType.getCharset() != null
+                                            ? responseType.getCharset()
+                                            : StandardCharsets.UTF_8;
                             call.readBody(response.getBody(), responseCharset);
                         } catch (java.io.IOException | RuntimeException exception) {
                             response.close();

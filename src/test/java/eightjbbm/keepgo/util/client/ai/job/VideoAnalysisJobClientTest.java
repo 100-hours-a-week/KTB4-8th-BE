@@ -95,7 +95,8 @@ class VideoAnalysisJobClientTest {
 
     @Test
     @DisplayName("복수 가이드 유형과 영상별 실패를 받고, 요청 본문의 업로드 날짜는 yyyy-MM-dd 문자열이다")
-    void receivesMultipleExplicitGuideTypesAndVideoFailures() throws Exception {
+    void receivesMultipleExplicitGuideTypesAndVideoFailures(org.springframework.boot.test.system.CapturedOutput output)
+            throws Exception {
         String fixture;
         try (var input = getClass().getResourceAsStream("/ai-analysis/mixed-analysis-response.json")) {
             fixture = new String(input.readAllBytes(), StandardCharsets.UTF_8);
@@ -119,6 +120,23 @@ class VideoAnalysisJobClientTest {
                                   {"video_url":"https://youtube.com/shorts/video-b","upload_date":null,"title":null,"description":null},
                                   {"video_url":"https://youtube.com/shorts/video-c","upload_date":null,"title":null,"description":null}]}
                                 """));
+        List<String> lines =
+                output.getOut().lines().filter(line -> line.contains("AI HTTP")).toList();
+        assertThat(lines).hasSize(4);
+        assertThat(lines.stream()
+                        .map(line -> line.split("callId=")[1].split(",")[0])
+                        .distinct()
+                        .toList())
+                .hasSize(1);
+        assertThat(lines).anySatisfy(line -> assertThat(line).contains("AI HTTP request", "body=" + request.get()));
+        assertThat(lines)
+                .anySatisfy(line -> assertThat(line)
+                        .contains(
+                                "AI HTTP body",
+                                "status=200",
+                                "complete=true",
+                                "body=" + fixture.replace("\r", "\\r").replace("\n", "\\n")));
+        assertThat(lines).anySatisfy(line -> assertThat(line).contains("AI HTTP end", "reason=complete", "elapsedMs="));
         assertThat(calls.get()).isEqualTo(1);
     }
 
