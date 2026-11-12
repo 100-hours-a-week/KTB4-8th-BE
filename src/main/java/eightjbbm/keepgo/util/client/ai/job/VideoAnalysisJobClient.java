@@ -3,6 +3,7 @@ package eightjbbm.keepgo.util.client.ai.job;
 import static eightjbbm.keepgo.util.client.ai.job.AiRequestException.Kind.*;
 
 import eightjbbm.keepgo.common.domain.BusinessScheduleDto;
+import eightjbbm.keepgo.util.client.ai.AiHttpLog;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -10,13 +11,13 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
@@ -28,7 +29,7 @@ import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.type.LogicalType;
 
-/** Job 실행 계층 전용. 호출 예산과 재시도는 상위 Job 계층이 관리한다. */
+/// Job 실행 계층 전용. 호출 예산과 재시도는 상위 Job 계층이 관리한다.
 public final class VideoAnalysisJobClient implements AutoCloseable {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration ANALYSIS_TIMEOUT = Duration.ofSeconds(130);
@@ -88,40 +89,62 @@ public final class VideoAnalysisJobClient implements AutoCloseable {
         var request = new HttpPost(endpoint);
         request.setHeader("Accept", "application/json");
         request.setEntity(new StringEntity(body, ContentType.APPLICATION_JSON));
+        var call = new AiHttpLog("POST", endpoint, body);
+        var httpFailure = new AtomicReference<AiRequestException>();
         var pending = executor.submit(() -> {
             try (var response = httpClient.executeOpen(null, request, null)) {
+                call.status(response.getCode());
                 if (response.getCode() != 200) {
                     var retryAfter = response.getFirstHeader("Retry-After");
-                    var failure = new AiRequestException(
-                            HTTP_ERROR, response.getCode(), retryAfter == null ? null : retryAfter.getValue(), null);
-                    // 응답을 닫으며 오류 본문을 기다리지 않도록 연결부터 중단한다.
-                    request.cancel();
-                    throw failure;
+                    httpFailure.set(new AiRequestException(
+                            HTTP_ERROR, response.getCode(), retryAfter == null ? null : retryAfter.getValue(), null));
                 }
-                return response.getEntity() == null
-                        ? ""
-                        : EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                try {
+                    String responseBody = call.readBody(
+                            response.getEntity() == null
+                                    ? null
+                                    : response.getEntity().getContent(),
+                            StandardCharsets.UTF_8);
+                    if (httpFailure.get() != null) throw httpFailure.get();
+                    return responseBody;
+                } finally {
+                    // 수신 실패 시 닫기가 남은 본문을 기다리지 않도록 중단한다.
+                    request.cancel();
+                }
             }
         });
+        String reason = "complete";
         try {
             // body 전체 수신까지 제한한다. 응답 헤더 수신만으로 타임아웃을 해제하지 않는다.
             remainingNanos = budget.toNanos() - (System.nanoTime() - started);
             var response = pending.get(Math.max(0, remainingNanos), TimeUnit.NANOSECONDS);
             return decode(response, urls);
         } catch (TimeoutException exception) {
+            reason = "timeout";
             request.cancel();
             pending.cancel(true);
+            if (httpFailure.get() != null) throw httpFailure.get();
             throw new AiRequestException(TIMEOUT, null, null, exception);
         } catch (InterruptedException exception) {
+            reason = "interrupted";
             request.cancel();
             pending.cancel(true);
             Thread.currentThread().interrupt();
             throw new AiRequestException(INTERRUPTED, null, null, exception);
         } catch (ExecutionException exception) {
             var cause = exception.getCause();
-            if (cause instanceof AiRequestException failure) throw failure;
+            reason = cause instanceof SocketTimeoutException ? "timeout" : "transport_error";
+            if (httpFailure.get() != null) {
+                reason = "http_error";
+                throw httpFailure.get();
+            }
             throw new AiRequestException(
                     cause instanceof SocketTimeoutException ? TIMEOUT : TRANSPORT_ERROR, null, null, cause);
+        } catch (AiRequestException exception) {
+            reason = "invalid_response";
+            throw exception;
+        } finally {
+            call.end(reason, true);
         }
     }
 
