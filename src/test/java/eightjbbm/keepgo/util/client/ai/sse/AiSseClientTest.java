@@ -45,7 +45,7 @@ class AiSseClientTest {
         String message = "상세\n".repeat(3000);
         String body = mapper.writeValueAsString(Map.of("message", message));
         serve((socket, out) -> httpResponse(out, 503, "Content-Type: application/json\r\n", body));
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
         assertThat(output.getOut()).contains(body.replace("\\", "\\\\"), "complete=true", "reason=http=503");
     }
@@ -62,7 +62,7 @@ class AiSseClientTest {
                 },
                 Duration.ofMillis(250));
         long start = System.nanoTime();
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
         assertThat(output.getOut()).contains("status=503", "complete=false, body={", "reason=total_timeout");
@@ -80,7 +80,7 @@ class AiSseClientTest {
             endChunks(out);
         });
         var seen = new ArrayList<AiStreamEvent>();
-        var result = client.stream("/v3/extract/stream?key=URI_SECRET", Map.of("chat", "안녕\n대화"), seen::add);
+        AiStreamResult result = client.stream("/v3/extract/stream?key=URI_SECRET", Map.of("chat", "안녕\n대화"), seen::add);
         assertThat(result.text()).isEqualTo(text);
         assertThat(seen).extracting(AiStreamEvent::name).containsExactly("status", "delta");
         assertThat(output.getOut())
@@ -195,7 +195,7 @@ class AiSseClientTest {
         });
         var seen = new ArrayList<AiStreamEvent>();
 
-        var result = client.stream("/v3/extract/stream", Map.of("chat", "안녕"), seen::add);
+        AiStreamResult result = client.stream("/v3/extract/stream", Map.of("chat", "안녕"), seen::add);
 
         assertThat(result.text()).isEqualTo("성수에서 카페");
         assertThat(result.done().path("query").asString()).isEqualTo("조용한");
@@ -221,7 +221,7 @@ class AiSseClientTest {
         });
         var seen = new ArrayList<AiStreamEvent>();
 
-        var result = client.stream("v3/recommend-course/stream", Map.of(), seen::add);
+        AiStreamResult result = client.stream("v3/recommend-course/stream", Map.of(), seen::add);
 
         assertThat(seen).hasSize(1);
         assertThat(seen.getFirst().data().path("stage").asString()).isEqualTo("retrieving");
@@ -248,7 +248,7 @@ class AiSseClientTest {
         });
         var seen = new ArrayList<AiStreamEvent>();
 
-        var thrown = failure(seen);
+        AiStreamException thrown = failure(seen);
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(type);
@@ -265,7 +265,7 @@ class AiSseClientTest {
         });
         var seen = new ArrayList<AiStreamEvent>();
 
-        var thrown = failure(seen);
+        AiStreamException thrown = failure(seen);
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -281,7 +281,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -298,7 +298,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
+        AiStreamResult result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
 
         assertThat(result.text()).isEmpty();
     }
@@ -319,7 +319,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -334,7 +334,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
 
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
     }
@@ -348,7 +348,7 @@ class AiSseClientTest {
             socket.setSoLinger(true, 0);
         });
 
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -364,7 +364,7 @@ class AiSseClientTest {
             endChunks(out);
         });
         var seen = new ArrayList<AiStreamEvent>();
-        var result = client.stream("/v3/extract/stream", Map.of(), seen::add);
+        AiStreamResult result = client.stream("/v3/extract/stream", Map.of(), seen::add);
         assertThat(result.text()).isEqualTo("한글");
         assertThat(seen).extracting(AiStreamEvent::name).containsExactly("delta");
     }
@@ -380,7 +380,7 @@ class AiSseClientTest {
                 },
                 Duration.ofMillis(250));
         var seen = new ArrayList<AiStreamEvent>();
-        var thrown = failure(seen);
+        AiStreamException thrown = failure(seen);
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(seen).isEmpty();
         assertThat(output.getOut())
@@ -395,7 +395,7 @@ class AiSseClientTest {
             chunk(out, "event: done\ndata: {\"query\":\"조용한\"}\n");
             endChunks(out);
         });
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(output.getOut()).contains("event=done", "body={\"query\":\"조용한\"}, complete=false", "reason=eof");
     }
@@ -409,7 +409,7 @@ class AiSseClientTest {
             Thread.sleep(3000);
         });
 
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -433,7 +433,7 @@ class AiSseClientTest {
         var seen = new ArrayList<AiStreamEvent>();
         long start = System.nanoTime();
 
-        var thrown = failure(seen);
+        AiStreamException thrown = failure(seen);
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -455,7 +455,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
+        AiStreamResult result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
 
         assertThat(result.text()).isEqualTo("성수에서 카페");
     }
@@ -475,7 +475,7 @@ class AiSseClientTest {
         serve((socket, out) -> httpError(out, httpStatus));
         var seen = new ArrayList<AiStreamEvent>();
 
-        var thrown = failure(seen);
+        AiStreamException thrown = failure(seen);
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(type);
@@ -498,7 +498,7 @@ class AiSseClientTest {
             throws Exception {
         serve((socket, out) -> httpResponse(out, httpStatus, "", body == null ? "" : body));
 
-        var thrown = failure(new ArrayList<>());
+        AiStreamException thrown = failure(new ArrayList<>());
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(type);
@@ -511,7 +511,7 @@ class AiSseClientTest {
         serve((socket, out) -> httpResponse(out, 200, headers, "{\"message\":\"extract_success\"}"));
         var seen = new ArrayList<AiStreamEvent>();
 
-        var thrown = failure(seen);
+        AiStreamException thrown = failure(seen);
 
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
@@ -530,7 +530,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
+        AiStreamResult result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
 
         assertThat(result.text()).isEqualTo("성수에서 ");
     }
