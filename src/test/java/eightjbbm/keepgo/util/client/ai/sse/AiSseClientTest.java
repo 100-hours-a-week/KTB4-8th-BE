@@ -354,6 +354,39 @@ class AiSseClientTest {
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
     }
 
+    @ParameterizedTest
+    @DisplayName("LF와 CRLF 및 CR 줄 구분에서 이벤트 해석이 같다")
+    @ValueSource(strings = {"\n", "\r\n", "\r"})
+    void preservesLineEndings(String newline) throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, ("event: delta\ndata: {\"text\":\"한글\"}\n\nevent: done\ndata: {}\n\n").replace("\n", newline));
+            endChunks(out);
+        });
+        var seen = new ArrayList<AiStreamEvent>();
+        var result = client.stream("/v3/extract/stream", Map.of(), seen::add);
+        assertThat(result.text()).isEqualTo("한글");
+        assertThat(seen).extracting(AiStreamEvent::name).containsExactly("delta");
+    }
+
+    @Test
+    @DisplayName("data 줄 끝이 오기 전 마감되어도 이미 받은 본문을 불완전한 이벤트로 남긴다")
+    void logsUnterminatedDataOnTimeout(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        serve(
+                (socket, out) -> {
+                    streamHead(out);
+                    chunk(out, "event: delta\ndata: {\"text\":\"미완성 한글");
+                    Thread.sleep(1500);
+                },
+                Duration.ofMillis(250));
+        var seen = new ArrayList<AiStreamEvent>();
+        var thrown = failure(seen);
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
+        assertThat(seen).isEmpty();
+        assertThat(output.getOut())
+                .contains("event=delta", "body={\"text\":\"미완성 한글, complete=false", "reason=total_timeout");
+    }
+
     @Test
     @DisplayName("구분자가 없는 마지막 이벤트는 전달하지 않고 불완전한 본문으로 기록한다")
     void logsPartialEventAtEof(org.springframework.boot.test.system.CapturedOutput output) throws Exception {

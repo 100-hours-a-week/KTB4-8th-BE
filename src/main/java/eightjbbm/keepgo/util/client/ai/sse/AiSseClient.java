@@ -4,9 +4,10 @@ import eightjbbm.keepgo.util.client.ai.AiErrors;
 import eightjbbm.keepgo.util.client.ai.AiHttpLog;
 import eightjbbm.keepgo.util.client.ai.sse.AiStreamException.Phase;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -141,7 +142,7 @@ public final class AiSseClient implements AutoCloseable {
                             null);
                 }
                 handle.opened();
-                var result = read(path, response, onEvent, expired, handle, call);
+                AiStreamResult result = read(path, response, onEvent, expired, handle, call);
                 endReason = "done";
                 return result;
             } finally {
@@ -175,9 +176,9 @@ public final class AiSseClient implements AutoCloseable {
         var text = new StringBuilder();
         var data = new StringBuilder();
         String name = null;
+        SseLineReader reader = null;
         try {
-            var reader = new BufferedReader(
-                    new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
+            reader = new SseLineReader(response.getEntity().getContent());
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 if (line.isEmpty()) {
                     if (!data.isEmpty()) {
@@ -208,11 +209,52 @@ public final class AiSseClient implements AutoCloseable {
                             exception instanceof java.net.SocketTimeoutException ? "idle_timeout" : "io"),
                     exception);
         } finally {
+            String partial = reader == null ? "" : reader.partialLine();
+            if (partial.startsWith("data:")) {
+                if (!data.isEmpty()) data.append('\n');
+                data.append(partial.substring(5).stripLeading());
+            } else if (!partial.isEmpty()) {
+                call.event(name, partial, false);
+            }
             if (!data.isEmpty()) call.event(name, data.toString(), false);
         }
         // 마지막 이벤트가 빈 줄로 끝나지 않은 채 끊긴 경우도 여기로 온다.
         throw fail(
                 call, path, Phase.IN_STREAM, new ServiceUnavailableException(), reason(expired, handle, "eof"), null);
+    }
+
+    /// BufferedReader와 같은 줄 구분 규칙을 쓰되, 읽기가 중단되어도 받은 부분 줄을 보존한다.
+    private static final class SseLineReader {
+        private final InputStream input;
+        private final ByteArrayOutputStream line = new ByteArrayOutputStream();
+        private boolean skipLf;
+
+        private SseLineReader(InputStream input) {
+            this.input = new BufferedInputStream(input);
+        }
+
+        private String readLine() throws IOException {
+            for (int value; (value = input.read()) != -1; ) {
+                if (skipLf && value == '\n') {
+                    skipLf = false;
+                    continue;
+                }
+                skipLf = value == '\r';
+                if (value == '\n' || value == '\r') return takeLine();
+                line.write(value);
+            }
+            return line.size() == 0 ? null : takeLine();
+        }
+
+        private String takeLine() {
+            String value = partialLine();
+            line.reset();
+            return value;
+        }
+
+        private String partialLine() {
+            return line.toString(StandardCharsets.UTF_8);
+        }
     }
 
     private static String reason(AtomicBoolean expired, AiStreamHandle handle, String fallback) {
