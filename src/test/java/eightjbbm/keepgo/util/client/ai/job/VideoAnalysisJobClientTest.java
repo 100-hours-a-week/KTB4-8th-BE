@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
+@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
 @DisplayName("영상 분석 Job 클라이언트")
 class VideoAnalysisJobClientTest {
     private HttpServer server;
@@ -28,6 +29,33 @@ class VideoAnalysisJobClientTest {
     private final AtomicReference<String> request = new AtomicReference<>();
     private boolean delayBody;
     private final AtomicInteger calls = new AtomicInteger();
+
+    @Test
+    @DisplayName("전체 오류 본문은 길이 제한 없이 한 로그 경계에 기록하고 HTTP 분류를 유지한다")
+    void logsEntireError(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        String body = "한글\n".repeat(2000) + "끝\t\u0001";
+        serve(503, body, "12", 0);
+        var exception = catchThrowableOfType(
+                AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofSeconds(5)));
+        assertThat(exception.kind()).isEqualTo(AiRequestException.Kind.HTTP_ERROR);
+        assertThat(output.getOut()).contains("complete=true", "한글\\n".repeat(2000), "끝\\t\\u0001", "reason=http_error");
+        assertThat(calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("지연된 오류 본문은 마감 안에 중단하며 받은 부분과 상태를 기록한다")
+    void logsPartialErrorAtDeadline(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        delayBody = true;
+        serve(503, "{\"message\":\"late\"}", "12", 1200);
+        long start = System.nanoTime();
+        var exception = catchThrowableOfType(
+                AiRequestException.class, () -> client.analyzeVideo(List.of("a"), Map.of(), Duration.ofMillis(300)));
+        assertThat(exception.kind()).isEqualTo(AiRequestException.Kind.HTTP_ERROR);
+        assertThat(exception.statusCode()).isEqualTo(503);
+        assertThat(Duration.ofNanos(System.nanoTime() - start).toMillis()).isLessThan(1000);
+        assertThat(output.getOut()).contains("status=503", "complete=false, body={", "reason=timeout");
+        assertThat(calls.get()).isEqualTo(1);
+    }
 
     @AfterEach
     void stop() {

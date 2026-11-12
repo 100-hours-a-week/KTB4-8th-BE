@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.ErrorResponseException;
 import tools.jackson.databind.ObjectMapper;
 
+@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
 @DisplayName("AI SSE 수신 규칙")
 class AiSseClientTest {
     private static final String DELTA_1 = "event: delta\ndata: {\"text\":\"성수에서 \"}\n\n";
@@ -37,6 +38,70 @@ class AiSseClientTest {
     private final AtomicReference<String> requestBody = new AtomicReference<>();
     private ServerSocket server;
     private AiSseClient client;
+
+    @Test
+    @DisplayName("긴 HTTP 오류 본문은 전체 기록하고 기존 오류 분류를 보존한다")
+    void logsHttpErrorBody(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        String message = "상세\n".repeat(3000);
+        String body = mapper.writeValueAsString(Map.of("message", message));
+        serve((socket, out) -> httpResponse(out, 503, "Content-Type: application/json\r\n", body));
+        var thrown = failure(new ArrayList<>());
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
+        assertThat(output.getOut()).contains(body.replace("\\", "\\\\"), "complete=true", "reason=http=503");
+    }
+
+    @Test
+    @DisplayName("오류 본문 수신도 전체 마감에 중단하고 부분 수신과 HTTP 상태를 기록한다")
+    void logsPartialHttpBody(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        serve(
+                (socket, out) -> {
+                    out.write("HTTP/1.1 503 X\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"
+                            .getBytes(StandardCharsets.UTF_8));
+                    out.flush();
+                    Thread.sleep(1500);
+                },
+                Duration.ofMillis(250));
+        long start = System.nanoTime();
+        var thrown = failure(new ArrayList<>());
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
+        assertThat(output.getOut()).contains("status=503", "complete=false, body={", "reason=total_timeout");
+    }
+
+    @Test
+    @DisplayName("SSE 전체 본문과 순번을 기록하고 이벤트 전달과 done을 보존한다")
+    void logsEveryEvent(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        String text = "한글".repeat(3000);
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, "event: status\ndata: {\"message\":\"준비\"}\n\n");
+            chunk(out, "event: delta\ndata: {\"text\":\"" + text + "\"}\n\n");
+            chunk(out, "event: done\ndata: {\"result\":\"완료\"}\n\n");
+            endChunks(out);
+        });
+        var seen = new ArrayList<AiStreamEvent>();
+        var result = client.stream("/v3/extract/stream?key=URI_SECRET", Map.of("chat", "안녕\n대화"), seen::add);
+        assertThat(result.text()).isEqualTo(text);
+        assertThat(seen).extracting(AiStreamEvent::name).containsExactly("status", "delta");
+        assertThat(output.getOut())
+                .contains(
+                        "sequence=1, event=status",
+                        "sequence=2, event=delta",
+                        "sequence=3, event=done",
+                        text,
+                        "reason=done")
+                .doesNotContain("URI_SECRET");
+        var lines = output.getOut()
+                .lines()
+                .filter(line -> line.contains("AI HTTP") || line.contains("AI SSE"))
+                .toList();
+        assertThat(lines).hasSize(6);
+        var ids = lines.stream()
+                .map(line -> line.split("callId=")[1].split(",")[0])
+                .distinct()
+                .toList();
+        assertThat(ids).hasSize(1);
+    }
 
     @AfterEach
     void stop() throws Exception {
@@ -233,7 +298,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var result = client.stream("/v3/extract/stream", Map.of(), event -> {});
+        var result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
 
         assertThat(result.text()).isEmpty();
     }
@@ -290,6 +355,19 @@ class AiSseClientTest {
     }
 
     @Test
+    @DisplayName("구분자가 없는 마지막 이벤트는 전달하지 않고 불완전한 본문으로 기록한다")
+    void logsPartialEventAtEof(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        serve((socket, out) -> {
+            streamHead(out);
+            chunk(out, "event: done\ndata: {\"query\":\"조용한\"}\n");
+            endChunks(out);
+        });
+        var thrown = failure(new ArrayList<>());
+        assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
+        assertThat(output.getOut()).contains("event=done", "body={\"query\":\"조용한\"}, complete=false", "reason=eof");
+    }
+
+    @Test
     @DisplayName("이벤트 사이 지연이 제한을 넘으면 실패한다")
     void failsWhenStreamStalls() throws Exception {
         serve((socket, out) -> {
@@ -306,7 +384,8 @@ class AiSseClientTest {
 
     @Test
     @DisplayName("이벤트가 제때 와도 전체 상한을 넘으면 실패한다")
-    void failsWhenStreamExceedsTotalTimeout() throws Exception {
+    void failsWhenStreamExceedsTotalTimeout(org.springframework.boot.test.system.CapturedOutput output)
+            throws Exception {
         serve(
                 (socket, out) -> {
                     streamHead(out);
@@ -327,6 +406,7 @@ class AiSseClientTest {
         assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(2));
         assertThat(seen).isNotEmpty().hasSizeLessThan(30);
+        assertThat(output.getOut()).contains("reason=total_timeout", "status=200");
     }
 
     @Test
@@ -342,7 +422,7 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var result = client.stream("/v3/extract/stream", Map.of(), event -> {});
+        var result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
 
         assertThat(result.text()).isEqualTo("성수에서 카페");
     }
@@ -417,35 +497,40 @@ class AiSseClientTest {
             endChunks(out);
         });
 
-        var result = client.stream("/v3/extract/stream", Map.of(), event -> {});
+        var result = client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {});
 
         assertThat(result.text()).isEqualTo("성수에서 ");
     }
 
     @Test
     @DisplayName("연결할 수 없으면 스트림 시작 전 실패로 변환한다")
-    void failsBeforeStreamWhenConnectionRefused() throws Exception {
+    void failsBeforeStreamWhenConnectionRefused(org.springframework.boot.test.system.CapturedOutput output)
+            throws Exception {
         int unusedPort;
         try (var socket = new ServerSocket(0)) {
             unusedPort = socket.getLocalPort();
         }
         client = new AiSseClient(
-                URI.create("http://127.0.0.1:" + unusedPort),
+                URI.create("http://USER_SECRET:PASS_SECRET@127.0.0.1:" + unusedPort),
                 mapper,
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(5));
 
-        assertThatThrownBy(() -> client.stream("/v3/extract/stream", Map.of(), event -> {}))
+        assertThatThrownBy(() -> client.stream("/v3/extract/stream?key=QUERY_SECRET", Map.of(), event -> {}))
                 .isInstanceOfSatisfying(AiStreamException.class, thrown -> {
                     assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.BEFORE_STREAM);
                     assertThat(thrown.error()).isExactlyInstanceOf(ServiceUnavailableException.class);
+                    assertThat(thrown.getCause()).isNotNull();
                 });
+        assertThat(output.getOut())
+                .contains("reason=connect", "status=null")
+                .doesNotContain("USER_SECRET", "PASS_SECRET", "QUERY_SECRET");
     }
 
     @Test
     @DisplayName("취소 핸들을 부르면 이벤트가 계속 와도 AI 연결을 즉시 끊는다")
-    void cancelHandleClosesOpenConnection() throws Exception {
+    void cancelHandleClosesOpenConnection(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         serve((socket, out) -> {
             streamHead(out);
             while (true) {
@@ -464,6 +549,7 @@ class AiSseClientTest {
         assertThat(opened).hasValue(1);
         assertThat(thrown.phase()).isEqualTo(AiStreamException.Phase.IN_STREAM);
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
+        assertThat(output.getOut()).contains("reason=cancelled", "status=200");
     }
 
     @Test

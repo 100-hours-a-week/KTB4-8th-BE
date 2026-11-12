@@ -1,6 +1,7 @@
 package eightjbbm.keepgo.util.client.ai.sse;
 
 import eightjbbm.keepgo.util.client.ai.AiErrors;
+import eightjbbm.keepgo.util.client.ai.AiHttpLog;
 import eightjbbm.keepgo.util.client.ai.sse.AiStreamException.Phase;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.io.BufferedReader;
@@ -23,8 +24,6 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.ParseException;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
@@ -91,7 +90,9 @@ public final class AiSseClient implements AutoCloseable {
     public AiStreamResult stream(String path, Object body, Consumer<AiStreamEvent> onEvent, AiStreamHandle handle) {
         var request = new HttpPost(baseUri.resolve(path.startsWith("/") ? path : "/" + path));
         request.setHeader("Accept", "text/event-stream");
-        request.setEntity(new StringEntity(mapper.writeValueAsString(body), ContentType.APPLICATION_JSON));
+        String requestBody = mapper.writeValueAsString(body);
+        request.setEntity(new StringEntity(requestBody, ContentType.APPLICATION_JSON));
+        var call = new AiHttpLog("POST", baseUri.resolve(path.startsWith("/") ? path : "/" + path), requestBody);
         handle.bind(request);
         // 마감이 되면 연결을 끊어 막힌 읽기를 깨운다. idleTimeout만으로는 이벤트가 계속 오는 스트림을 끝내지 못한다.
         var expired = new AtomicBoolean();
@@ -102,6 +103,8 @@ public final class AiSseClient implements AutoCloseable {
                 },
                 totalTimeout.toMillis(),
                 TimeUnit.MILLISECONDS);
+        String endReason = "failure";
+        boolean responseBody = false;
         try {
             ClassicHttpResponse response;
             try {
@@ -109,6 +112,7 @@ public final class AiSseClient implements AutoCloseable {
             } catch (IOException | IllegalStateException exception) {
                 // 연결을 맺는 도중 취소되면 HttpClient가 IllegalStateException을 던질 수 있다.
                 throw fail(
+                        call,
                         path,
                         Phase.BEFORE_STREAM,
                         new ServiceUnavailableException(),
@@ -116,17 +120,20 @@ public final class AiSseClient implements AutoCloseable {
                         exception);
             }
             try {
+                call.status(response.getCode());
                 if (response.getCode() != 200) {
-                    var errorBody = bodyOf(response);
+                    responseBody = true;
+                    var errorBody = bodyOf(response, call);
                     var error = AiErrors.fromHttpResponse(response.getCode(), messageOf(errorBody));
-                    var logged = errorBody.length() > 200 ? errorBody.substring(0, 200) : errorBody;
-                    throw fail(
-                            path, Phase.BEFORE_STREAM, error, "http=" + response.getCode() + ", body=" + logged, null);
+                    throw fail(call, path, Phase.BEFORE_STREAM, error, "http=" + response.getCode(), null);
                 }
                 var contentType = response.getFirstHeader("Content-Type");
                 if (contentType == null
                         || !contentType.getValue().split(";")[0].strip().equalsIgnoreCase("text/event-stream")) {
+                    responseBody = true;
+                    bodyOf(response, call);
                     throw fail(
+                            call,
                             path,
                             Phase.BEFORE_STREAM,
                             new ServiceUnavailableException(),
@@ -134,17 +141,26 @@ public final class AiSseClient implements AutoCloseable {
                             null);
                 }
                 handle.opened();
-                return read(path, response, onEvent, expired, handle);
+                var result = read(path, response, onEvent, expired, handle, call);
+                endReason = "done";
+                return result;
             } finally {
                 // 남은 본문을 기다리지 않도록 연결부터 중단한다.
                 request.cancel();
                 try {
                     response.close();
                 } catch (IOException exception) {
-                    log.debug("AI 스트림 응답 닫기 실패: path={}", path, exception);
+                    log.debug(
+                            "AI 스트림 응답 닫기 실패: path={}",
+                            AiHttpLog.escape(URI.create(path).getRawPath()),
+                            exception);
                 }
             }
+        } catch (AiStreamException exception) {
+            endReason = "stream_error";
+            throw exception;
         } finally {
+            call.end(reason(expired, handle, endReason), responseBody);
             deadline.cancel(false);
         }
     }
@@ -154,7 +170,8 @@ public final class AiSseClient implements AutoCloseable {
             ClassicHttpResponse response,
             Consumer<AiStreamEvent> onEvent,
             AtomicBoolean expired,
-            AiStreamHandle handle) {
+            AiStreamHandle handle,
+            AiHttpLog call) {
         var text = new StringBuilder();
         var data = new StringBuilder();
         String name = null;
@@ -164,7 +181,10 @@ public final class AiSseClient implements AutoCloseable {
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 if (line.isEmpty()) {
                     if (!data.isEmpty()) {
-                        AiStreamResult result = dispatch(path, name, data.toString(), text, onEvent);
+                        String eventData = data.toString();
+                        data.setLength(0);
+                        call.event(name, eventData);
+                        AiStreamResult result = dispatch(call, path, name, eventData, text, onEvent);
                         if (result != null) return result;
                     }
                     name = null;
@@ -178,10 +198,21 @@ public final class AiSseClient implements AutoCloseable {
             }
         } catch (IOException exception) {
             throw fail(
-                    path, Phase.IN_STREAM, new ServiceUnavailableException(), reason(expired, handle, "io"), exception);
+                    call,
+                    path,
+                    Phase.IN_STREAM,
+                    new ServiceUnavailableException(),
+                    reason(
+                            expired,
+                            handle,
+                            exception instanceof java.net.SocketTimeoutException ? "idle_timeout" : "io"),
+                    exception);
+        } finally {
+            if (!data.isEmpty()) call.event(name, data.toString(), false);
         }
         // 마지막 이벤트가 빈 줄로 끝나지 않은 채 끊긴 경우도 여기로 온다.
-        throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), reason(expired, handle, "eof"), null);
+        throw fail(
+                call, path, Phase.IN_STREAM, new ServiceUnavailableException(), reason(expired, handle, "eof"), null);
     }
 
     private static String reason(AtomicBoolean expired, AiStreamHandle handle, String fallback) {
@@ -189,18 +220,24 @@ public final class AiSseClient implements AutoCloseable {
     }
 
     private AiStreamResult dispatch(
-            String path, String name, String data, StringBuilder text, Consumer<AiStreamEvent> onEvent) {
+            AiHttpLog call,
+            String path,
+            String name,
+            String data,
+            StringBuilder text,
+            Consumer<AiStreamEvent> onEvent) {
         if (name == null || !EVENTS.contains(name)) return null;
         JsonNode payload;
         try {
             payload = mapper.readTree(data);
         } catch (JacksonException exception) {
-            throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "invalid_json", exception);
+            throw fail(call, path, Phase.IN_STREAM, new ServiceUnavailableException(), "invalid_json", exception);
         }
         switch (name) {
             case "delta" -> {
                 if (!payload.path("text").isString()) {
-                    throw fail(path, Phase.IN_STREAM, new ServiceUnavailableException(), "delta_without_text", null);
+                    throw fail(
+                            call, path, Phase.IN_STREAM, new ServiceUnavailableException(), "delta_without_text", null);
                 }
                 text.append(payload.get("text").asString());
                 onEvent.accept(new AiStreamEvent("delta", payload));
@@ -212,17 +249,19 @@ public final class AiSseClient implements AutoCloseable {
             case "error" -> {
                 var message = payload.path("message");
                 String reason = message.isString() ? message.asString() : null;
-                throw fail(path, Phase.IN_STREAM, AiErrors.fromMessage(reason), "error=" + reason, null);
+                throw fail(call, path, Phase.IN_STREAM, AiErrors.fromMessage(reason), "error_event", null);
             }
             default -> {}
         }
         return null;
     }
 
-    private static String bodyOf(ClassicHttpResponse response) {
+    private static String bodyOf(ClassicHttpResponse response, AiHttpLog call) {
         try {
-            return response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity(), 4096);
-        } catch (IOException | ParseException exception) {
+            return call.readBody(
+                    response.getEntity() == null ? null : response.getEntity().getContent(), StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            call.failure("http_body_io");
             return "";
         }
     }
@@ -238,16 +277,20 @@ public final class AiSseClient implements AutoCloseable {
     }
 
     private static AiStreamException fail(
-            String path, Phase phase, ErrorResponseException error, String reason, Throwable cause) {
+            AiHttpLog call, String path, Phase phase, ErrorResponseException error, String reason, Throwable cause) {
+        call.failure(reason);
         if ("cancelled".equals(reason)) {
-            log.info("AI 스트림 취소: path={}, phase={}", path, phase);
+            log.info(
+                    "AI 스트림 취소: path={}, phase={}",
+                    AiHttpLog.escape(URI.create(path).getRawPath()),
+                    phase);
         } else {
             log.error(
                     "AI 스트림 실패: path={}, phase={}, status={}, reason={}",
-                    path,
+                    AiHttpLog.escape(URI.create(path).getRawPath()),
                     phase,
                     error.getStatusCode().value(),
-                    reason,
+                    AiHttpLog.escape(reason),
                     cause);
         }
         return new AiStreamException(phase, error, cause);

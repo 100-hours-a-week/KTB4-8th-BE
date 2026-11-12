@@ -10,9 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.client.RestClient;
 
 @Slf4j
@@ -35,40 +33,63 @@ public class AiServerApiClientConfig {
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(callProperties.analysisTimeout());
 
-        return builder.requestFactory(new BufferingClientHttpRequestFactory(requestFactory))
+        return builder.requestFactory(requestFactory)
                 .baseUrl(properties.address())
                 .requestInterceptor((request, body, execution) -> {
-                    String safeUri = request.getURI().toString().replaceAll("([?&]key=)[^&]*", "$1***");
-
-                    MediaType contentType = request.getHeaders().getContentType();
-
-                    var charset = contentType != null && contentType.getCharset() != null
-                            ? contentType.getCharset()
+                    MediaType requestType = request.getHeaders().getContentType();
+                    var requestCharset = requestType != null && requestType.getCharset() != null
+                            ? requestType.getCharset()
                             : StandardCharsets.UTF_8;
+                    var call = new AiHttpLog(
+                            request.getMethod().name(), request.getURI(), new String(body, requestCharset));
+                    String reason = "io";
+                    try {
+                        var response = execution.execute(request, body);
+                        call.status(response.getStatusCode().value());
+                        MediaType responseType = response.getHeaders().getContentType();
+                        var responseCharset = responseType != null && responseType.getCharset() != null
+                                ? responseType.getCharset()
+                                : StandardCharsets.UTF_8;
+                        try {
+                            call.readBody(response.getBody(), responseCharset);
+                        } catch (java.io.IOException | RuntimeException exception) {
+                            response.close();
+                            throw exception;
+                        }
+                        reason = response.getStatusCode().isError() ? "http_error" : "complete";
+                        byte[] responseBytes = call.bodyBytes();
+                        return new org.springframework.http.client.ClientHttpResponse() {
+                            @Override
+                            public org.springframework.http.HttpStatusCode getStatusCode() throws java.io.IOException {
+                                return response.getStatusCode();
+                            }
 
-                    if (log.isInfoEnabled()) {
-                        String requestBody = body.length == 0 ? "<empty>" : new String(body, charset);
+                            @Override
+                            public String getStatusText() throws java.io.IOException {
+                                return response.getStatusText();
+                            }
 
-                        log.info(
-                                "AI HTTP request: method={}, uri={}, contentType={}, body={}",
-                                request.getMethod(),
-                                safeUri,
-                                contentType,
-                                requestBody);
+                            @Override
+                            public HttpHeaders getHeaders() {
+                                return response.getHeaders();
+                            }
+
+                            @Override
+                            public java.io.InputStream getBody() {
+                                return new java.io.ByteArrayInputStream(responseBytes);
+                            }
+
+                            @Override
+                            public void close() {
+                                response.close();
+                            }
+                        };
+                    } catch (java.io.IOException | RuntimeException exception) {
+                        reason = exception.getClass().getSimpleName();
+                        throw exception;
+                    } finally {
+                        call.end(reason, true);
                     }
-
-                    var response = execution.execute(request, body);
-
-                    String responseBody = StreamUtils.copyToString(response.getBody(), charset);
-
-                    log.info(
-                            "RestClient response: method={}, uri={}, status={}, body={}",
-                            request.getMethod(),
-                            request.getURI(),
-                            response.getStatusCode().value(),
-                            responseBody);
-
-                    return response;
                 })
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();
