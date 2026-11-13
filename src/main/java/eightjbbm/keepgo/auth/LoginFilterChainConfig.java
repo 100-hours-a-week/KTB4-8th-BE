@@ -1,15 +1,19 @@
 package eightjbbm.keepgo.auth;
 
+import eightjbbm.keepgo.auth.authorizationrequest.OAuthFailureHandler;
+import eightjbbm.keepgo.auth.authorizationrequest.SharedAuthorizationRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
@@ -20,6 +24,8 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 public class LoginFilterChainConfig {
 
     private final OidcLoginSuccessHandler oidcLoginSuccessHandler;
+    private final SharedAuthorizationRequestRepository authorizationRequests;
+    private final OAuthFailureHandler oauthFailureHandler;
 
     @Order(1)
     @Bean
@@ -40,7 +46,20 @@ public class LoginFilterChainConfig {
                 .cors(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .oauth2Login(auth -> auth.successHandler(oidcLoginSuccessHandler))
+                .addFilterBefore(oauthFailureHandler, OAuth2AuthorizationRequestRedirectFilter.class)
+                .oauth2Login(auth -> auth.withObjectPostProcessor(
+                                new ObjectPostProcessor<OAuth2AuthorizationRequestRedirectFilter>() {
+                                    @Override
+                                    public <O extends OAuth2AuthorizationRequestRedirectFilter> O postProcess(
+                                            O filter) {
+                                        filter.setAuthenticationFailureHandler(oauthFailureHandler);
+                                        return filter;
+                                    }
+                                })
+                        .authorizationEndpoint(
+                                endpoint -> endpoint.authorizationRequestRepository(authorizationRequests))
+                        .successHandler(oidcLoginSuccessHandler)
+                        .failureHandler(oauthFailureHandler))
                 .build();
     }
 }

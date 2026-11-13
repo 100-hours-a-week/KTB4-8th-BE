@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
+import eightjbbm.keepgo.auth.authorizationrequest.SharedAuthorizationRequestRepository;
 import eightjbbm.keepgo.interestextraction.service.*;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
@@ -12,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
-import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,8 +29,7 @@ public class InterestExtractionServiceV2 {
     private final OAuthAccountRepository oauthAccountRepository;
     private final MemberRepository memberRepository;
 
-    private final HttpSessionOAuth2AuthorizationRequestRepository authorizationRequests =
-            new HttpSessionOAuth2AuthorizationRequestRepository();
+    private final SharedAuthorizationRequestRepository authorizationRequests;
 
     /// 유튜브 연동 API
     ///
