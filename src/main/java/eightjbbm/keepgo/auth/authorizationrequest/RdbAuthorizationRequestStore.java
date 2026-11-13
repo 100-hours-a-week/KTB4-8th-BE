@@ -37,19 +37,23 @@ public class RdbAuthorizationRequestStore implements AuthorizationRequestStore {
     }
 
     @Override
-    public String consume(String id, String browserHash, Instant now) {
+    public String consume(String id, String browserHash, Instant ignoredNow) {
         return transactions.execute(status -> {
             List<String> rows = jdbc.query(
-                    "SELECT request_json FROM oauth_authorization_request WHERE request_id = ? AND browser_hash = ? AND expires_at > ? FOR UPDATE",
+                    "SELECT request_json FROM oauth_authorization_request WHERE request_id = ? AND browser_hash = ? FOR UPDATE",
                     (rs, row) -> rs.getString(1),
                     id,
-                    browserHash,
-                    Timestamp.from(now));
+                    browserHash);
             if (rows.isEmpty()) {
                 return null;
             }
-            jdbc.update("DELETE FROM oauth_authorization_request WHERE request_id = ?", id);
-            return rows.getFirst();
+            // 잠금 대기 중 만료될 수 있으므로 소비 직전에 시각을 다시 읽는다.
+            int deleted = jdbc.update(
+                    "DELETE FROM oauth_authorization_request WHERE request_id = ? AND browser_hash = ? AND expires_at > ?",
+                    id,
+                    browserHash,
+                    Timestamp.from(Instant.now()));
+            return deleted == 1 ? rows.getFirst() : null;
         });
     }
 

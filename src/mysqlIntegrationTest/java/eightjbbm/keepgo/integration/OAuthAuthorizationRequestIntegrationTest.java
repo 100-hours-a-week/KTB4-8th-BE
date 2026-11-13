@@ -544,4 +544,66 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             throw new IllegalStateException(exception);
         }
     }
+
+    @Test
+    @DisplayName("행 잠금을 기다리는 동안 만료된 요청은 코드 교환하지 않는다")
+    void expiresWhileWaitingForRowLock() throws Exception {
+        issueTokens.set(false);
+        exchanges.set(0);
+        var started = start(port);
+        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
+                .get("state");
+        String cookie = started.headers().allValues("Set-Cookie").stream()
+                .filter(value -> value.startsWith("oauth_req_"))
+                .findFirst()
+                .orElseThrow()
+                .split(";", 2)[0];
+        try (var connection = jdbc.getDataSource().getConnection();
+                var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            connection.setAutoCommit(false);
+            long connectionId;
+            try (var statement = connection.createStatement();
+                    var result = statement.executeQuery("SELECT CONNECTION_ID()")) {
+                result.next();
+                connectionId = result.getLong(1);
+            }
+            try (var lock = connection.prepareStatement(
+                    "SELECT request_id FROM oauth_authorization_request WHERE request_id = ? FOR UPDATE")) {
+                lock.setString(1, hash(state));
+                lock.executeQuery().close();
+            }
+            var callback = executor.submit(() -> callback(port, state, cookie));
+            try {
+                long deadline =
+                        System.nanoTime() + java.time.Duration.ofSeconds(15).toNanos();
+                int waits;
+                do {
+                    waits = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t ON t.THREAD_ID = w.BLOCKING_THREAD_ID WHERE t.PROCESSLIST_ID = ?",
+                            Integer.class,
+                            connectionId);
+                    if (waits > 0) {
+                        break;
+                    }
+                    Thread.sleep(25);
+                } while (System.nanoTime() < deadline);
+                assertThat(waits).isPositive();
+                Thread.sleep(50);
+                try (var expire = connection.prepareStatement(
+                        "UPDATE oauth_authorization_request SET expires_at = ? WHERE request_id = ?")) {
+                    expire.setTimestamp(
+                            1, java.sql.Timestamp.from(java.time.Instant.now().minusMillis(10)));
+                    expire.setString(2, hash(state));
+                    expire.executeUpdate();
+                }
+                connection.commit();
+                assertThat(callback.get().statusCode()).isEqualTo(302);
+                assertThat(exchanges.get()).isZero();
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+
 }
