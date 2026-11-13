@@ -437,6 +437,10 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
 
     @AfterAll
     void closeSecondInstance() {
+        jdbc.update(
+                "DELETE FROM oauth_account WHERE issuer = ? AND subject = ?",
+                "https://accounts.google.com",
+                "test-subject");
         if (second != null) {
             second.close();
         }
@@ -648,6 +652,4 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             }
         }
     }
-
-
 }
