@@ -17,7 +17,10 @@ public class OAuthSentryConfiguration {
         return new io.sentry.EventProcessor() {
             @Override
             public io.sentry.SentryEvent process(io.sentry.SentryEvent event, io.sentry.Hint hint) {
-                return OAuthFailureHandler.class.getName().equals(event.getLogger()) ? null : event;
+                return OAuthFailureHandler.class.getName().equals(event.getLogger())
+                                || "oauth.authorization-request.storage".equals(event.getLogger())
+                        ? null
+                        : event;
             }
         };
     }

@@ -131,7 +131,7 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
 
     @Test
     @DisplayName("다른 인스턴스의 콜백이 OIDC 인증을 완료하고 기존 성공 계약으로 이동한다")
-    void completesOidcAcrossInstances() throws Exception {
+    void completesOidcAcrossInstances(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         issueTokens.set(true);
         exchanges.set(0);
         {
@@ -169,6 +169,38 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                     .header("Authorization", "Bearer " + accessToken)
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
+            SentryTestConfig.envelopes.clear();
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .stop();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+            }
+            try {
+                var failedLink = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
+                assertThat(failedLink.statusCode()).isEqualTo(500);
+                assertThat(failedLink.headers().firstValue("Content-Type").orElseThrow())
+                        .contains("application/problem+json");
+                assertThat(output).contains("OAuth authorization request storage failed");
+                assertThat(oauthEvents()).hasSize(1);
+                assertThat(oauthEvents().getFirst()).contains("start", "server").doesNotContain(accessToken, "Cookie");
+                SentryTestConfig.failSend.set(true);
+                var reportingFailure =
+                        HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
+                assertThat(reportingFailure.statusCode()).isEqualTo(500);
+                assertThat(reportingFailure.headers().firstValue("Content-Type").orElseThrow())
+                        .contains("application/problem+json");
+            } finally {
+                SentryTestConfig.failSend.set(false);
+                if (REDIS) {
+                    ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                    redis.getConnectionFactory())
+                            .start();
+                } else {
+                    jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+                }
+            }
             var link = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
             assertThat(link.statusCode()).isEqualTo(200);
             assertThat(link.headers().firstValue("Content-Type").orElseThrow()).contains("application/json");

@@ -1,5 +1,8 @@
 package eightjbbm.keepgo.interestextraction.service.youtubeanalyze;
 
+import eightjbbm.keepgo.auth.authorizationrequest.AuthorizationRequestProperties;
+import eightjbbm.keepgo.auth.authorizationrequest.AuthorizationRequestStorageException;
+import eightjbbm.keepgo.auth.authorizationrequest.OAuthSentryReporter;
 import eightjbbm.keepgo.auth.authorizationrequest.SharedAuthorizationRequestRepository;
 import eightjbbm.keepgo.interestextraction.service.*;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
@@ -29,6 +32,8 @@ public class InterestExtractionService {
     private final MemberRepository memberRepository;
 
     private final SharedAuthorizationRequestRepository authorizationRequests;
+    private final OAuthSentryReporter sentryReporter;
+    private final AuthorizationRequestProperties authorizationRequestProperties;
 
     /// 유튜브 연동 API
     ///
@@ -51,7 +56,12 @@ public class InterestExtractionService {
         }
 
         // 콜백에서 Spring Security가 인증 요청과 state를 검증한다.
-        authorizationRequests.saveAuthorizationRequest(authorizationRequest, request, response);
+        try {
+            authorizationRequests.saveAuthorizationRequest(authorizationRequest, request, response);
+        } catch (AuthorizationRequestStorageException exception) {
+            sentryReporter.report("start", authorizationRequestProperties.provider());
+            throw exception;
+        }
 
         // 같은 브라우저 세션에서는 가장 최근 연동 요청을 사용한다.
         request.getSession()

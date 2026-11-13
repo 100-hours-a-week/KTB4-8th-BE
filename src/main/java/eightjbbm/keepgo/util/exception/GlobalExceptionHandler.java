@@ -1,5 +1,6 @@
 package eightjbbm.keepgo.util.exception;
 
+import eightjbbm.keepgo.auth.authorizationrequest.AuthorizationRequestStorageException;
 import eightjbbm.keepgo.util.client.ai.sse.AiStreamException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final org.slf4j.Logger OAUTH_STORAGE_LOG =
+            org.slf4j.LoggerFactory.getLogger("oauth.authorization-request.storage");
     private final MessageSource messageSource;
 
     @ExceptionHandler(ErrorResponseException.class)
@@ -50,6 +53,16 @@ public class GlobalExceptionHandler {
                     .body(body);
         }
         log.error("처리되지 않은 서버 오류가 발생했습니다.", exception);
+        return internalServerError(request);
+    }
+
+    @ExceptionHandler(AuthorizationRequestStorageException.class)
+    public ResponseEntity<ProblemDetail> handleAuthorizationRequestStorageException(HttpServletRequest request) {
+        OAUTH_STORAGE_LOG.error("OAuth authorization request storage failed");
+        return internalServerError(request);
+    }
+
+    private ResponseEntity<ProblemDetail> internalServerError(HttpServletRequest request) {
         InternalServerErrorException fallback = new InternalServerErrorException();
         ProblemDetail body = fallback.updateAndGetBody(messageSource, request.getLocale());
         body.setInstance(URI.create(request.getRequestURI()));
