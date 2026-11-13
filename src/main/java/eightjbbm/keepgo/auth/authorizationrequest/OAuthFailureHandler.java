@@ -31,7 +31,8 @@ public class OAuthFailureHandler extends OncePerRequestFilter implements Authent
         try {
             chain.doFilter(request, response);
         } catch (RuntimeException exception) {
-            log.error("OAuth failure: stage=filter classification=server provider={}", properties.provider());
+            String stage = request.getRequestURI().startsWith("/oauth2/authorization/") ? "start" : "callback";
+            log.error("OAuth failure: stage={} classification=server provider={}", stage, properties.provider());
             response.sendRedirect(properties.failureUrl());
         }
     }

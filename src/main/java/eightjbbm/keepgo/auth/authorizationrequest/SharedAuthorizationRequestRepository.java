@@ -45,11 +45,15 @@ public class SharedAuthorizationRequestRepository
         random.nextBytes(bytes);
         String browser = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         String id = hash(authorizationRequest.getState());
-        store.save(
-                id,
-                codec.encode(authorizationRequest),
-                hash(browser),
-                Instant.now().plus(properties.ttl()));
+        try {
+            store.save(
+                    id,
+                    codec.encode(authorizationRequest),
+                    hash(browser),
+                    Instant.now().plus(properties.ttl()));
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("OAuth authorization request storage failed");
+        }
         addCookie(response, COOKIE_PREFIX + id, browser, properties.ttl());
     }
 

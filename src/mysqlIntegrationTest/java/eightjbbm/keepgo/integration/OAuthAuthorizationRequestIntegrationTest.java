@@ -28,6 +28,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestConstructor;
 
+@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @DisplayName("OAuth 인증 요청 공유 통합 테스트")
@@ -44,17 +45,23 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
     private final int port;
     private final Environment environment;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final tools.jackson.databind.ObjectMapper mapper;
     private ConfigurableApplicationContext second;
 
     OAuthAuthorizationRequestIntegrationTest(
-            @LocalServerPort int port, Environment environment, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+            @LocalServerPort int port,
+            Environment environment,
+            org.springframework.jdbc.core.JdbcTemplate jdbc,
+            tools.jackson.databind.ObjectMapper mapper) {
         this.port = port;
         this.environment = environment;
         this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     @DynamicPropertySource
     static void oauthStub(DynamicPropertyRegistry registry) {
+        registry.add("keepgo.security.oauth2.authorization-request.cleanup-interval", () -> "1000");
         registry.add(
                 "spring.security.oauth2.client.registration.google-login.client-authentication-method", () -> "none");
         registry.add("spring.security.oauth2.client.provider.google.authorization-uri", () -> baseUrl() + "/authorize");
@@ -99,6 +106,10 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             assertThat(exchanges.get()).isZero();
             var accepted = callback(otherPort, state, cookie);
             assertThat(accepted.statusCode()).isEqualTo(302);
+            assertThat(accepted.headers().allValues("Set-Cookie"))
+                    .anySatisfy(value -> assertThat(value)
+                            .startsWith(cookie.split("=", 2)[0] + "=")
+                            .contains("Max-Age=0"));
             assertThat(exchanges.get()).isEqualTo(1);
             callback(port, state, cookie);
             assertThat(exchanges.get()).isEqualTo(1);
@@ -135,6 +146,44 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             assertThat(response.statusCode()).isEqualTo(302);
             assertThat(response.headers().firstValue("Location").orElseThrow())
                     .contains("#accessToken=", "expiresIn=1800", "initialLogin=");
+            String fragment = URI.create(
+                            response.headers().firstValue("Location").orElseThrow())
+                    .getRawFragment();
+            String accessToken =
+                    query(URI.create("http://localhost/?" + fragment)).get("accessToken");
+            var linkRequest = HttpRequest.newBuilder(
+                            URI.create("http://localhost:" + port + "/api/v2/member/external-connections/youtube"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+            var link = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
+            assertThat(link.statusCode()).isEqualTo(200);
+            assertThat(link.headers().firstValue("Content-Type").orElseThrow()).contains("application/json");
+            String linkUrl =
+                    mapper.readTree(link.body()).get("authorization_url").asString();
+            String linkState = query(URI.create(linkUrl)).get("state");
+            String linkCookie = link.headers().allValues("Set-Cookie").stream()
+                    .filter(value -> value.startsWith("oauth_req_"))
+                    .findFirst()
+                    .orElseThrow()
+                    .split(";", 2)[0];
+            issueTokens.set(false);
+            var linkCallback = HttpRequest.newBuilder(URI.create("http://localhost:" + otherPort
+                            + "/login/oauth2/code/google?code=test-code&state=" + linkState))
+                    .header("Cookie", linkCookie)
+                    .GET()
+                    .build();
+            assertThat(send(linkCallback).statusCode()).isEqualTo(302);
+            assertThat(exchanges.get()).isEqualTo(2);
+            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+            try {
+                var failedLink = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
+                assertThat(failedLink.statusCode()).isEqualTo(500);
+                assertThat(failedLink.headers().firstValue("Content-Type").orElseThrow())
+                        .contains("application/problem+json");
+            } finally {
+                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            }
         }
     }
 
@@ -286,7 +335,8 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
 
     @Test
     @DisplayName("콜백의 저장소 장애는 코드 교환 없이 실패 화면으로 이동한다")
-    void storageFailureRedirectsAtCallback() throws Exception {
+    void storageFailureRedirectsAtCallback(org.springframework.boot.test.system.CapturedOutput output)
+            throws Exception {
         issueTokens.set(false);
         exchanges.set(0);
         int otherPort = ((ServletWebServerApplicationContext) secondInstance())
@@ -307,9 +357,36 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             assertThat(response.headers().firstValue("Location").orElseThrow())
                     .isEqualTo("http://localhost:3000/login");
             assertThat(exchanges.get()).isZero();
+            assertThat(output.getAll())
+                    .contains("classification=server", "provider=rdb")
+                    .doesNotContain(state, cookie, "test-code");
         } finally {
             jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
         }
+    }
+
+    @Test
+    @DisplayName("만료된 인증 요청 행은 주기적으로 정리된다")
+    void expiredRowsAreCleanedUp() throws Exception {
+        var started = start(port);
+        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
+                .get("state");
+        String id = hash(state);
+        jdbc.update(
+                "UPDATE oauth_authorization_request SET expires_at = ? WHERE request_id = ?",
+                java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),
+                id);
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(8).toNanos();
+        Integer count;
+        do {
+            count = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM oauth_authorization_request WHERE request_id = ?", Integer.class, id);
+            if (count != null && count == 0) {
+                break;
+            }
+            Thread.sleep(50);
+        } while (System.nanoTime() < deadline);
+        assertThat(count).isZero();
     }
 
     private static String hash(String value) throws Exception {
