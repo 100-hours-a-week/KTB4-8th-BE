@@ -46,22 +46,30 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
     private final Environment environment;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final tools.jackson.databind.ObjectMapper mapper;
+    private final org.springframework.data.redis.core.StringRedisTemplate redis;
+    private static final boolean REDIS = System.getenv("OAUTH_REDIS_TEST_PORT") != null;
     private ConfigurableApplicationContext second;
 
     OAuthAuthorizationRequestIntegrationTest(
             @LocalServerPort int port,
             Environment environment,
             org.springframework.jdbc.core.JdbcTemplate jdbc,
-            tools.jackson.databind.ObjectMapper mapper) {
+            tools.jackson.databind.ObjectMapper mapper,
+            org.springframework.data.redis.core.StringRedisTemplate redis) {
         this.port = port;
         this.environment = environment;
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.redis = redis;
     }
 
     @DynamicPropertySource
     static void oauthStub(DynamicPropertyRegistry registry) {
         registry.add("keepgo.security.oauth2.authorization-request.cleanup-interval", () -> "1000");
+        if (REDIS) {
+            registry.add("keepgo.security.oauth2.authorization-request.provider", () -> "redis");
+            registry.add("spring.data.redis.port", () -> System.getenv("OAUTH_REDIS_TEST_PORT"));
+        }
         registry.add(
                 "spring.security.oauth2.client.registration.google-login.client-authentication-method", () -> "none");
         registry.add("spring.security.oauth2.client.provider.google.authorization-uri", () -> baseUrl() + "/authorize");
@@ -268,10 +276,14 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                 .findFirst()
                 .orElseThrow()
                 .split(";", 2)[0];
-        jdbc.update(
-                "UPDATE oauth_authorization_request SET expires_at = ? WHERE request_id = ?",
-                java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),
-                hash(state));
+        if (REDIS) {
+            redis.opsForHash().put("oauth:authorization-request:" + hash(state), "expires", "1");
+        } else {
+            jdbc.update(
+                    "UPDATE oauth_authorization_request SET expires_at = ? WHERE request_id = ?",
+                    java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),
+                    hash(state));
+        }
         assertThat(callback(otherPort, state, cookie).statusCode()).isEqualTo(302);
         assertThat(exchanges.get()).isZero();
     }
@@ -294,10 +306,14 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                     .findFirst()
                     .orElseThrow()
                     .split(";", 2)[0];
-            jdbc.update(
-                    "UPDATE oauth_authorization_request SET request_json = ? WHERE request_id = ?",
-                    invalid,
-                    hash(state));
+            if (REDIS) {
+                redis.opsForHash().put("oauth:authorization-request:" + hash(state), "json", invalid);
+            } else {
+                jdbc.update(
+                        "UPDATE oauth_authorization_request SET request_json = ? WHERE request_id = ?",
+                        invalid,
+                        hash(state));
+            }
             var response = callback(otherPort, state, cookie);
             assertThat(response.statusCode()).isEqualTo(302);
             assertThat(response.headers().firstValue("Location").orElseThrow())
@@ -320,7 +336,12 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
     @Test
     @DisplayName("저장소 장애 시 로그인 시작은 실패 화면으로 이동한다")
     void storageFailureRedirectsAtStart() throws Exception {
-        jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        if (REDIS) {
+            ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory) redis.getConnectionFactory())
+                    .stop();
+        } else {
+            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        }
         try {
             var response = start(port);
             assertThat(response.statusCode()).isEqualTo(302);
@@ -329,7 +350,13 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             assertThat(response.headers().allValues("Set-Cookie"))
                     .noneMatch(cookie -> cookie.startsWith("JSESSIONID="));
         } finally {
-            jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .start();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            }
         }
     }
 
@@ -350,7 +377,14 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                 .findFirst()
                 .orElseThrow()
                 .split(";", 2)[0];
-        jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        var otherRedis = secondInstance().getBean(org.springframework.data.redis.core.StringRedisTemplate.class);
+        if (REDIS) {
+            ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                            otherRedis.getConnectionFactory())
+                    .stop();
+        } else {
+            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        }
         try {
             var response = callback(otherPort, state, cookie);
             assertThat(response.statusCode()).isEqualTo(302);
@@ -361,7 +395,13 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                     .contains("classification=server", "provider=rdb")
                     .doesNotContain(state, cookie, "test-code");
         } finally {
-            jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                otherRedis.getConnectionFactory())
+                        .start();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            }
         }
     }
 
@@ -426,6 +466,10 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             "keepgo.clients.geocoding.key"
         };
         var properties = Stream.of(keys).collect(Collectors.toMap(key -> key, environment::getProperty));
+        if (REDIS) {
+            properties.put("keepgo.security.oauth2.authorization-request.provider", "redis");
+            properties.put("spring.data.redis.port", System.getenv("OAUTH_REDIS_TEST_PORT"));
+        }
         properties.put("keepgo.security.oauth2.authorization-request.secure-cookie", "false");
         properties.put("server.port", "0");
         properties.put("spring.flyway.enabled", "false");

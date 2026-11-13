@@ -4,12 +4,17 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
+@ConditionalOnProperty(
+        name = "keepgo.security.oauth2.authorization-request.provider",
+        havingValue = "rdb",
+        matchIfMissing = true)
 @RequiredArgsConstructor
 public class RdbAuthorizationRequestStore implements AuthorizationRequestStore {
     private final JdbcTemplate jdbc;
