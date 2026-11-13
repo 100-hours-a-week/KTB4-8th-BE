@@ -26,6 +26,20 @@ class AuthorizationRequestPropertiesTest {
     }
 
     @Test
+    @DisplayName("Redis provider와 사용자 지정 TTL을 선택할 수 있다")
+    void selectsRedis() {
+        runner.withPropertyValues(
+                        "keepgo.security.oauth2.authorization-request.provider=redis",
+                        "keepgo.security.oauth2.authorization-request.ttl=30s")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(AuthorizationRequestProperties.class)
+                                    .ttl())
+                            .isEqualTo(Duration.ofSeconds(30));
+                });
+    }
+
+    @Test
     @DisplayName("지원하지 않는 provider는 기동에 실패한다")
     void rejectsUnsupportedProvider() {
         runner.withPropertyValues("keepgo.security.oauth2.authorization-request.provider=invalid")

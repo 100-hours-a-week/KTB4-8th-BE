@@ -11,7 +11,7 @@ public record AuthorizationRequestProperties(
         @DefaultValue("true") boolean secureCookie,
         @DefaultValue("http://localhost:3000/login") String failureUrl) {
     public AuthorizationRequestProperties {
-        if (!"rdb".equals(provider)) {
+        if (!"rdb".equals(provider) && !"redis".equals(provider)) {
             throw new IllegalArgumentException("Unsupported OAuth authorization request provider");
         }
         if (ttl.isZero() || ttl.isNegative()) {
