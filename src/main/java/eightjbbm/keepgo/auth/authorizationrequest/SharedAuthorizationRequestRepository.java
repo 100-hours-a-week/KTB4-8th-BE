@@ -52,7 +52,7 @@ public class SharedAuthorizationRequestRepository
                     hash(browser),
                     Instant.now().plus(properties.ttl()));
         } catch (RuntimeException exception) {
-            throw new IllegalStateException("OAuth authorization request storage failed");
+            throw new AuthorizationRequestStorageException();
         }
         addCookie(response, COOKIE_PREFIX + id, browser, properties.ttl());
     }
