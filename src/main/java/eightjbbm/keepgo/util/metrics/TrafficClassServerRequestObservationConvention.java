@@ -16,8 +16,7 @@ public class TrafficClassServerRequestObservationConvention extends DefaultServe
     static final String GENERATION = "generation";
     static final String INTERACTIVE = "interactive";
 
-    private static final Set<String> GENERATION_ROUTES =
-            Set.of("POST /api/v1/user/recommendation", "POST /api/v1/user/youtube-analyze");
+    private static final Set<String> GENERATION_ROUTES = Set.of();
 
     @Override
     public KeyValues getLowCardinalityKeyValues(ServerRequestObservationContext context) {

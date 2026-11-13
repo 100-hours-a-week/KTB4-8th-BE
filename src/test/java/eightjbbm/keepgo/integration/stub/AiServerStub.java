@@ -30,9 +30,11 @@ import org.slf4j.LoggerFactory;
 public final class AiServerStub implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(AiServerStub.class);
-    private static final String ANALYZE_PATH = "/v1/analyze-video";
-    private static final String EMBED_PATH = "/v1/embed-places";
+    private static final String ANALYZE_V3_PATH = "/v3/analyze-video";
+    private static final String EMBED_PATH = "/v3/embed-places";
+    private static final Pattern PLACE_ID = Pattern.compile("\"place_id\"\\s*:\\s*(\\d+)");
     private static final Pattern VIDEO_URL = Pattern.compile("https://youtube\\.com/shorts/[A-Za-z0-9_-]+");
+    private static final Pattern V3_VIDEOS = Pattern.compile("\"videos\"\\s*:\\s*\\[");
     private static final Pattern VIDEO_ID = Pattern.compile("https://youtube\\.com/shorts/([A-Za-z0-9_-]+)");
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -65,7 +67,7 @@ public final class AiServerStub implements AutoCloseable {
         } catch (IOException exception) {
             throw new IllegalStateException("AI 스텁 서버를 시작하지 못했습니다", exception);
         }
-        server.createContext(ANALYZE_PATH, exchange -> handle(exchange, true));
+        server.createContext(ANALYZE_V3_PATH, exchange -> handle(exchange, true));
         server.createContext(EMBED_PATH, exchange -> handle(exchange, false));
         server.createContext("/__admin/stats", exchange -> write(exchange, new StubResponse(200, statsJson(), false)));
         server.createContext("/__admin/reset", exchange -> {
@@ -214,6 +216,10 @@ public final class AiServerStub implements AutoCloseable {
             if (analysis) {
                 analysisRequests.incrementAndGet();
                 analysisRequestBodies.add(requestBody);
+                if (!V3_VIDEOS.matcher(requestBody).find()) {
+                    write(exchange, new StubResponse(400, "{\"message\":\"videos required\"}", false));
+                    return;
+                }
             } else {
                 embeddingRequests.incrementAndGet();
                 embeddingRequestBodies.add(requestBody);
@@ -231,7 +237,7 @@ public final class AiServerStub implements AutoCloseable {
             if (response == null) {
                 response = analysis
                         ? new StubResponse(200, successfulAnalysis(requestBody, analysisGuide.get()), false)
-                        : new StubResponse(200, "{\"message\":\"ok\"}", false);
+                        : new StubResponse(200, successfulEmbedding(requestBody), false);
             }
 
             write(exchange, response);
@@ -296,6 +302,11 @@ public final class AiServerStub implements AutoCloseable {
             }
         }
         return "{\"message\":\"analyze_success\",\"data\":{\"results\":[" + String.join(",", results) + "]}}";
+    }
+
+    private static String successfulEmbedding(String requestBody) {
+        Matcher placeId = PLACE_ID.matcher(requestBody);
+        return "{\"success\":true,\"place_id\":" + (placeId.find() ? placeId.group(1) : "0") + "}";
     }
 
     private static String row(String url, GuideTemplate guide) {

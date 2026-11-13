@@ -38,9 +38,9 @@ class AiServerStubTest {
     @Test
     @DisplayName("영상 중복 제출 수를 회차별로 집계하고 초기화한다")
     void countsDuplicateVideos() throws Exception {
-        post("/v1/analyze-video", requestBody("video-a"));
-        post("/v1/analyze-video", requestBody("video-a"));
-        post("/v1/analyze-video", requestBody("video-b"));
+        post("/v3/analyze-video", requestBody("video-a"));
+        post("/v3/analyze-video", requestBody("video-a"));
+        post("/v3/analyze-video", requestBody("video-b"));
         String stats = HTTP.send(
                         HttpRequest.newBuilder(URI.create(stub.baseUrl() + "/__admin/stats"))
                                 .GET()
@@ -68,7 +68,7 @@ class AiServerStubTest {
                     .mapToObj(index -> CompletableFuture.runAsync(
                             () -> {
                                 try {
-                                    post("/v1/analyze-video", requestBody("video-" + index));
+                                    post("/v3/analyze-video", requestBody("video-" + index));
                                 } catch (Exception exception) {
                                     throw new IllegalStateException(exception);
                                 }
@@ -85,15 +85,49 @@ class AiServerStubTest {
     }
 
     @Test
+    @DisplayName("/v3/analyze-video의 videos[] 요청을 받아 영상별 결과를 돌려준다")
+    void acceptsV3VideosRequest() throws Exception {
+        HttpResponse<String> response = post(
+                "/v3/analyze-video",
+                "{\"videos\":[{\"video_url\":\"https://youtube.com/shorts/video-a\","
+                        + "\"upload_date\":null,\"title\":null,\"description\":null}]}");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("https://youtube.com/shorts/video-a");
+        assertThat(stub.analysisRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("/v3/analyze-video는 구계약 video_urls 본문을 400으로 거절한다")
+    void rejectsLegacyBodyOnV3() throws Exception {
+        HttpResponse<String> response =
+                post("/v3/analyze-video", "{\"video_urls\":[\"https://youtube.com/shorts/video-a\"]}");
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(stub.analysisRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("구계약 /v1/analyze-video는 404로 응답하고 요청 수에 세지 않는다")
+    void rejectsLegacyV1Path() throws Exception {
+        HttpResponse<String> response =
+                post("/v1/analyze-video", "{\"video_urls\":[\"https://youtube.com/shorts/video-a\"]}");
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(stub.analysisRequestCount()).isZero();
+        assertThat(stub.requestCount()).isZero();
+    }
+
+    @Test
     @DisplayName("5xx와 잘못된 응답을 주입한다")
     void injectsServerErrorAndMalformedBody() throws Exception {
         stub.failAnalysis(503, "{\"message\":\"down\"}");
-        HttpResponse<String> serverError = post("/v1/analyze-video", requestBody("video-a"));
+        HttpResponse<String> serverError = post("/v3/analyze-video", requestBody("video-a"));
         assertThat(serverError.statusCode()).isEqualTo(503);
         assertThat(serverError.body()).contains("down");
 
         stub.returnMalformedAnalysis("{\"message\":");
-        HttpResponse<String> malformed = post("/v1/analyze-video", requestBody("video-b"));
+        HttpResponse<String> malformed = post("/v3/analyze-video", requestBody("video-b"));
         assertThat(malformed.statusCode()).isEqualTo(200);
         assertThat(malformed.body()).isEqualTo("{\"message\":");
     }
@@ -102,13 +136,23 @@ class AiServerStubTest {
     @DisplayName("임베딩 요청에도 5xx·잘못된 응답·연결 종료를 주입한다")
     void injectsEmbeddingFailures() throws Exception {
         stub.failEmbedding(502, "{\"message\":\"bad\"}");
-        assertThat(post("/v1/embed-places", "{}").statusCode()).isEqualTo(502);
+        assertThat(post("/v3/embed-places", "{}").statusCode()).isEqualTo(502);
 
         stub.returnMalformedEmbedding("{");
-        assertThat(post("/v1/embed-places", "{}").body()).isEqualTo("{");
+        assertThat(post("/v3/embed-places", "{}").body()).isEqualTo("{");
 
         stub.resetEmbeddingConnection();
-        assertThatThrownBy(() -> post("/v1/embed-places", "{}")).isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> post("/v3/embed-places", "{}")).isInstanceOf(IOException.class);
+    }
+
+    @Test
+    @DisplayName("임베딩 기본 응답은 success true와 요청의 place_id를 돌려준다")
+    void returnsSuccessfulEmbeddingByDefault() throws Exception {
+        HttpResponse<String> response =
+                post("/v3/embed-places", "{\"place_id\":7,\"place_name\":\"A\",\"summary\":\"s\"}");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("{\"success\":true,\"place_id\":7}");
     }
 
     @Test
@@ -117,7 +161,7 @@ class AiServerStubTest {
         stub.setAnalysisDelay(Duration.ofMillis(250));
 
         long startedAt = System.nanoTime();
-        post("/v1/analyze-video", requestBody("video-a"));
+        post("/v3/analyze-video", requestBody("video-a"));
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startedAt);
 
         assertThat(elapsed).isGreaterThanOrEqualTo(Duration.ofMillis(200));
@@ -126,8 +170,8 @@ class AiServerStubTest {
     @Test
     @DisplayName("k6 측정용 통계 조회와 초기화를 제공한다")
     void exposesStatsAndResetForPerfHarness() throws Exception {
-        post("/v1/analyze-video", requestBody("video-a"));
-        post("/v1/embed-places", "{}");
+        post("/v3/analyze-video", requestBody("video-a"));
+        post("/v3/embed-places", "{}");
 
         HttpResponse<String> stats = get("/__admin/stats");
         assertThat(stats.statusCode()).isEqualTo(200);
@@ -143,7 +187,7 @@ class AiServerStubTest {
     void closesConnectionWithoutResponse() {
         stub.resetAnalysisConnection();
 
-        assertThatThrownBy(() -> post("/v1/analyze-video", requestBody("video-a")))
+        assertThatThrownBy(() -> post("/v3/analyze-video", requestBody("video-a")))
                 .isInstanceOf(IOException.class);
     }
 
@@ -162,6 +206,7 @@ class AiServerStubTest {
     }
 
     private static String requestBody(String videoId) {
-        return "{\"video_urls\":[\"https://youtube.com/shorts/" + videoId + "\"]}";
+        return "{\"videos\":[{\"video_url\":\"https://youtube.com/shorts/" + videoId
+                + "\",\"upload_date\":null,\"title\":null,\"description\":null}]}";
     }
 }

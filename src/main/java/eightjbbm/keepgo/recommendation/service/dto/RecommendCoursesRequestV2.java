@@ -18,19 +18,14 @@ public record RecommendCoursesRequestV2(
         LocalDateTime datetime,
         Coordinate origin) {
     record Candidate(
-            String placeId,
-            String placeName,
-            String summary,
-            Float lat,
-            Float lng,
-            BusinessScheduleDto businessHours) {}
+            Long placeId, String placeName, String summary, Float lat, Float lng, BusinessScheduleDto businessHours) {}
 
     public static RecommendCoursesRequestV2 from(OutingCriteria outingCriteria, List<OutingGuide> outingGuides) {
         return new RecommendCoursesRequestV2(
                 outingCriteria.getUserPreferenceSummary(),
                 outingGuides.stream()
                         .map(outingGuide -> new Candidate(
-                                outingGuide.getId().toString(),
+                                outingGuide.getId(),
                                 outingGuide.getName(),
                                 outingGuide.getDescription(),
                                 outingGuide.getCoordinate().lat(),

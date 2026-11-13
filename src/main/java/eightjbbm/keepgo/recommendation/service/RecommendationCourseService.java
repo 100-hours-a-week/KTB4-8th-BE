@@ -32,11 +32,10 @@ public class RecommendationCourseService {
     /// 가이드를 트랜잭션 안에서 미리 읽어 두므로, 반환된 엔티티를 트랜잭션 밖에서 DTO로 변환할 수 있다.
     @Transactional
     public List<OutingCourse> saveCourses(OutingCriteria criteria, RecommendCoursesResponseV2.SuccessData data) {
-        int matchScore = data.matchScore() == null ? DEFAULT_MATCH_SCORE : data.matchScore();
         Map<Long, OutingGuide> guidesById = findGuides(data);
 
         return data.courses().stream()
-                .map(course -> saveCourse(criteria, course, matchScore, guidesById))
+                .map(course -> saveCourse(criteria, course, guidesById))
                 .toList();
     }
 
@@ -52,10 +51,8 @@ public class RecommendationCourseService {
     }
 
     private OutingCourse saveCourse(
-            OutingCriteria criteria,
-            RecommendCoursesResponseV2.Course course,
-            int matchScore,
-            Map<Long, OutingGuide> guidesById) {
+            OutingCriteria criteria, RecommendCoursesResponseV2.Course course, Map<Long, OutingGuide> guidesById) {
+        int matchScore = course.matchScore() == null ? DEFAULT_MATCH_SCORE : course.matchScore();
         var outingCourse = new OutingCourse(
                 course.title(), course.totalDurationMinutes(), matchScore, criteria.getRequestedLocationName(), null);
         var savedCourse = outingCourseRepository.save(outingCourse);

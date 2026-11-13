@@ -582,6 +582,33 @@ origin : dict
 }
 ```
 
+<a id="ai-v3-stream"></a>
+
+### v3 스트리밍 — BE 구현 기준
+
+시트의 v3 탭 URL `v3/recommend-course/stream`은 앞 슬래시가 없는 표기이므로 BE는 `POST /v3/recommend-course/stream`으로 정규화해 호출한다. 응답은 `text/event-stream`이며 이벤트마다 `event: <이름>`과 JSON `data:`가 온다. 공통 수신 규칙은 [AiSseClient](../../../src/main/java/eightjbbm/keepgo/util/client/ai/sse/AiSseClient.java)를 따른다.
+
+| 이벤트 | 본문 | BE 처리 |
+| --- | --- | --- |
+| `status` | `{"stage": String}` | `stage`를 값 그대로 FE에 전달한다. 알 수 없는 값도 막지 않는다. |
+| `done` | `{"message", "data": {"error", "courses"}}` | `message`로 결과를 판정한다. 코스는 여기서 한 번에 받는다. |
+| `error` | `{"message": String}` | `llm_timeout`·`llm_rate_limited`·`llm_invalid_response`는 502(`AI_LLM_*`), 그 밖은 503으로 변환한다. |
+
+`done.message` 판정:
+
+| message | 결과 |
+| --- | --- |
+| `recommend_success`, `recommend_not_found` | 성공. `data.error`가 null이고 `data.courses`가 있어야 한다. |
+| `recommend_cancel_accepted` | 중단(`stopped`). |
+| `recommend_failed` | 실패. `data.error`가 `llm_*`이면 502, 아니면 503. |
+| 그 밖의 값, `data` 누락 | 실패(503). |
+
+- HTTP 200만으로 성공으로 보지 않는다.
+- `match_score`는 `data.courses[]` 각 코스에서 읽는다. 없으면 기본값 85를 쓴다. v2 탭의 `data.match_score`(전체 값)는 읽지 않는다.
+- 요청 `candidates[].place_id`는 정수다. 응답 `places[].place_id`는 정수 또는 숫자 문자열을 받아 정수로 해석한다.
+- `done`·`error` 없이 연결이 끊기면 실패로 처리하고 회원이 다시 요청할 수 있다.
+- 취소 시 BE가 AI 연결을 직접 닫는다. 아래 `/v1/recommend-courses/{request_id}/cancel`은 BE에서 호출하지 않는다(#370).
+
 <a id="cancellation"></a>
 
 ## 코스 추천 취소
@@ -752,8 +779,8 @@ request_id: String(path parameter)
 
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
-| 추천 요청 | v2·v3의 category 배열, available_time 문자열, business_hours 객체 | [RecommendCoursesRequestV2](../../../src/main/java/eightjbbm/keepgo/recommendation/service/dto/RecommendCoursesRequestV2.java)에 대응하는 구조가 있다. 구형 [RecommendCourseRequest](../../../src/main/java/eightjbbm/keepgo/util/dto/RecommendCourseRequest.java)는 availableTime 정수, businessHours 문자열이며 후보 생성 시 좌표·영업시간이 null이다. 호출 경로별 계약을 구분한다. |
-| 추천 응답 | v2·v3는 data.error, match_score와 여러 message 값 | [RecommendCoursesResponseV2](../../../src/main/java/eightjbbm/keepgo/recommendation/service/dto/RecommendCoursesResponseV2.java)가 필드를 갖는다. [RecommendationServiceV2](../../../src/main/java/eightjbbm/keepgo/recommendation/service/RecommendationServiceV2.java)는 error=null, courses!=null인 recommend_success/recommend_not_found를 성공으로 수용한다. HTTP 200만으로 업무 성공을 판정하지 않는다. |
-| 추천 취소 | request_id 경로, 취소 응답은 있지만 원 요청에서 ID 전달 규약 미기재 | BE의 작업 ID와 AI request_id 간 상관관계·취소 전달 보장을 시트만으로 확정할 수 없다. |
+| 추천 요청 | v2·v3의 category 배열, available_time 문자열, business_hours 객체 | [RecommendCoursesRequestV2](../../../src/main/java/eightjbbm/keepgo/recommendation/service/dto/RecommendCoursesRequestV2.java)가 `POST /v3/recommend-course/stream`으로 보낸다. 후보 `place_id`는 정수다. BE의 v1 추천 호출은 제거되었다(#370). |
+| 추천 응답 | v3는 SSE `status`·`done`·`error`, `done`의 data.error와 여러 message 값 | [AiServerRecommendApiService](../../../src/main/java/eightjbbm/keepgo/recommendation/service/AiServerRecommendApiService.java)가 `done` 본문을 읽고, [RecommendationServiceV2](../../../src/main/java/eightjbbm/keepgo/recommendation/service/RecommendationServiceV2.java)가 `message`로 판정한다([v3 스트리밍](#ai-v3-stream)). HTTP 200만으로 업무 성공을 판정하지 않는다. `match_score`는 코스별이다. 시트 예시는 `data.match_score`(전체 값)이므로 AI 팀 확인이 필요하다. |
+| 추천 취소 | request_id 경로, 취소 응답은 있지만 원 요청에서 ID 전달 규약 미기재 | BE의 v2·v3 취소는 스트림 연결을 닫는다. AI 취소 API 연동은 채택하지 않았으며(#356), v1 취소 호출은 제거되었다(#370). |
 
 AI(v2)·AI(v3)는 query를 필수로 적지만 현재 RecommendCoursesRequestV2는 nullable로 선언한다. 선택 항목 history_place_ids는 현재 신형 DTO에 없다. 원문 예시는 스마트 따옴표·누락 쉼표를 포함하며, 후보 배열을 설명에서 dict로 표기한 부분도 있다.

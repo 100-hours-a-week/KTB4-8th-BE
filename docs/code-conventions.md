@@ -138,6 +138,7 @@ class OutingWishlistServiceTest {
 - **의존성 주입**: `@RequiredArgsConstructor`로 생성자 주입한다. 필드 주입(`@Autowired`)을 쓰지 않는다.
 - **설정값**: `keepgo.*` 접두사를 쓰는 record `@ConfigurationProperties`로 읽는다. `@Value`를 쓰지 않는다.
 - **로깅**: `@Slf4j`를 쓴다. 객체를 통째로 `toString()`해서 남기지 않고, 필요한 식별자만 남긴다. 예외 로그 수준은 [예외 처리](exception-handling.md#로깅)를 따른다.
+- **AI 통신 본문 로깅 예외**: AI RestClient, `VideoAnalysisJobClient`, `AiSseClient`의 실제 전송 경로는 운영 기본 INFO에서 요청·응답과 SSE 개별 이벤트 본문을 길이 제한·샘플링 없이 기록한다. 채팅 원문·위치 등 나들이 조건·영상 제목/설명·AI 결과의 원문 기록을 허용한다. 인증 헤더·API 키·URI 인증정보는 기록하지 않으며 URI는 경로만 남긴다. 줄바꿈·제어문자·역슬래시는 복원 가능한 이스케이프로 한 로그 항목 경계를 보존한다. 호출 ID·HTTP 상태·SSE 수신 순번·경과 시간·종료 사유를 함께 기록하고, 기존 제한 시간 안에 받은 불완전한 본문은 `complete=false`로 구분한다. 이 정책은 로그 저장량과 로그 열람자에게 공개되는 업무 정보를 늘리며, 수신하지 못한 데이터나 수집 시스템의 보존을 보장하지 않는다. 실패 ERROR는 기존 예외 규칙을 따르되 본문을 중복 기록하지 않는다.
 - **주석**: 한국어로 쓰고, 문서 주석은 `///` 형식을 쓴다. 주석 처리된 코드는 커밋하지 않는다.
 - **`var`**: 우변에서 타입이 드러날 때만 쓴다(`new`, `from(...)`, 이름에 타입이 있는 팩토리).
 
@@ -165,12 +166,12 @@ class OutingWishlistServiceTest {
 | 헥사고날 구조 | `outingwishlist`는 의도된 예외다. 다른 기능으로 확산하지 않는다. |
 | 패키지 구조 | `interestextraction`은 엔티티가 `repository` 아래에, Command/Result가 `service` 루트에 있다. `chat`은 `dto`, `controller/dto`, `service/dto`가 함께 있다. `recommendation`은 일부 Response가 기능 루트에 있다. |
 | 공용 코드 위치 | 공용 `Address`가 `sandbox.ds`에, `QuerydslConfig`가 `outingwishlist` 안에 있다. |
-| 버전 접미사 | `ChatControllerV2`, `ChatServiceV2`, `RecommendationControllerV2/V3`, `InterestExtractionControllerV3`, `InterestExtractionServiceV2/V3`, `YoutubeApiServiceV2`와 관련 DTO |
-| MapStruct | `MemberMapper`, `ChatMapper` 등이 `INSTANCE` 싱글턴으로 사용된다. `InterestExtractionMapper`는 싱글턴 이름도 다르다. |
-| 트랜잭션 | `outingwishlist` 외의 조회 메서드에 `readOnly`가 없다. |
+| 버전 접미사 | `ChatControllerV2`, `ChatServiceV2`, `RecommendationControllerV2/V3`, `InterestExtractionControllerV3`, `InterestExtractionServiceV3`, `YoutubeApiServiceV2`와 관련 DTO |
+| MapStruct | `ChatMapper` 등이 `INSTANCE` 싱글턴으로 사용된다. `InterestExtractionMapper`는 싱글턴 이름도 다르다. |
+| 트랜잭션 | `outingwishlist`와 `MemberService.getMemberInfo` 외의 일부 조회 메서드에 `readOnly`가 없다. |
 | 엔티티 생성자 | `Member`, `OAuthAccount`, `Chat`, `MemberLikedVideo`, `File`, `OutingGuide`, `OutingPlace`, `OutingEvent`가 public 기본 생성자를 쓴다. |
 | fetch 전략 | `Member.profileImage`가 기본값 EAGER인 `@OneToOne`이다. |
 | 시간 필드 | `OutingCourse`, `VideoAnalysis`, `MemberLikedVideo`, `OutingWishlistEntry`가 `createDatetime`/`deleteDatetime`을 쓴다. |
 | 테스트 | 한국어 snake_case 메서드 이름, `@DisplayName` 누락, JUnit `assertEquals` 사용이 섞여 있다. `GoogleApiClientUnitTests.test1` |
 | 설정값 | `OutingCriteriaProperties`에 `keepgo.*` 접두사가 없다. |
-| 로깅·주석 | `MemberService`에 `toString()` 로깅과 주석 처리된 코드가 있다. |
+| 외부 SDK 설정 호환 | OAuth Sentry 수동 전송은 기존 Sentry SDK의 `sentry.dsn`과 `SENTRY_DSN`을 공유한다. |

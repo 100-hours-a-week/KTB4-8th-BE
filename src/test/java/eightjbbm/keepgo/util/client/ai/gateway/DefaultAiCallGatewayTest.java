@@ -4,21 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,6 +43,7 @@ class DefaultAiCallGatewayTest {
             Duration.ofMillis(20),
             Duration.ofSeconds(130),
             Duration.ofSeconds(5),
+            Duration.ofSeconds(30),
             Duration.ofSeconds(30));
 
     private final AiServerService ai = mock(AiServerService.class);
@@ -61,7 +66,7 @@ class DefaultAiCallGatewayTest {
     void respectsGlobalSlotLimit() {
         int limit = 2;
         givenSlots(limit);
-        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class))).thenAnswer(call -> {
             int active = inFlight.incrementAndGet();
             maxInFlight.accumulateAndGet(active, Math::max);
             try {
@@ -69,15 +74,15 @@ class DefaultAiCallGatewayTest {
             } finally {
                 inFlight.decrementAndGet();
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
-        List<CompletableFuture<AnalyzeVideoResponseV2>> calls = List.of(
-                gateway.submitAnalysis(1, List.of("a"), () -> {}),
-                gateway.submitAnalysis(2, List.of("b"), () -> {}),
-                gateway.submitAnalysis(3, List.of("c"), () -> {}),
-                gateway.submitAnalysis(4, List.of("d"), () -> {}));
+        List<CompletableFuture<VideoAnalysisResponse>> calls = List.of(
+                gateway.submitVideoAnalysis(1, List.of("a"), Map.of(), null),
+                gateway.submitVideoAnalysis(2, List.of("b"), Map.of(), null),
+                gateway.submitVideoAnalysis(3, List.of("c"), Map.of(), null),
+                gateway.submitVideoAnalysis(4, List.of("d"), Map.of(), null));
 
         CompletableFuture.allOf(calls.toArray(CompletableFuture[]::new)).join();
 
@@ -92,21 +97,21 @@ class DefaultAiCallGatewayTest {
         CountDownLatch firstStarted = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
         AtomicInteger calls = new AtomicInteger();
-        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class))).thenAnswer(call -> {
             List<String> ids = call.getArgument(0);
             order.add(ids.getFirst());
             if (calls.incrementAndGet() == 1) {
                 firstStarted.countDown();
                 releaseFirst.await(5, TimeUnit.SECONDS);
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
-        CompletableFuture<AnalyzeVideoResponseV2> first = gateway.submitAnalysis(1, List.of("a1"), () -> {});
+        CompletableFuture<VideoAnalysisResponse> first = gateway.submitVideoAnalysis(1, List.of("a1"), Map.of(), null);
         assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
-        CompletableFuture<AnalyzeVideoResponseV2> second = gateway.submitAnalysis(1, List.of("a2"), () -> {});
-        CompletableFuture<AnalyzeVideoResponseV2> other = gateway.submitAnalysis(2, List.of("b1"), () -> {});
+        CompletableFuture<VideoAnalysisResponse> second = gateway.submitVideoAnalysis(1, List.of("a2"), Map.of(), null);
+        CompletableFuture<VideoAnalysisResponse> other = gateway.submitVideoAnalysis(2, List.of("b1"), Map.of(), null);
         releaseFirst.countDown();
 
         CompletableFuture.allOf(first, second, other).join();
@@ -122,25 +127,25 @@ class DefaultAiCallGatewayTest {
         CountDownLatch firstStarted = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
         AtomicInteger calls = new AtomicInteger();
-        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class))).thenAnswer(call -> {
             List<String> ids = call.getArgument(0);
             order.add(ids.getFirst());
             if (calls.incrementAndGet() == 1) {
                 firstStarted.countDown();
                 releaseFirst.await(5, TimeUnit.SECONDS);
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
-        CompletableFuture<AnalyzeVideoResponseV2> first = gateway.submitAnalysis(1, List.of("a1"), () -> {});
+        CompletableFuture<VideoAnalysisResponse> first = gateway.submitVideoAnalysis(1, List.of("a1"), Map.of(), null);
         assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
-        List<CompletableFuture<AnalyzeVideoResponseV2>> queued = List.of(
+        List<CompletableFuture<VideoAnalysisResponse>> queued = List.of(
                 first,
-                gateway.submitAnalysis(1, List.of("a2"), () -> {}),
-                gateway.submitAnalysis(1, List.of("a3"), () -> {}),
-                gateway.submitAnalysis(2, List.of("b1"), () -> {}),
-                gateway.submitAnalysis(2, List.of("b2"), () -> {}));
+                gateway.submitVideoAnalysis(1, List.of("a2"), Map.of(), null),
+                gateway.submitVideoAnalysis(1, List.of("a3"), Map.of(), null),
+                gateway.submitVideoAnalysis(2, List.of("b1"), Map.of(), null),
+                gateway.submitVideoAnalysis(2, List.of("b2"), Map.of(), null));
         releaseFirst.countDown();
 
         CompletableFuture.allOf(queued.toArray(CompletableFuture[]::new)).join();
@@ -156,19 +161,25 @@ class DefaultAiCallGatewayTest {
         CountDownLatch releaseFirst = new CountDownLatch(1);
         AtomicInteger calls = new AtomicInteger();
         AtomicInteger beforeSendCalls = new AtomicInteger();
-        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class))).thenAnswer(call -> {
             if (calls.incrementAndGet() == 1) {
                 firstStarted.countDown();
                 releaseFirst.await(5, TimeUnit.SECONDS);
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway();
 
-        CompletableFuture<AnalyzeVideoResponseV2> first =
-                gateway.submitAnalysis(1, List.of("a1"), beforeSendCalls::incrementAndGet);
-        CompletableFuture<AnalyzeVideoResponseV2> second =
-                gateway.submitAnalysis(2, List.of("b1"), beforeSendCalls::incrementAndGet);
+        CompletableFuture<VideoAnalysisResponse> first =
+                gateway.submitVideoAnalysis(1, List.of("a1"), Map.of(), ids -> {
+                    beforeSendCalls.incrementAndGet();
+                    return ids;
+                });
+        CompletableFuture<VideoAnalysisResponse> second =
+                gateway.submitVideoAnalysis(2, List.of("b1"), Map.of(), ids -> {
+                    beforeSendCalls.incrementAndGet();
+                    return ids;
+                });
         assertThat(firstStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
         assertThat(beforeSendCalls.get()).isEqualTo(1);
@@ -184,11 +195,11 @@ class DefaultAiCallGatewayTest {
         when(slots.acquire(any(AiCallType.class), any(Duration.class))).thenReturn(Optional.empty());
         gateway = startedGateway();
 
-        CompletableFuture<AnalyzeVideoResponseV2> pending = gateway.submitAnalysis(1, List.of("a"), () -> {});
+        CompletableFuture<VideoAnalysisResponse> pending = gateway.submitVideoAnalysis(1, List.of("a"), Map.of(), null);
         gateway.shutdown();
 
         assertThat(pending).failsWithin(Duration.ofSeconds(1));
-        assertThat(gateway.submitAnalysis(2, List.of("b"), () -> {})).isCompletedExceptionally();
+        assertThat(gateway.submitVideoAnalysis(2, List.of("b"), Map.of(), null)).isCompletedExceptionally();
     }
 
     @Test
@@ -196,13 +207,13 @@ class DefaultAiCallGatewayTest {
     void failsCallExceedingTotalTimeout() throws Exception {
         givenSlots(1);
         CountDownLatch interrupted = new CountDownLatch(1);
-        when(ai.analyzeVideoV2(anyList())).thenAnswer(call -> {
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class))).thenAnswer(call -> {
             try {
                 Thread.sleep(5_000);
             } catch (InterruptedException error) {
                 interrupted.countDown();
             }
-            return failure();
+            return emptyResponse();
         });
         gateway = startedGateway(new AiCallProperties(
                 1,
@@ -211,9 +222,10 @@ class DefaultAiCallGatewayTest {
                 Duration.ofMillis(20),
                 Duration.ofMillis(200),
                 Duration.ofMillis(100),
-                Duration.ofSeconds(30)));
+                Duration.ofSeconds(30),
+                Duration.ofMillis(100)));
 
-        CompletableFuture<AnalyzeVideoResponseV2> call = gateway.submitAnalysis(1, List.of("a"), () -> {});
+        CompletableFuture<VideoAnalysisResponse> call = gateway.submitVideoAnalysis(1, List.of("a"), Map.of(), null);
 
         assertThat(call)
                 .failsWithin(Duration.ofSeconds(2))
@@ -222,6 +234,38 @@ class DefaultAiCallGatewayTest {
                 .isInstanceOf(java.util.concurrent.TimeoutException.class);
         assertThat(interrupted.await(2, TimeUnit.SECONDS)).isTrue();
         verify(slots, timeout(2_000)).release(any(AiCallType.class), anyString());
+    }
+
+    @Test
+    @DisplayName("임베딩은 장소마다 AI 호출 하나를 보낸다")
+    void embedsEachGuideWithOwnCall() {
+        givenSlots(1);
+        List<OutingGuide> guides = List.of(guide(1), guide(2), guide(3));
+        gateway = startedGateway();
+
+        gateway.submitEmbedding(guides).join();
+
+        verify(ai, times(3)).embedPlace(any(OutingGuide.class));
+        guides.forEach(guide -> verify(ai).embedPlace(guide));
+    }
+
+    @Test
+    @DisplayName("임베딩 중 한 장소가 실패해도 나머지는 보내고 전체는 실패로 끝낸다")
+    void embedsRemainingGuidesWhenOneFails() {
+        givenSlots(1);
+        List<OutingGuide> guides = List.of(guide(1), guide(2), guide(3));
+        doThrow(new IllegalStateException("AI down")).when(ai).embedPlace(guides.get(1));
+        gateway = startedGateway();
+
+        CompletableFuture<Void> call = gateway.submitEmbedding(guides);
+
+        assertThat(call)
+                .failsWithin(Duration.ofSeconds(2))
+                .withThrowableThat()
+                .havingRootCause()
+                .isInstanceOf(IllegalStateException.class);
+        verify(ai).embedPlace(guides.get(0));
+        verify(ai).embedPlace(guides.get(2));
     }
 
     @Test
@@ -234,6 +278,7 @@ class DefaultAiCallGatewayTest {
                         Duration.ofMillis(200),
                         Duration.ofSeconds(130),
                         Duration.ofSeconds(5),
+                        Duration.ofSeconds(30),
                         Duration.ofSeconds(30)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -242,12 +287,13 @@ class DefaultAiCallGatewayTest {
     @DisplayName("beforeSend가 없으면 요청한 영상을 모두 보낸다")
     void sendsAllRequestedVideosWithoutBeforeSend() {
         givenSlots(1);
-        when(jobClient.analyzeVideo(anyList(), any(Duration.class))).thenReturn(new VideoAnalysisResponse(List.of()));
+        when(jobClient.analyzeVideo(anyList(), anyMap(), any(Duration.class)))
+                .thenReturn(new VideoAnalysisResponse(List.of()));
         gateway = startedGateway();
 
-        gateway.submitVideoAnalysis(1, List.of("a", "b"), null).join();
+        gateway.submitVideoAnalysis(1, List.of("a", "b"), Map.of(), null).join();
 
-        verify(jobClient).analyzeVideo(eq(List.of("a", "b")), any(Duration.class));
+        verify(jobClient).analyzeVideo(eq(List.of("a", "b")), eq(Map.of()), any(Duration.class));
     }
 
     @Test
@@ -257,14 +303,20 @@ class DefaultAiCallGatewayTest {
         gateway = startedGateway();
 
         CompletableFuture<VideoAnalysisResponse> call =
-                gateway.submitVideoAnalysis(1, List.of("a"), requested -> List.of("a", "other"));
+                gateway.submitVideoAnalysis(1, List.of("a"), Map.of(), requested -> List.of("a", "other"));
 
         assertThat(call)
                 .failsWithin(Duration.ofSeconds(2))
                 .withThrowableThat()
                 .havingRootCause()
                 .isInstanceOf(IllegalStateException.class);
-        verify(jobClient, never()).analyzeVideo(anyList(), any(Duration.class));
+        verify(jobClient, never()).analyzeVideo(anyList(), anyMap(), any(Duration.class));
+    }
+
+    private static OutingGuide guide(long id) {
+        OutingGuide guide = mock(OutingGuide.class);
+        when(guide.getId()).thenReturn(id);
+        return guide;
     }
 
     private DefaultAiCallGateway startedGateway() {
@@ -297,7 +349,7 @@ class DefaultAiCallGatewayTest {
                 .release(any(AiCallType.class), anyString());
     }
 
-    private static AnalyzeVideoResponseV2 failure() {
-        return new AnalyzeVideoResponseV2.Failure("failure", new AnalyzeVideoResponseV2.Failure.Data());
+    private static VideoAnalysisResponse emptyResponse() {
+        return new VideoAnalysisResponse(List.of());
     }
 }

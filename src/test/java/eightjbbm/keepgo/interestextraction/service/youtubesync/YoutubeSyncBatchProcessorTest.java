@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,11 +17,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.util.DateTime;
+import com.google.api.services.youtube.model.Video;
+import com.google.api.services.youtube.model.VideoSnippet;
 import eightjbbm.keepgo.integration.stub.YoutubeStub;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisManager;
 import eightjbbm.keepgo.interestextraction.repository.videoanalysis.VideoAnalysisStatus;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallGateway;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
+import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -50,7 +56,7 @@ class YoutubeSyncBatchProcessorTest {
     @Test
     @DisplayName("재시도가 모두 실패한 배치는 FAILED로 기록한다")
     void recordsBatchFailedWhenRetriesAreExhausted() {
-        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any()))
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), anyMap(), any()))
                 .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
         doThrow(new CannotAcquireLockException("deadlock"))
                 .when(batchWriter)
@@ -66,7 +72,7 @@ class YoutubeSyncBatchProcessorTest {
     @Test
     @DisplayName("sweeper가 마감해 중단되면 이미 전송한 배치의 분석 중 기록을 FAILED로 정리한다")
     void failsInProgressAnalysesWhenFenced() {
-        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any()))
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), anyMap(), any()))
                 .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
         doThrow(new SyncFencedException(1L))
                 .when(batchWriter)
@@ -97,6 +103,27 @@ class YoutubeSyncBatchProcessorTest {
                         eq(List.of(SharedVideoResult.failed("v1"))),
                         eq(100));
         verify(batchWriter, never()).recordFailed(anyLong(), anyString(), anyList(), anyInt());
+    }
+
+    @Test
+    @DisplayName("YouTube 메타를 한국 날짜로 전달하고 snippet이 없으면 null 메타로 전달한다")
+    void passesVideoMetaToGateway() {
+        Video withSnippet = YoutubeStub.video("v0");
+        withSnippet.setSnippet(new VideoSnippet()
+                .setPublishedAt(DateTime.parseRfc3339("2026-11-01T16:00:00Z"))
+                .setTitle("제목")
+                .setDescription("설명"));
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), anyMap(), any()))
+                .thenReturn(failedFuture(new AiRequestException(AiRequestException.Kind.TIMEOUT, null, null, null)));
+
+        processor.process(1L, "instance-a", 2L, List.of(withSnippet, YoutubeStub.video("v1")), 10);
+
+        verify(gateway)
+                .submitVideoAnalysis(
+                        eq(1L),
+                        eq(List.of("v0", "v1")),
+                        eq(Map.of("v0", new VideoMeta(LocalDate.of(2026, 11, 2), "제목", "설명"), "v1", VideoMeta.EMPTY)),
+                        any());
     }
 
     @Test
@@ -149,9 +176,9 @@ class YoutubeSyncBatchProcessorTest {
 
     /// 실제 게이트웨이처럼 슬롯을 얻은 뒤 beforeSend를 실행하고, 전송 없이 AI 호출 실패로 끝낸다.
     private void givenGatewayRunsBeforeSend() {
-        when(gateway.submitVideoAnalysis(anyLong(), anyList(), any())).thenAnswer(call -> {
+        when(gateway.submitVideoAnalysis(anyLong(), anyList(), anyMap(), any())).thenAnswer(call -> {
             List<String> requested = call.getArgument(1);
-            UnaryOperator<List<String>> beforeSend = call.getArgument(2);
+            UnaryOperator<List<String>> beforeSend = call.getArgument(3);
             try {
                 beforeSend.apply(requested);
             } catch (RuntimeException error) {

@@ -4,15 +4,10 @@ import eightjbbm.keepgo.chat.dto.*;
 import eightjbbm.keepgo.chat.entity.Chat;
 import eightjbbm.keepgo.chat.repository.ChatRepository;
 import eightjbbm.keepgo.chat.service.requeststore.ChatRequestGuard;
-import eightjbbm.keepgo.member.entity.Member;
-import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
-import eightjbbm.keepgo.util.cache.getreply.GetReplyCacheService;
-import eightjbbm.keepgo.util.cache.getreply.GetReplyJobStatus;
 import eightjbbm.keepgo.util.client.geocoding.GeoCodingApiClient;
 import eightjbbm.keepgo.util.exception.BadRequestException;
-import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -25,53 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatService {
 
     private final ChatRequestGuard requestGuard;
-    private final MemberRepository memberRepository;
     private final ChatRepository chatRepository;
-    private final GetReplyCacheService getReplyCacheService;
     private final OutingCriteriaRepository outingCriteriaRepository;
     private final GeoCodingApiClient geoCodingApiClient;
-
-    /// 채팅 전송 API
-    /// @param command {@link SendChatCommand}
-    /// @return {@link SendChatResult}
-    public SendChatResult sendChat(SendChatCommand command) {
-        Long memberId = command.memberId();
-        Member member = memberRepository.findById(memberId).orElseThrow();
-        Chat userChat = chatRepository.save(Chat.from(member, command.content()));
-        OutingCriteria outingCriteria = outingCriteriaRepository
-                .findById(memberId)
-                .orElse(OutingCriteria.emptyOutingCriteriaWithMemberId(command.memberId()));
-        getReplyCacheService.createRequest(
-                command.memberId(),
-                command.content(),
-                userChat.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                outingCriteria);
-        return SendChatResult.from(userChat);
-    }
-
-    /// 채팅 대답 폴링 API
-    public GetReplyResult getReply(GetReplyCommand command) {
-        // getReply 상태 확인
-        GetReplyJobStatus status = getReplyCacheService.checkStatus(command.memberId());
-        switch (status) {
-            case PENDING -> {
-                return GetReplyResult.InProgress.from("IN_PROGRESS", 1);
-            }
-            case FAILED -> throw new ServiceUnavailableException();
-            case SUCCESS -> {
-                String reply = getReplyCacheService.getReply(command.memberId());
-                return GetReplyResult.Completed.from(
-                        "COMPLETED",
-                        reply,
-                        outingCriteriaRepository.findById(command.memberId()).get());
-            }
-        }
-        return null;
-    }
 
     /// 채팅 내역 조회 API
     /// @param command {@link GetChatsCommand}
     /// @return {@link GetChatsResult}
+    @Transactional(readOnly = true)
     public GetChatsResult getChats(GetChatsCommand command) {
         int size = command.size() == null ? 20 : command.size();
 

@@ -1,3 +1,0 @@
-package eightjbbm.keepgo.recommendation.dto;
-
-public record StopRecommendationCommand(Long memberId) {}

@@ -1,5 +1,7 @@
 # 유튜브 영상 분석 API 서비스 처리 흐름
 
+> **#357 이후:** 이 문서는 #357 이전 설계 기록이며 `YoutubeVideoAnalyzer`·`DefaultYoutubeVideoAnalyzer`, `AiServerService#analyzeVideoV2`, `AnalyzeVideoResponseV2` 등은 제거됨. 현재 코드에는 없다.
+
 분석 기준: 2026-10-20 작업 트리의 Java 소스. 대상은 `eightjbbm.keepgo.interestextraction.service.youtubeanalyze`의 8개 타입이며, API 진입점과 외부 호출·저장소 구현을 함께 확인했다. 아래의 정상 처리 흐름은 서비스가 의도한 파이프라인이다. **현재 구현에서는 신규 영상 선별 조건의 모순으로 분석 단계에 도달하지 못한다.** 코드 수정 없이 관찰 결과를 문서화했다.
 
 ## 1. API 진입점과 클래스 역할
@@ -51,7 +53,7 @@ flowchart TD
     B --> C[백엔드 분석 전략 호출]
     C --> D[백엔드 결과 Map에 없는 Video 선별]
     D --> E[최대 10개씩 순차 분할]
-    E --> F[AI POST /v1/analyze-video]
+    E --> F[AI POST /v3/analyze-video]
     F --> G{응답 타입}
     G -- Failure --> H[해당 배치의 추출 결과 없음]
     G -- Success --> I{각 결과 status}

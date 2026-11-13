@@ -1,116 +1,54 @@
 package eightjbbm.keepgo.member.service;
 
-import eightjbbm.keepgo.member.dto.*;
+import eightjbbm.keepgo.member.dto.GetMemberInfoCommand;
+import eightjbbm.keepgo.member.dto.GetMemberInfoResult;
+import eightjbbm.keepgo.member.dto.UpdateMemberInfoCommand;
+import eightjbbm.keepgo.member.dto.UpdateMemberInfoResult;
 import eightjbbm.keepgo.member.entity.Member;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
+import eightjbbm.keepgo.member.exception.MemberNotFoundException;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
-import eightjbbm.keepgo.outingwishlist.adapter.out.persistence.OutingWishlist;
-import eightjbbm.keepgo.recommendation.repository.OutingEventRepository;
-import eightjbbm.keepgo.recommendation.repository.OutingPlaceRepository;
-import eightjbbm.keepgo.util.client.ai.AiServerApiClient;
-import eightjbbm.keepgo.util.client.google.GetLikedVideosResponse;
-import eightjbbm.keepgo.util.client.google.GoogleApiClient;
 import eightjbbm.keepgo.util.file.FileRepository;
 import eightjbbm.keepgo.util.file.FileUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MemberService {
     private final MemberRepository memberRepository;
     private final FileRepository fileRepository;
     private final OAuthAccountRepository oAuthAccountRepository;
-    private final OutingPlaceRepository outingPlaceRepository;
-    private final OutingEventRepository outingEventRepository;
-    private final OutingWishlist outingWishlist;
-    private final GoogleApiClient googleApiClient;
-    private final AiServerApiClient aiServerApiClient;
-    private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
 
     /// 회원 정보 수정 API
     /// @param command {@link UpdateMemberInfoCommand}
     /// @return {@link UpdateMemberInfoResult}
     @Transactional
     public UpdateMemberInfoResult updateMemberInfo(UpdateMemberInfoCommand command) {
-        Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        member.updateNickname(command.nickname());
+        Member member = memberRepository.findById(command.memberId()).orElseThrow(MemberNotFoundException::new);
+        if (command.nickname() != null) {
+            member.updateNickname(command.nickname());
+        }
 
         String profileImagePath = FileUtil.extractPathFromUrl(command.profileImagePath());
-
-        fileRepository.findByStoragePath(profileImagePath).ifPresent(member::updateProfileImage);
+        if (profileImagePath != null) {
+            fileRepository.findByStoragePath(profileImagePath).ifPresent(member::updateProfileImage);
+        }
         return UpdateMemberInfoResult.from(member);
     }
 
     /// 회원 정보 조회 API
     ///
-    /// 상태: 구현 완료
     /// @param command {@link GetMemberInfoCommand}
-    /// @result {@link GetMemberInfoResult}
+    /// @return {@link GetMemberInfoResult}
+    @Transactional(readOnly = true)
     public GetMemberInfoResult getMemberInfo(GetMemberInfoCommand command) {
-        Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        OAuthAccount oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
+        Member member = memberRepository.findById(command.memberId()).orElseThrow(MemberNotFoundException::new);
+        OAuthAccount oAuthAccount = oAuthAccountRepository
+                .findByMember(member)
+                .orElseThrow(() -> new IllegalStateException("회원의 OAuth 계정이 없습니다: " + command.memberId()));
         return GetMemberInfoResult.from(member, oAuthAccount);
-    }
-
-    /// 좋아요한 동영상 목록 동기화 API
-    ///
-    /// 회원의 좋아요한 동영상 재생목록 ID를 가져오는 것은 회원가입 때 진행해야 됨.
-    /// @param command {@link SynchronizeYoutubeLikeVideosCommand}
-    public void synchronizeYoutubeLikeVideos(SynchronizeYoutubeLikeVideosCommand command) {
-        Member member = memberRepository.findById(command.memberId()).orElseThrow();
-        var oAuthAccount = oAuthAccountRepository.findByMember(member).orElseThrow();
-        var client = oAuth2AuthorizedClientService.loadAuthorizedClient("google", oAuthAccount.getName());
-        if (client == null) {
-            throw new IllegalStateException("Google OAuth 인증 정보가 없습니다.");
-        }
-        String oAuth2AccessToken = client.getAccessToken().getTokenValue();
-        var likedVideos = googleApiClient.getLikedVideos(oAuth2AccessToken);
-        log.info(likedVideos.toString());
-        likedVideos.items().stream().map(GetLikedVideosResponse.Item::id).forEach(url -> {
-            /*
-            AnalyzeVideoResponse response = aiServerApiClient.analyzeVideo(new AnalyzeVideoRequest("https://youtube.com/shorts/" + url));
-            if (response instanceof AnalyzeVideoResponseV2.Success successResponse) {
-                OutingGuide guide;
-                if (isPlaceOrEvent(successResponse.data())) {
-                    guide = outingPlaceRepository.findByName(successResponse.getName()).orElseGet(
-                            () -> outingPlaceRepository.save(new OutingPlace(
-                                    successResponse.getCategory(),
-                                    successResponse.getName(),
-                                    successResponse.getSummary(),
-                                    null,
-                                    null,
-                                    null
-                            ))
-                    );
-                } else {
-                    guide = outingEventRepository.findByName(successResponse.getName()).orElseGet(
-                            () -> outingEventRepository.save(new OutingEvent(
-                                    successResponse.getCategory(),
-                                    successResponse.getName(),
-                                    successResponse.getSummary(),
-                                    null, //successResponse.data().eventStartDate(),
-                                    null, //successResponse.data().eventEndDate(),
-                                    null,
-                                    null,
-                                    null
-                            ))
-                    );
-                }
-                outingCollectionPrivateRepository.save(new OutingCollectionPrivate(member, guide));
-            }
-
-             */
-
-        });
-    }
-
-    private boolean isPlaceOrEvent(String category) {
-        return category.equals("팝업") || category.equals("전시");
     }
 }

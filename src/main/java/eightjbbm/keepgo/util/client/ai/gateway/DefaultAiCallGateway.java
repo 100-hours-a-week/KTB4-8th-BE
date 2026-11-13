@@ -2,10 +2,10 @@ package eightjbbm.keepgo.util.client.ai.gateway;
 
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.util.client.ai.analysis.AiServerService;
-import eightjbbm.keepgo.util.client.ai.analysis.AnalyzeVideoResponseV2;
 import eightjbbm.keepgo.util.client.ai.job.AiRequestException;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisJobClient;
 import eightjbbm.keepgo.util.client.ai.job.VideoAnalysisResponse;
+import eightjbbm.keepgo.util.client.ai.job.VideoMeta;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
@@ -66,16 +66,8 @@ public class DefaultAiCallGateway implements AiCallGateway {
     }
 
     @Override
-    public CompletableFuture<AnalyzeVideoResponseV2> submitAnalysis(
-            long syncId, List<String> videoIds, Runnable beforeSend) {
-        List<String> ids = List.copyOf(videoIds);
-        Runnable start = beforeSend == null ? () -> {} : beforeSend;
-        return enqueue("sync:" + syncId, AiCallType.ANALYSIS, () -> aiServerService.analyzeVideoV2(ids), start);
-    }
-
-    @Override
     public CompletableFuture<VideoAnalysisResponse> submitVideoAnalysis(
-            long syncId, List<String> videoIds, UnaryOperator<List<String>> beforeSend) {
+            long syncId, List<String> videoIds, Map<String, VideoMeta> metas, UnaryOperator<List<String>> beforeSend) {
         List<String> requested = List.copyOf(videoIds);
         UnaryOperator<List<String>> select = beforeSend == null ? UnaryOperator.identity() : beforeSend;
         AtomicReference<List<String>> toSend = new AtomicReference<>(requested);
@@ -84,7 +76,7 @@ public class DefaultAiCallGateway implements AiCallGateway {
                 AiCallType.ANALYSIS,
                 () -> toSend.get().isEmpty()
                         ? new VideoAnalysisResponse(List.of())
-                        : videoAnalysisJobClient.analyzeVideo(toSend.get(), properties.analysisTimeout()),
+                        : videoAnalysisJobClient.analyzeVideo(toSend.get(), metas, properties.analysisTimeout()),
                 () -> toSend.set(subsetOf(requested, select.apply(requested))));
     }
 
@@ -98,15 +90,17 @@ public class DefaultAiCallGateway implements AiCallGateway {
 
     @Override
     public CompletableFuture<Void> submitEmbedding(List<OutingGuide> guides) {
-        List<OutingGuide> copy = List.copyOf(guides);
-        return enqueue(
-                "embedding",
-                AiCallType.EMBEDDING,
-                () -> {
-                    aiServerService.embedPlaces(copy);
-                    return null;
-                },
-                () -> {});
+        // v3는 장소 하나씩 받으므로 장소마다 슬롯·타임아웃을 따로 쓴다. 하나가 실패해도 나머지는 끝까지 보낸다.
+        return CompletableFuture.allOf(List.copyOf(guides).stream()
+                .map(guide -> enqueue(
+                        "embedding",
+                        AiCallType.EMBEDDING,
+                        () -> {
+                            aiServerService.embedPlace(guide);
+                            return (Void) null;
+                        },
+                        () -> {}))
+                .toArray(CompletableFuture[]::new));
     }
 
     private <T> CompletableFuture<T> enqueue(String queueKey, AiCallType type, Supplier<T> call, Runnable beforeSend) {

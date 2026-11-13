@@ -3,17 +3,25 @@ package eightjbbm.keepgo.recommendation.controller;
 import eightjbbm.keepgo.recommendation.GetHotPlaceListResponse;
 import eightjbbm.keepgo.recommendation.GetOngoingEventListResponse;
 import eightjbbm.keepgo.recommendation.service.HotPlaceServiceV2;
+import eightjbbm.keepgo.recommendation.service.RecommendationServiceV2;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequiredArgsConstructor
 public class RecommendationControllerV3 {
 
     private final HotPlaceServiceV2 hotPlaceServiceV2;
+    private final RecommendationServiceV2 recommendationService;
 
     @GetMapping("/api/v3/places/hot")
     public ResponseEntity<GetHotPlaceListResponse> getHotPlaceList() {
@@ -23,5 +31,21 @@ public class RecommendationControllerV3 {
     @GetMapping("/api/v3/events/ongoing")
     public ResponseEntity<GetOngoingEventListResponse> getOngoingEventList() {
         return ResponseEntity.status(HttpStatus.OK).body(hotPlaceServiceV2.getOngoingEventList());
+    }
+
+    @PostMapping(value = "/api/v3/member/recommendation", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> recommendOutingCourse(@AuthenticationPrincipal Jwt jwt) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        return ResponseEntity.status(HttpStatus.OK)
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .cacheControl(CacheControl.noCache())
+                .body(recommendationService.recommendOutingCourseV3(memberId));
+    }
+
+    @PostMapping("/api/v3/member/recommendation/cancellation")
+    public ResponseEntity<Void> cancelOutingCourseRecommendation(@AuthenticationPrincipal Jwt jwt) {
+        Long memberId = Long.valueOf(jwt.getSubject());
+        recommendationService.cancelOutingCourseRecommendation(memberId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

@@ -2,6 +2,8 @@
 
 > 초기 설계 자료다. 최종 정책과 문서별 적용 순서는 [문서 안내](youtube-analysis-refactoring.md)를 따른다. 현재 구현 완료를 의미하지 않는다.
 
+> **#357 이후:** 이 문서는 #357 이전 설계 기록이며 `YoutubeVideoAnalyzer`·`DefaultYoutubeVideoAnalyzer`, `AiServerService#analyzeVideoV2`, `AnalyzeVideoResponseV2` 등은 제거됨. 현재 코드에는 없다.
+
 ## 1. 목적
 
 `eightjbbm.keepgo.interestextraction.service.youtubeanalyzev3.DefaultYoutubeVideoAnalyzer#analyze`를 리팩토링한다.

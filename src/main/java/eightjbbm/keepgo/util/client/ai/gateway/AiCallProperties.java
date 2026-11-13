@@ -7,6 +7,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /// AI 호출 게이트웨이의 전역 상한·재시도 주기·호출 전체 제한을 배포 없이 조정할 수 있게 한다.
 ///
 /// `analysisTimeout`·`embeddingTimeout`은 전송부터 응답 수신까지의 전체 제한이며 연결 시간을 포함한다.
+/// SSE 스트림에서는 `analysisTimeout`이 스트림 전체 상한이고, `streamIdleTimeout`은 이벤트 사이 지연 한도다.
+/// AI 서버가 15초마다 keep-alive 주석을 보내므로 그 두 배인 30초를 기본으로 한다.
 @ConfigurationProperties(prefix = "keepgo.ai-call")
 public record AiCallProperties(
         @DefaultValue("3") int analysisLimit,
@@ -15,7 +17,8 @@ public record AiCallProperties(
         @DefaultValue("200ms") Duration retryInterval,
         @DefaultValue("130s") Duration analysisTimeout,
         @DefaultValue("5s") Duration connectTimeout,
-        @DefaultValue("30s") Duration embeddingTimeout) {
+        @DefaultValue("30s") Duration embeddingTimeout,
+        @DefaultValue("30s") Duration streamIdleTimeout) {
 
     public AiCallProperties {
         if (analysisLimit <= 0) {
@@ -29,7 +32,11 @@ public record AiCallProperties(
         requirePositive(analysisTimeout, "analysisTimeout");
         requirePositive(connectTimeout, "connectTimeout");
         requirePositive(embeddingTimeout, "embeddingTimeout");
+        requirePositive(streamIdleTimeout, "streamIdleTimeout");
         requireWithin(connectTimeout, analysisTimeout, "connectTimeout", "analysisTimeout");
+        if (streamIdleTimeout.compareTo(analysisTimeout) >= 0) {
+            throw new IllegalArgumentException("streamIdleTimeout은 analysisTimeout보다 짧아야 합니다: " + streamIdleTimeout);
+        }
         requireWithin(connectTimeout, embeddingTimeout, "connectTimeout", "embeddingTimeout");
         // 임대가 호출보다 먼저 끝나면 다른 호출이 같은 슬롯을 가져가 상한을 넘는다.
         if (leaseDuration.compareTo(analysisTimeout) <= 0 || leaseDuration.compareTo(embeddingTimeout) <= 0) {

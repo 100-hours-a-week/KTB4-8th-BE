@@ -4,6 +4,8 @@
 
 > 초기 설계 자료다. 최종 정책과 문서별 적용 순서는 [문서 안내](youtube-analysis-refactoring.md)를 따른다. 현재 구현 완료를 의미하지 않는다.
 
+> **#357 이후:** 이 문서는 #357 이전 설계 기록이며 `YoutubeVideoAnalyzer`·`DefaultYoutubeVideoAnalyzer`, `AiServerService#analyzeVideoV2`, `AnalyzeVideoResponseV2` 등은 제거됨. 현재 코드에는 없다.
+
 AI 요청의 실행 관리는 공통화하고 영상 분석·임베딩의 업무 처리는 유형별 Handler가 담당한다. 기존 클래스의 수정·대체 대상도 포함한다.
 
 ### 전체 클래스 목록

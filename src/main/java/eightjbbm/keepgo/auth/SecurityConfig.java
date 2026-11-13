@@ -35,7 +35,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, GoogleOAuthCredentialsProperties.class})
 public class SecurityConfig {
 
     private final JwtProperties jwtProperties;

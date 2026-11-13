@@ -8,7 +8,6 @@
 
 - [채팅 전송](#send)
 - [나들이 조건 수정](#criteria)
-- [챗봇 응답 조회](#response)
 - [채팅 내역 조회](#history)
 - [채팅 내역 초기화](#clear)
 
@@ -16,105 +15,9 @@
 
 ## 채팅 전송
 
-v1은 202와 Location을 반환하고 별도 API로 응답을 폴링한다. v2는 같은 기능의 결과를 SSE 이벤트로 전달한다. 각 버전의 요청·응답은 아래 계약을 따른다.
+v1 전송 및 응답 폴링 API는 제거되었다(#366). v2는 결과를 SSE 이벤트로 전달한다. v3는 v2의 이벤트에 AI 응답 조각(`chat-reply.delta`)과 오류 구분(`chat-reply.bad-gateway`)을 더한다. 각 버전의 요청·응답은 아래 계약을 따른다.
 
 다른 버전 탭에는 이 항목이 미기재되어 있다. 지원 중단으로 판단하지 않는다.
-
-<a id="backend-v1-row-10"></a>
-
-### v1 — FE - BE, 원본 10행
-
-[원본 시트](https://docs.google.com/spreadsheets/d/1ui37GlGUVHzM5lS3ZZE8TauRGyU035JWdjBCJ16TUOk/edit?gid=1284625682#gid=1284625682&range=A10)
-
-원본 메타데이터: B1: 최종 수정일 / D1: 260926 1349.
-
-**번호**
-
-```text
-8
-```
-
-**도메인**
-
-```text
-채팅
-```
-
-**API 엔드포인트 이름**
-
-```text
-채팅 전송
-```
-
-**비고**
-
-```text
-구현 완료
-```
-
-**API 엔드포인트 주소**
-
-```text
-POST /api/v1/user/chat-messages
-```
-
-**요청 본문**
-
-```text
-{
-    "content": String
-}
-```
-
-**항목 설명 (G열)**
-
-미기재
-
-**응답 코드 (H열)**
-
-```text
-202
-```
-
-**응답 본문**
-
-```text
-Location: /api/v1/user/chat-messages/{chatId}/response
-
-{
-    "content": String,
-    "is_by_bot": false
-}
-```
-
-**항목 설명 (J열)**
-
-```text
-폴링 방식으로 조회
-```
-
-**발생할 수 있는 오류 코드 (K열)**
-
-```text
-400
-401(Access Token 만료)
-409
-422
-500
-503
-```
-
-**외부 통신**
-
-```text
-AI 서버
-```
-
-**캐시**
-
-```text
-대답 생성 작업
-```
 
 <a id="backend-v2-row-8"></a>
 
@@ -238,6 +141,94 @@ data: {
     "categories": List<String>
   }
 }
+```
+
+<a id="backend-v3-chat-stream"></a>
+
+### v3 — FE - BE (v3), 시트 미반영(#354)
+
+시트에 행이 없다. 이슈 #354의 결정으로 추가한 계약이며 시트 반영은 별도 확인이 필요하다. v2는 바뀌지 않는다.
+
+**API 엔드포인트 이름**
+
+```text
+채팅 전송 API (스트리밍, delta 중계)
+```
+
+**API 엔드포인트 주소**
+
+```text
+POST /api/v3/member/chat-messages
+```
+
+**요청 본문**
+
+```text
+{
+  "content": String
+}
+```
+
+**응답 코드**
+
+```text
+200
+(스트림이 시작된 뒤)
+```
+
+**응답 본문**
+
+```text
+event: chat-reply.accepted
+id: 123
+data: {"chat": {"content": String, "is_by_bot": false}}
+
+event: chat-reply.delta
+id: 123
+data: {"text": String}
+
+event: chat-reply.success
+id: 123
+data: {
+  "chat": {"content": String, "is_by_bot": true},
+  "slot": {v2 chat-reply.success의 slot과 같다}
+}
+
+event: chat-reply.service-unavailable
+id: 123
+data: ProblemDetail (503)
+
+event: chat-reply.bad-gateway
+id: 123
+data: ProblemDetail (502, AI_LLM_* code)
+```
+
+**항목 설명**
+
+```text
+delta: AI 응답 조각. 누적은 FE가 한다. 최종 문장은 chat-reply.success의 chat.content에 다시 담긴다.
+스트림 시작 전 실패: AI 서버가 스트림을 시작하기 전(연결 실패, HTTP 오류)에 실패하면 SSE를 열지 않고 일반 HTTP 오류(502 또는 503)로 응답한다.
+스트림 중 실패: AI error 이벤트나 done 없는 끊김은 chat-reply.service-unavailable(503) 또는 chat-reply.bad-gateway(502, LLM 오류)로 보낸다. 이미 보낸 delta는 FE가 버리거나 실패로 표시한다.
+저장: AI가 done을 보낸 경우에만 나들이 조건과 봇 채팅을 저장한다. 부분 응답은 저장하지 않는다. FE 연결이 끊겨도 AI 스트림을 끝까지 받아 done이면 저장한다.
+사용자 채팅: 사용자 메시지는 AI 호출 전에 저장된다. 스트림 시작 전 실패(HTTP 오류)에도 남으므로 FE가 같은 문장을 재전송하면 중복 저장된다. v2도 같다.
+첫 AI 이벤트가 오기 전까지 응답 헤더가 지연될 수 있다.
+```
+
+**발생할 수 있는 오류 코드**
+
+```text
+400
+401(Access Token 만료)
+409
+422
+502
+503
+```
+
+**외부 통신**
+
+```text
+AI 서버 (/v3/extract/stream)
 ```
 
 <a id="criteria"></a>
@@ -369,131 +360,6 @@ category: 카테고리(카페, 팝업, ...)
 
 ```text
 주소의 변동이 없는 입력일 경우
-```
-
-<a id="response"></a>
-
-## 챗봇 응답 조회
-
-다른 버전 탭에는 이 항목이 미기재되어 있다. 지원 중단으로 판단하지 않는다.
-
-<a id="backend-v1-row-13"></a>
-
-### v1 — FE - BE, 원본 13행
-
-[원본 시트](https://docs.google.com/spreadsheets/d/1ui37GlGUVHzM5lS3ZZE8TauRGyU035JWdjBCJ16TUOk/edit?gid=1284625682#gid=1284625682&range=A13)
-
-원본 메타데이터: B1: 최종 수정일 / D1: 260926 1349.
-
-**번호**
-
-```text
-10
-```
-
-**도메인**
-
-```text
-채팅
-```
-
-**API 엔드포인트 이름**
-
-```text
-챗봇 응답 조회
-```
-
-**비고**
-
-```text
-구현 완료
-```
-
-**API 엔드포인트 주소**
-
-```text
-GET /api/v1/user/chat-messages/{chatId}/response
-```
-
-**요청 본문**
-
-```text
-없음
-```
-
-**항목 설명 (G열)**
-
-미기재
-
-**응답 코드 (H열)**
-
-```text
-200
-```
-
-**응답 본문**
-
-```text
-{
-    "status": String,
-    "poll_after": Integer
-}
-```
-
-**항목 설명 (J열)**
-
-미기재
-
-**발생할 수 있는 오류 코드 (K열)**
-
-```text
-400
-401(Access Token 만료)
-404
-500
-```
-
-**외부 통신**
-
-```text
-AI 서버
-```
-
-**캐시**
-
-```text
-대답 생성 작업
-의도 카드
-```
-
-#### 추가 응답·설명 — 원본 14행
-
-**응답 코드 (H열)**
-
-```text
-200
-```
-
-**응답 본문**
-
-```text
-{
-    "status": String,
-    "chat": {
-        "content": String,
-        "is_by_bot": true
-    },
-    "slot": {
-        "origin": {
-            "lat": Float,
-            "lng": Float
-        },
-        "region": String,
-        "datetime": String,
-        "available_time": Integer,
-        "category": List<String>
-    }
-}
 ```
 
 <a id="history"></a>
@@ -683,3 +549,5 @@ DELETE /api/v1/user/chat-messages
 | 항목·출처 | 시트 명세 | 현재 구현·확인 필요 |
 | --- | --- | --- |
 | [v1 11행](chat.md#backend-v1-row-11) | 지역 변동 시 200 및 user_location_name 객체 | [ChatController](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatController.java)는 지역명이 있으면 String 본문, 없으면 204. 시트의 객체 형태와 다르다. |
+| [v3 채팅 전송](chat.md#backend-v3-chat-stream) | 시트에 없음. #354에서 추가 | [ChatStreamController](../../../src/main/java/eightjbbm/keepgo/chat/controller/ChatStreamController.java)가 `/api/v3/member/chat-messages`를 제공한다. 스트림 시작 전 AI 오류는 HTTP 오류로, 스트림 중 오류는 `chat-reply.service-unavailable`/`chat-reply.bad-gateway` 이벤트로 응답한다. v2 이벤트·오류(`service-unavailable`)는 그대로다. |
+| [v2 채팅 전송](chat.md#backend-v2-row-8) | `chat-reply.success`와 `service-unavailable` | AI 호출만 /v3/extract/stream 수신으로 바뀌었다. delta는 중계하지 않고, AI의 모든 실패를 `chat-reply.service-unavailable`로 보낸다. |

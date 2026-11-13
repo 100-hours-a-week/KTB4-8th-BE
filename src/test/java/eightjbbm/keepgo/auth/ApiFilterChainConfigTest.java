@@ -16,6 +16,7 @@ import eightjbbm.keepgo.recommendation.GetHotPlaceListResponse;
 import eightjbbm.keepgo.recommendation.GetOngoingEventListResponse;
 import eightjbbm.keepgo.recommendation.controller.RecommendationControllerV3;
 import eightjbbm.keepgo.recommendation.service.HotPlaceServiceV2;
+import eightjbbm.keepgo.recommendation.service.RecommendationServiceV2;
 import eightjbbm.keepgo.util.file.FileController;
 import eightjbbm.keepgo.util.file.FileService;
 import java.security.KeyPair;
@@ -233,6 +234,11 @@ class ApiFilterChainConfigTest {
         @Bean
         HotPlaceServiceV2 hotPlaceService() {
             return mock(HotPlaceServiceV2.class);
+        }
+
+        @Bean
+        RecommendationServiceV2 recommendationService() {
+            return mock(RecommendationServiceV2.class);
         }
 
         @Bean
