@@ -108,6 +108,7 @@ var member = memberRepository.findById(id).orElseThrow(MemberNotFoundException::
 
 - 4xx는 `WARN` 이하로 남기고 스택 트레이스는 남기지 않는다.
 - 5xx(500, 502, 503)는 `ERROR`로 남기고 원인 예외(cause)를 함께 남긴다.
+- OAuth 인증 요청의 서버 장애는 예외 메시지와 원인에 인증 정보가 포함될 수 있어 원문과 스택을 기록하지 않는다. 대신 단계·분류·provider를 `ERROR`로 남기고 안전한 Sentry 이벤트로 보고한다.
 
 ## 회원 조회 오류 계약
 

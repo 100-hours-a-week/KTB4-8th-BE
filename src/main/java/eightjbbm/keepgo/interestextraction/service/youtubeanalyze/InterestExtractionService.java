@@ -5,24 +5,23 @@ import eightjbbm.keepgo.interestextraction.service.*;
 import eightjbbm.keepgo.member.entity.OAuthAccount;
 import eightjbbm.keepgo.member.repository.MemberRepository;
 import eightjbbm.keepgo.member.repository.OAuthAccountRepository;
+import eightjbbm.keepgo.util.exception.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.Serializable;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
-public class InterestExtractionServiceV2 {
+public class InterestExtractionService {
 
     private static final String PENDING_YOUTUBE_LINK =
-            InterestExtractionServiceV2.class.getName() + ".pendingYoutubeLink";
+            "eightjbbm.keepgo.interestextraction.service.youtubeanalyze.InterestExtractionServiceV2.pendingYoutubeLink";
 
     private final YoutubeAuthorizedClientService youtubeAuthorizedClientService;
     private final ClientRegistrationRepository clientRegistrationRepository;
@@ -88,7 +87,13 @@ public class InterestExtractionServiceV2 {
     private OAuthAccount getGoogleAccount(Long memberId) {
         return oauthAccountRepository
                 .findByMember(memberRepository.getReferenceById(memberId))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Google 로그인 계정을 찾을 수 없습니다."));
+                .orElseThrow(InterestExtractionService::googleAccountNotFound);
+    }
+
+    private static NotFoundException googleAccountNotFound() {
+        var exception = new NotFoundException();
+        exception.setDetail("Google 로그인 계정을 찾을 수 없습니다.");
+        return exception;
     }
 
     private record PendingYoutubeLink(String state, String issuer, String subject, Instant createdAt)

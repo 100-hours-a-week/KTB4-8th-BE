@@ -18,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class OAuthFailureHandler extends OncePerRequestFilter implements AuthenticationFailureHandler {
     private final AuthorizationRequestProperties properties;
+    private final OAuthSentryReporter sentryReporter;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -33,6 +34,7 @@ public class OAuthFailureHandler extends OncePerRequestFilter implements Authent
         } catch (RuntimeException exception) {
             String stage = request.getRequestURI().startsWith("/oauth2/authorization/") ? "start" : "callback";
             log.error("OAuth failure: stage={} classification=server provider={}", stage, properties.provider());
+            sentryReporter.report(stage, properties.provider());
             response.sendRedirect(properties.failureUrl());
         }
     }
@@ -49,6 +51,7 @@ public class OAuthFailureHandler extends OncePerRequestFilter implements Authent
             log.warn("OAuth failure: stage={} classification=authentication provider={}", stage, properties.provider());
         } else {
             log.error("OAuth failure: stage={} classification=server provider={}", stage, properties.provider());
+            sentryReporter.report(stage, properties.provider());
         }
         response.sendRedirect(properties.failureUrl());
     }

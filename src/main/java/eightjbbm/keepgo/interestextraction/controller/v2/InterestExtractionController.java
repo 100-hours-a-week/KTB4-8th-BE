@@ -3,7 +3,7 @@ package eightjbbm.keepgo.interestextraction.controller.v2;
 import eightjbbm.keepgo.interestextraction.service.GetConnectedServiceListCommand;
 import eightjbbm.keepgo.interestextraction.service.GetYoutubeConnectionCommand;
 import eightjbbm.keepgo.interestextraction.service.UnlinkYoutubeAccountCommand;
-import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.InterestExtractionServiceV2;
+import eightjbbm.keepgo.interestextraction.service.youtubeanalyze.InterestExtractionService;
 import eightjbbm.keepgo.interestextraction.service.youtubesync.YoutubeSyncCoordinator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,8 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-public class InterestExtractionControllerV2 {
-    private final InterestExtractionServiceV2 interestExtractionServiceV2;
+public class InterestExtractionController {
+    private final InterestExtractionService interestExtractionService;
     private final YoutubeSyncCoordinator youtubeSyncCoordinator;
 
     @PostMapping("/api/v2/member/youtube-sync")
@@ -35,7 +35,7 @@ public class InterestExtractionControllerV2 {
     @GetMapping("/api/v2/member/external-connections")
     public ResponseEntity<GetConnectedServiceListResponse> getConnectedServiceList(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        var result = interestExtractionServiceV2.getConnectedServiceList(new GetConnectedServiceListCommand(memberId));
+        var result = interestExtractionService.getConnectedServiceList(new GetConnectedServiceListCommand(memberId));
         return ResponseEntity.status(HttpStatus.OK)
                 .body(InterestExtractionMapper.interestExtractionMapper.fromResult(result));
     }
@@ -46,7 +46,7 @@ public class InterestExtractionControllerV2 {
     public ResponseEntity<LinkYoutubeAccountResponse> linkYoutubeAccount(
             @AuthenticationPrincipal Jwt jwt, HttpServletRequest request, HttpServletResponse response) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        String authorizationUrl = interestExtractionServiceV2.linkYoutubeAccount(memberId, request, response);
+        String authorizationUrl = interestExtractionService.linkYoutubeAccount(memberId, request, response);
         return ResponseEntity.status(HttpStatus.OK).body(new LinkYoutubeAccountResponse(authorizationUrl));
     }
 
@@ -55,7 +55,7 @@ public class InterestExtractionControllerV2 {
     @GetMapping("/api/v2/member/external-connections/youtube")
     public ResponseEntity<GetYoutubeConnectionResponse> getYoutubeConnection(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        var result = interestExtractionServiceV2.getYoutubeConnection(new GetYoutubeConnectionCommand(memberId));
+        var result = interestExtractionService.getYoutubeConnection(new GetYoutubeConnectionCommand(memberId));
         return ResponseEntity.status(HttpStatus.OK)
                 .body(InterestExtractionMapper.interestExtractionMapper.fromResult(result));
     }
@@ -65,7 +65,7 @@ public class InterestExtractionControllerV2 {
     @DeleteMapping("/api/v2/member/external-connections/youtube")
     public ResponseEntity<Void> unlinkYoutubeAccount(@AuthenticationPrincipal Jwt jwt) {
         Long memberId = Long.valueOf(jwt.getSubject());
-        interestExtractionServiceV2.unlinkYoutubeAccount(new UnlinkYoutubeAccountCommand(memberId));
+        interestExtractionService.unlinkYoutubeAccount(new UnlinkYoutubeAccountCommand(memberId));
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
