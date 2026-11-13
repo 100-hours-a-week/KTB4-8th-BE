@@ -29,6 +29,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestConstructor;
 
 @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+@org.springframework.context.annotation.Import(OAuthAuthorizationRequestIntegrationTest.SentryTestConfig.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @DisplayName("OAuth 인증 요청 공유 통합 테스트")
@@ -49,22 +50,26 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
     private static final boolean REDIS = System.getenv("OAUTH_REDIS_TEST_PORT") != null;
     private ConfigurableApplicationContext second;
+    private final org.springframework.context.ApplicationContext context;
 
     OAuthAuthorizationRequestIntegrationTest(
             @LocalServerPort int port,
             Environment environment,
             org.springframework.jdbc.core.JdbcTemplate jdbc,
             tools.jackson.databind.ObjectMapper mapper,
-            org.springframework.data.redis.core.StringRedisTemplate redis) {
+            org.springframework.data.redis.core.StringRedisTemplate redis,
+            org.springframework.context.ApplicationContext context) {
         this.port = port;
         this.environment = environment;
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.redis = redis;
+        this.context = context;
     }
 
     @DynamicPropertySource
     static void oauthStub(DynamicPropertyRegistry registry) {
+        registry.add("sentry.dsn", () -> "https://public@example.com/1");
         registry.add("keepgo.security.oauth2.authorization-request.cleanup-interval", () -> "1000");
         if (REDIS) {
             registry.add("keepgo.security.oauth2.authorization-request.provider", () -> "redis");
@@ -126,7 +131,7 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
 
     @Test
     @DisplayName("다른 인스턴스의 콜백이 OIDC 인증을 완료하고 기존 성공 계약으로 이동한다")
-    void completesOidcAcrossInstances() throws Exception {
+    void completesOidcAcrossInstances(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         issueTokens.set(true);
         exchanges.set(0);
         {
@@ -164,6 +169,38 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                     .header("Authorization", "Bearer " + accessToken)
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
+            SentryTestConfig.envelopes.clear();
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .stop();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+            }
+            try {
+                var failedLink = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
+                assertThat(failedLink.statusCode()).isEqualTo(500);
+                assertThat(failedLink.headers().firstValue("Content-Type").orElseThrow())
+                        .contains("application/problem+json");
+                assertThat(output).contains("OAuth authorization request storage failed");
+                assertThat(oauthEvents()).hasSize(1);
+                assertThat(oauthEvents().getFirst()).contains("start", "server").doesNotContain(accessToken, "Cookie");
+                SentryTestConfig.failSend.set(true);
+                var reportingFailure =
+                        HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
+                assertThat(reportingFailure.statusCode()).isEqualTo(500);
+                assertThat(reportingFailure.headers().firstValue("Content-Type").orElseThrow())
+                        .contains("application/problem+json");
+            } finally {
+                SentryTestConfig.failSend.set(false);
+                if (REDIS) {
+                    ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                    redis.getConnectionFactory())
+                            .start();
+                } else {
+                    jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+                }
+            }
             var link = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
             assertThat(link.statusCode()).isEqualTo(200);
             assertThat(link.headers().firstValue("Content-Type").orElseThrow()).contains("application/json");
@@ -183,14 +220,26 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                     .build();
             assertThat(send(linkCallback).statusCode()).isEqualTo(302);
             assertThat(exchanges.get()).isEqualTo(2);
-            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .stop();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+            }
             try {
                 var failedLink = HttpClient.newHttpClient().send(linkRequest, HttpResponse.BodyHandlers.ofString());
                 assertThat(failedLink.statusCode()).isEqualTo(500);
                 assertThat(failedLink.headers().firstValue("Content-Type").orElseThrow())
                         .contains("application/problem+json");
             } finally {
-                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+                if (REDIS) {
+                    ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                    redis.getConnectionFactory())
+                            .start();
+                } else {
+                    jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+                }
             }
         }
     }
@@ -334,6 +383,247 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
     }
 
     @Test
+    @DisplayName("저장소 장애는 민감 정보 없는 Sentry 이벤트 한 건을 전송한다")
+    void reportsStorageFailureWithoutSecrets() throws Exception {
+        SentryTestConfig.envelopes.clear();
+        io.sentry.Sentry.addBreadcrumb("secret-breadcrumb");
+        if (REDIS) {
+            ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory) redis.getConnectionFactory())
+                    .stop();
+        } else {
+            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        }
+        try {
+            var response = start(port);
+
+            assertThat(response.statusCode()).isEqualTo(302);
+            assertThat(response.headers().firstValue("Location").orElseThrow())
+                    .isEqualTo("http://localhost:3000/login");
+            assertThat(oauthEvents()).hasSize(1);
+            String payload = oauthEvents().getFirst();
+            assertThat(payload)
+                    .contains("stage", "start", "provider", REDIS ? "redis" : "rdb", "server")
+                    .doesNotContain("secret-breadcrumb", "authorization_request", "Cookie");
+        } finally {
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .start();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("예상된 인증 실패는 Sentry 이벤트를 만들지 않는다")
+    void expectedFailureDoesNotReport() throws Exception {
+        SentryTestConfig.envelopes.clear();
+        var response = callback(port, "secret-state", null);
+        assertThat(response.statusCode()).isEqualTo(302);
+        var started = start(port);
+        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
+                .get("state");
+        String cookie = started.headers().allValues("Set-Cookie").stream()
+                .filter(value -> value.startsWith("oauth_req_"))
+                .findFirst()
+                .orElseThrow()
+                .split(";", 2)[0];
+        var cancelled = HttpRequest.newBuilder(URI.create(
+                        "http://localhost:" + port + "/login/oauth2/code/google?error=access_denied&state=" + state))
+                .header("Cookie", cookie)
+                .GET()
+                .build();
+        assertThat(send(cancelled).statusCode()).isEqualTo(302);
+        assertThat(oauthEvents()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("콜백 장애 이벤트에 인증 정보가 포함되지 않는다")
+    void callbackEventExcludesCredentials() throws Exception {
+        var started = start(port);
+        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
+                .get("state");
+        String cookie = started.headers().allValues("Set-Cookie").stream()
+                .filter(value -> value.startsWith("oauth_req_"))
+                .findFirst()
+                .orElseThrow()
+                .split(";", 2)[0];
+        SentryTestConfig.envelopes.clear();
+        if (REDIS) {
+            ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory) redis.getConnectionFactory())
+                    .stop();
+        } else {
+            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        }
+        try {
+            var request = HttpRequest.newBuilder(URI.create(
+                            "http://localhost:" + port + "/login/oauth2/code/google?code=secret-code&state=" + state))
+                    .header("Cookie", cookie + "; secret-cookie=secret-cookie-value")
+                    .header("Authorization", "Bearer secret-access-token")
+                    .header("X-Secret", "secret-header")
+                    .GET()
+                    .build();
+            var response = send(request);
+            assertThat(response.statusCode()).isEqualTo(302);
+            assertThat(oauthEvents()).hasSize(1);
+            String payload = oauthEvents().getFirst();
+            assertThat(payload)
+                    .contains("callback", "server", REDIS ? "redis" : "rdb")
+                    .doesNotContain(
+                            state,
+                            cookie,
+                            "secret-code",
+                            "secret-cookie-value",
+                            "secret-access-token",
+                            "secret-header",
+                            "secret-breadcrumb");
+        } finally {
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .start();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("행 잠금을 기다리는 동안 만료된 요청은 코드 교환하지 않는다")
+    void expiresWhileWaitingForRowLock() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(REDIS);
+        issueTokens.set(false);
+        exchanges.set(0);
+        var started = start(port);
+        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
+                .get("state");
+        String cookie = started.headers().allValues("Set-Cookie").stream()
+                .filter(value -> value.startsWith("oauth_req_"))
+                .findFirst()
+                .orElseThrow()
+                .split(";", 2)[0];
+        try (var connection = jdbc.getDataSource().getConnection();
+                var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            connection.setAutoCommit(false);
+            long connectionId;
+            try (var statement = connection.createStatement();
+                    var result = statement.executeQuery("SELECT CONNECTION_ID()")) {
+                result.next();
+                connectionId = result.getLong(1);
+            }
+            try (var lock = connection.prepareStatement(
+                    "SELECT request_id FROM oauth_authorization_request WHERE request_id = ? FOR UPDATE")) {
+                lock.setString(1, hash(state));
+                lock.executeQuery().close();
+            }
+            var callback = executor.submit(() -> callback(port, state, cookie));
+            try {
+                long deadline =
+                        System.nanoTime() + java.time.Duration.ofSeconds(15).toNanos();
+                int waits;
+                do {
+                    waits = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t ON t.THREAD_ID = w.BLOCKING_THREAD_ID WHERE t.PROCESSLIST_ID = ?",
+                            Integer.class,
+                            connectionId);
+                    if (waits > 0) {
+                        break;
+                    }
+                    Thread.sleep(25);
+                } while (System.nanoTime() < deadline);
+                assertThat(waits).isPositive();
+                Thread.sleep(50);
+                try (var expire = connection.prepareStatement(
+                        "UPDATE oauth_authorization_request SET expires_at = ? WHERE request_id = ?")) {
+                    expire.setTimestamp(
+                            1, java.sql.Timestamp.from(java.time.Instant.now().minusMillis(10)));
+                    expire.setString(2, hash(state));
+                    expire.executeUpdate();
+                }
+                connection.commit();
+                assertThat(callback.get().statusCode()).isEqualTo(302);
+                assertThat(exchanges.get()).isZero();
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("연동 계정이 없는 회원은 기존 404 상세를 받는다")
+    void missingGoogleAccountKeepsNotFoundResponse() throws Exception {
+        var member = context.getBean(eightjbbm.keepgo.member.repository.MemberRepository.class)
+                .save(eightjbbm.keepgo.member.entity.Member.create("계정 없는 회원"));
+        String accessToken = context.getBean(eightjbbm.keepgo.auth.accesstokenblacklist.AccessTokenManager.class)
+                .issue(member.getId(), java.util.List.of());
+        var request = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/v2/member/external-connections/youtube"))
+                .header("Authorization", "Bearer " + accessToken)
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(mapper.readTree(response.body()).get("detail").asString()).isEqualTo("Google 로그인 계정을 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("손상된 저장 데이터가 복구 예외와 Sentry 이벤트에 노출되지 않는다")
+    void corruptRequestDoesNotLeakException() throws Exception {
+        var started = start(port);
+        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
+                .get("state");
+        String cookie = started.headers().allValues("Set-Cookie").stream()
+                .filter(value -> value.startsWith("oauth_req_"))
+                .findFirst()
+                .orElseThrow()
+                .split(";", 2)[0];
+        if (REDIS) {
+            redis.opsForHash().put("oauth:authorization-request:" + hash(state), "json", "secret-exception-value");
+        } else {
+            assertThat(jdbc.update(
+                            "UPDATE oauth_authorization_request SET request_json = ? WHERE request_id = ?",
+                            "secret-exception-value",
+                            hash(state)))
+                    .isEqualTo(1);
+        }
+        exchanges.set(0);
+        SentryTestConfig.envelopes.clear();
+        var response = callback(port, state, cookie);
+        assertThat(response.statusCode()).isEqualTo(302);
+        assertThat(oauthEvents()).hasSize(1);
+        assertThat(exchanges.get()).isZero();
+        assertThat(oauthEvents().getFirst()).doesNotContain("secret-exception-value", "exception", "secret-breadcrumb");
+    }
+
+    @Test
+    @DisplayName("Sentry 전송이 실패해도 로그인 화면으로 이동한다")
+    void sentryFailureDoesNotPreventRedirect() throws Exception {
+        SentryTestConfig.failSend.set(true);
+        if (REDIS) {
+            ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory) redis.getConnectionFactory())
+                    .stop();
+        } else {
+            jdbc.execute("RENAME TABLE oauth_authorization_request TO oauth_authorization_request_offline");
+        }
+        try {
+            var response = start(port);
+            assertThat(response.statusCode()).isEqualTo(302);
+            assertThat(response.headers().firstValue("Location").orElseThrow())
+                    .isEqualTo("http://localhost:3000/login");
+        } finally {
+            SentryTestConfig.failSend.set(false);
+            if (REDIS) {
+                ((org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory)
+                                redis.getConnectionFactory())
+                        .start();
+            } else {
+                jdbc.execute("RENAME TABLE oauth_authorization_request_offline TO oauth_authorization_request");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("저장소 장애 시 로그인 시작은 실패 화면으로 이동한다")
     void storageFailureRedirectsAtStart() throws Exception {
         if (REDIS) {
@@ -392,7 +682,7 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
                     .isEqualTo("http://localhost:3000/login");
             assertThat(exchanges.get()).isZero();
             assertThat(output.getAll())
-                    .contains("classification=server", "provider=rdb")
+                    .contains("classification=server", REDIS ? "provider=redis" : "provider=rdb")
                     .doesNotContain(state, cookie, "test-code");
         } finally {
             if (REDIS) {
@@ -408,6 +698,9 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
     @Test
     @DisplayName("만료된 인증 요청 행은 주기적으로 정리된다")
     void expiredRowsAreCleanedUp() throws Exception {
+        if (REDIS) {
+            return;
+        }
         var started = start(port);
         String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
                 .get("state");
@@ -427,6 +720,57 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             Thread.sleep(50);
         } while (System.nanoTime() < deadline);
         assertThat(count).isZero();
+    }
+
+    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
+    static class SentryTestConfig {
+        static final java.util.concurrent.atomic.AtomicBoolean failSend =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        static final java.util.List<io.sentry.SentryEnvelope> envelopes =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        eightjbbm.keepgo.auth.authorizationrequest.OAuthSentryConfiguration.OAuthSentryOptions testSentryOptions() {
+            var options = new io.sentry.SentryOptions();
+            options.setDsn("https://public@example.com/1");
+            options.setTransportFactory(testTransportFactory());
+            return new eightjbbm.keepgo.auth.authorizationrequest.OAuthSentryConfiguration.OAuthSentryOptions(options);
+        }
+
+        @org.springframework.context.annotation.Bean
+        io.sentry.ITransportFactory testTransportFactory() {
+            return (configuration, details) -> new io.sentry.transport.ITransport() {
+                public void send(io.sentry.SentryEnvelope envelope, io.sentry.Hint hint) throws java.io.IOException {
+                    if (failSend.get()) throw new java.io.IOException("transport failure");
+                    envelopes.add(envelope);
+                }
+
+                public void flush(long timeout) {}
+
+                public io.sentry.transport.RateLimiter getRateLimiter() {
+                    return null;
+                }
+
+                public void close(boolean restarting) {}
+
+                public void close() {}
+            };
+        }
+    }
+
+    private static java.util.List<String> oauthEvents() {
+        return SentryTestConfig.envelopes.stream()
+                .map(envelope -> {
+                    try {
+                        return new String(envelope.getItems().iterator().next().getData(), StandardCharsets.UTF_8);
+                    } catch (Exception exception) {
+                        throw new IllegalStateException(exception);
+                    }
+                })
+                .filter(payload ->
+                        !payload.contains("org.springframework.scheduling.support.TaskUtils$LoggingErrorHandler"))
+                .toList();
     }
 
     private static String hash(String value) throws Exception {
@@ -590,66 +934,6 @@ class OAuthAuthorizationRequestIntegrationTest extends MySqlIntegrationTestSuppo
             return server;
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
-        }
-    }
-
-    @Test
-    @DisplayName("행 잠금을 기다리는 동안 만료된 요청은 코드 교환하지 않는다")
-    void expiresWhileWaitingForRowLock() throws Exception {
-        issueTokens.set(false);
-        exchanges.set(0);
-        var started = start(port);
-        String state = query(URI.create(started.headers().firstValue("Location").orElseThrow()))
-                .get("state");
-        String cookie = started.headers().allValues("Set-Cookie").stream()
-                .filter(value -> value.startsWith("oauth_req_"))
-                .findFirst()
-                .orElseThrow()
-                .split(";", 2)[0];
-        try (var connection = jdbc.getDataSource().getConnection();
-                var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-            connection.setAutoCommit(false);
-            long connectionId;
-            try (var statement = connection.createStatement();
-                    var result = statement.executeQuery("SELECT CONNECTION_ID()")) {
-                result.next();
-                connectionId = result.getLong(1);
-            }
-            try (var lock = connection.prepareStatement(
-                    "SELECT request_id FROM oauth_authorization_request WHERE request_id = ? FOR UPDATE")) {
-                lock.setString(1, hash(state));
-                lock.executeQuery().close();
-            }
-            var callback = executor.submit(() -> callback(port, state, cookie));
-            try {
-                long deadline =
-                        System.nanoTime() + java.time.Duration.ofSeconds(15).toNanos();
-                int waits;
-                do {
-                    waits = jdbc.queryForObject(
-                            "SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t ON t.THREAD_ID = w.BLOCKING_THREAD_ID WHERE t.PROCESSLIST_ID = ?",
-                            Integer.class,
-                            connectionId);
-                    if (waits > 0) {
-                        break;
-                    }
-                    Thread.sleep(25);
-                } while (System.nanoTime() < deadline);
-                assertThat(waits).isPositive();
-                Thread.sleep(50);
-                try (var expire = connection.prepareStatement(
-                        "UPDATE oauth_authorization_request SET expires_at = ? WHERE request_id = ?")) {
-                    expire.setTimestamp(
-                            1, java.sql.Timestamp.from(java.time.Instant.now().minusMillis(10)));
-                    expire.setString(2, hash(state));
-                    expire.executeUpdate();
-                }
-                connection.commit();
-                assertThat(callback.get().statusCode()).isEqualTo(302);
-                assertThat(exchanges.get()).isZero();
-            } finally {
-                connection.rollback();
-            }
         }
     }
 }
