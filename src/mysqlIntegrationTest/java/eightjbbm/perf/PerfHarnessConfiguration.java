@@ -90,7 +90,7 @@ public class PerfHarnessConfiguration {
 
         private static Video video(String id) {
             VideoStatus status = new VideoStatus();
-            status.setUploadStatus("uploaded");
+            status.setUploadStatus("processed");
             status.setPrivacyStatus("public");
 
             VideoContentDetails details = new VideoContentDetails();
