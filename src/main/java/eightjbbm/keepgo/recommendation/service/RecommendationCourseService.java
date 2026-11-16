@@ -7,7 +7,7 @@ import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
-import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponse;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +31,7 @@ public class RecommendationCourseService {
     /// 추천 응답의 코스와 스톱을 저장한다.
     /// 가이드를 트랜잭션 안에서 미리 읽어 두므로, 반환된 엔티티를 트랜잭션 밖에서 DTO로 변환할 수 있다.
     @Transactional
-    public List<OutingCourse> saveCourses(OutingCriteria criteria, RecommendCoursesResponseV2.SuccessData data) {
+    public List<OutingCourse> saveCourses(OutingCriteria criteria, RecommendCoursesResponse.SuccessData data) {
         Map<Long, OutingGuide> guidesById = findGuides(data);
 
         return data.courses().stream()
@@ -39,7 +39,7 @@ public class RecommendationCourseService {
                 .toList();
     }
 
-    private Map<Long, OutingGuide> findGuides(RecommendCoursesResponseV2.SuccessData data) {
+    private Map<Long, OutingGuide> findGuides(RecommendCoursesResponse.SuccessData data) {
         List<Long> guideIds = data.courses().stream()
                 .flatMap(course -> course.places().stream())
                 .map(place -> Long.valueOf(place.placeId()))
@@ -51,7 +51,7 @@ public class RecommendationCourseService {
     }
 
     private OutingCourse saveCourse(
-            OutingCriteria criteria, RecommendCoursesResponseV2.Course course, Map<Long, OutingGuide> guidesById) {
+            OutingCriteria criteria, RecommendCoursesResponse.Course course, Map<Long, OutingGuide> guidesById) {
         int matchScore = course.matchScore() == null ? DEFAULT_MATCH_SCORE : course.matchScore();
         var outingCourse = new OutingCourse(
                 course.title(), course.totalDurationMinutes(), matchScore, criteria.getRequestedLocationName(), null);

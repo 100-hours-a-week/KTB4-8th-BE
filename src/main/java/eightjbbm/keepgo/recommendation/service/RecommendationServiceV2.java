@@ -4,7 +4,7 @@ import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.recommendation.repository.RecommendationJobStore;
-import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponse;
 import eightjbbm.keepgo.util.client.ai.AiErrors;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.sse.AiStreamEvent;
@@ -312,19 +312,16 @@ public class RecommendationServiceV2 {
         }
     }
 
-    private RecommendCoursesResponseV2.SuccessData requireSuccess(RecommendCoursesResponseV2.Done response) {
-        var data = response.data();
-
-        if (data != null
-                && data.error() == null
-                && data.courses() != null
+    private RecommendCoursesResponse.SuccessData requireSuccess(RecommendCoursesResponse.Done response) {
+        if (response.error() == null
+                && response.courses() != null
                 && ("recommend_success".equals(response.message())
                         || "recommend_not_found".equals(response.message()))) {
-            return data;
+            return RecommendCoursesResponse.SuccessData.from(response);
         }
 
-        throw data != null && "recommend_failed".equals(response.message())
-                ? AiErrors.fromMessage(data.error())
+        throw "recommend_failed".equals(response.message())
+                ? AiErrors.fromMessage(response.error())
                 : new ServiceUnavailableException();
     }
 
