@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -12,12 +14,15 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import eightjbbm.keepgo.recommendation.controller.RecommendationControllerV2;
 import eightjbbm.keepgo.recommendation.controller.RecommendationControllerV3;
+import eightjbbm.keepgo.recommendation.entity.OutingCourse;
 import eightjbbm.keepgo.recommendation.entity.OutingGuide;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteriaRepository;
 import eightjbbm.keepgo.recommendation.repository.CaffeineRecommendationJobStore;
+import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
+import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
 import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
-import eightjbbm.keepgo.recommendation.service.dto.RecommendOutingCourseResultV2;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.sse.AiSseClient;
@@ -58,16 +63,20 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("코스 추천 AI 스트림 수신")
 class RecommendationServiceV2Test {
 
-    private static final String DONE_SUCCESS = "event: done\ndata: {\"message\":\"recommend_success\",\"data\":"
-            + "{\"error\":null,\"courses\":[{\"title\":\"성수 산책\",\"match_score\":74,\"total_duration_minutes\":60,"
+    private static final String DONE_SUCCESS = "event: done\ndata: {\"message\":\"recommend_success\","
+            + "\"error\":null,\"courses\":[{\"title\":\"성수 산책\",\"match_score\":74,\"total_duration_minutes\":60,"
             + "\"places\":[{\"place_id\":1,\"place_name\":\"A\",\"travel_minutes\":0,\"arrival_time\":\"14:00\","
-            + "\"stay_minutes\":60,\"reason\":\"조용함\"}]}]}}\n\n";
+            + "\"stay_minutes\":60,\"reason\":\"조용함\"}]}]}\n\n";
 
     private final CaffeineRecommendationJobStore jobs = new CaffeineRecommendationJobStore();
     private final OutingCriteriaRepository criteriaRepository = mock(OutingCriteriaRepository.class);
     private final RecommendationCandidateSelector candidateSelector = mock(RecommendationCandidateSelector.class);
-    private final RecommendationCourseService courseService = mock(RecommendationCourseService.class);
-    private final RecommendationResultMapper resultMapper = mock(RecommendationResultMapper.class);
+    private final OutingCourseRepository courseRepository = mock(OutingCourseRepository.class);
+    private final OutingGuideRepository guideRepository = mock(OutingGuideRepository.class);
+    private final OutingStopRepository stopRepository = mock(OutingStopRepository.class);
+    private final RecommendationCourseService courseService =
+            spy(new RecommendationCourseService(courseRepository, stopRepository, guideRepository));
+    private final RecommendationResultMapper resultMapper = new RecommendationResultMapper();
     private final ExecutorService executor = Executors.newFixedThreadPool(2);
     private final AtomicReference<String> requestBody = new AtomicReference<>();
     private final AtomicReference<String> requestPath = new AtomicReference<>();
@@ -140,12 +149,9 @@ class RecommendationServiceV2Test {
         when(guide.getId()).thenReturn(1L);
         when(guide.getCoordinate()).thenReturn(new Coordinate(37.5f, 127.0f));
         when(candidateSelector.select(eq(1L), any())).thenReturn(List.of(guide));
-        when(courseService.saveCourses(any(), any())).thenReturn(List.of());
-        when(resultMapper.toResult(any(), any()))
-                .thenReturn(new RecommendOutingCourseResultV2(
-                        new RecommendOutingCourseResultV2.OutingCourseMetadata(0, "성수", "2026-11-01T14:00"),
-                        List.of(),
-                        List.of()));
+        when(guide.getName()).thenReturn("A");
+        when(guideRepository.findAllById(any())).thenReturn(List.of(guide));
+        when(courseRepository.save(any(OutingCourse.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var jwt = Jwt.withTokenValue("token").header("alg", "none").subject("1").build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
@@ -182,8 +188,19 @@ class RecommendationServiceV2Test {
         var data = ArgumentCaptor.forClass(RecommendCoursesResponseV2.SuccessData.class);
         verify(courseService).saveCourses(any(), data.capture());
         assertThat(data.getValue().courses().getFirst().matchScore()).isEqualTo(74);
-        assertThat(data.getValue().courses().getFirst().places().getFirst().placeId())
-                .isEqualTo("1");
+        var place = data.getValue().courses().getFirst().places().getFirst();
+        assertThat(place.placeId()).isEqualTo("1");
+        assertThat(place.placeName()).isEqualTo("A");
+        assertThat(place.travelMinutes()).isZero();
+        assertThat(place.arrivalTime()).isEqualTo(java.time.LocalTime.of(14, 0));
+        assertThat(place.stayMinutes()).isEqualTo(60);
+        assertThat(place.reason()).isEqualTo("조용함");
+        assertThat(response.getContentAsString())
+                .doesNotContain("service-unavailable")
+                .contains("\"recommendationScore\":\"74\"")
+                .contains("\"sequence\":0")
+                .contains("\"name\":\"A\"");
+        verify(criteriaRepository).deleteById(1L);
     }
 
     @Test
@@ -206,7 +223,9 @@ class RecommendationServiceV2Test {
     void judgesNotFoundAndCancelAccepted() throws Exception {
         script = exchange -> {
             stream(exchange);
-            write(exchange, "event: done\ndata: {\"message\":\"recommend_not_found\",\"data\":{\"courses\":[]}}\n\n");
+            write(
+                    exchange,
+                    "event: done\ndata: {\"message\":\"recommend_not_found\",\"error\":null,\"courses\":[]}\n\n");
         };
         assertThat(names(events(post("/api/v3/member/recommendation"), "recommendation.success")))
                 .endsWith("outing-course-recommendation.success");
@@ -215,10 +234,14 @@ class RecommendationServiceV2Test {
             stream(exchange);
             write(
                     exchange,
-                    "event: done\ndata: {\"message\":\"recommend_cancel_accepted\",\"data\":{\"courses\":[]}}\n\n");
+                    "event: done\ndata: {\"message\":\"recommend_cancel_accepted\",\"error\":null,\"courses\":[]}\n\n");
         };
         assertThat(names(events(post("/api/v3/member/recommendation"), "recommendation.stopped")))
                 .endsWith("outing-course-recommendation.stopped");
+        var saved = ArgumentCaptor.forClass(RecommendCoursesResponseV2.SuccessData.class);
+        verify(courseService).saveCourses(any(), saved.capture());
+        assertThat(saved.getValue().courses()).isEmpty();
+        verify(criteriaRepository).deleteById(1L);
     }
 
     @Test
@@ -228,7 +251,7 @@ class RecommendationServiceV2Test {
             stream(exchange);
             write(
                     exchange,
-                    "event: done\ndata: {\"message\":\"recommend_failed\",\"data\":{\"error\":\"llm_timeout\",\"courses\":[]}}\n\n");
+                    "event: done\ndata: {\"message\":\"recommend_failed\",\"error\":\"llm_timeout\",\"courses\":[]}\n\n");
         };
 
         var v3 = events(post("/api/v3/member/recommendation"), "recommendation.bad-gateway");
@@ -237,7 +260,28 @@ class RecommendationServiceV2Test {
         assertThat(names(v3)).endsWith("outing-course-recommendation.bad-gateway");
         assertThat(v3.getContentAsString()).contains("\"code\":\"AI_LLM_TIMEOUT\"");
         assertThat(names(v2)).endsWith("outing-course-recommendation.service-unavailable");
-        verify(courseService, org.mockito.Mockito.never()).saveCourses(any(), any());
+        verify(courseService, never()).saveCourses(any(), any());
+        verify(criteriaRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 done은 저장이나 조건 삭제 없이 실패한다")
+    void rejectsInvalidDone() throws Exception {
+        for (String body : List.of(
+                "{\"message\":\"recommend_success\",\"error\":\"llm_timeout\",\"courses\":[]}",
+                "{\"message\":\"recommend_success\",\"error\":null}",
+                "{\"message\":\"recommend_success\",\"error\":null,\"courses\":null}",
+                "{\"message\":\"unknown\",\"error\":null,\"courses\":[]}",
+                "not-json")) {
+            script = exchange -> {
+                stream(exchange);
+                write(exchange, "event: done\ndata: " + body + "\n\n");
+            };
+            var response = events(post("/api/v3/member/recommendation"), "recommendation.service-unavailable");
+            assertThat(names(response)).doesNotContain("outing-course-recommendation.success");
+        }
+        verify(courseService, never()).saveCourses(any(), any());
+        verify(criteriaRepository, never()).deleteById(any());
     }
 
     @Test
@@ -249,6 +293,8 @@ class RecommendationServiceV2Test {
         };
 
         var first = events(post("/api/v3/member/recommendation"), "recommendation.service-unavailable");
+        verify(courseService, never()).saveCourses(any(), any());
+        verify(criteriaRepository, never()).deleteById(any());
         script = exchange -> {
             stream(exchange);
             write(exchange, DONE_SUCCESS);
@@ -256,6 +302,8 @@ class RecommendationServiceV2Test {
         var retry = events(post("/api/v3/member/recommendation"), "recommendation.success");
 
         assertThat(names(first)).endsWith("outing-course-recommendation.service-unavailable");
+        verify(courseService).saveCourses(any(), any());
+        verify(criteriaRepository).deleteById(1L);
         assertThat(names(retry)).endsWith("outing-course-recommendation.success");
     }
 
@@ -309,6 +357,8 @@ class RecommendationServiceV2Test {
         assertThat(cancellation.getStatus()).isEqualTo(204);
         assertThat(names(started)).endsWith("outing-course-recommendation.stopped");
         assertThat(aiConnectionClosed.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(courseService, never()).saveCourses(any(), any());
+        verify(criteriaRepository, never()).deleteById(any());
     }
 
     @Test

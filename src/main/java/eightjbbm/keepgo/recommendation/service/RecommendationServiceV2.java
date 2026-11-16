@@ -313,18 +313,15 @@ public class RecommendationServiceV2 {
     }
 
     private RecommendCoursesResponseV2.SuccessData requireSuccess(RecommendCoursesResponseV2.Done response) {
-        var data = response.data();
-
-        if (data != null
-                && data.error() == null
-                && data.courses() != null
+        if (response.error() == null
+                && response.courses() != null
                 && ("recommend_success".equals(response.message())
                         || "recommend_not_found".equals(response.message()))) {
-            return data;
+            return new RecommendCoursesResponseV2.SuccessData(response.error(), response.courses());
         }
 
-        throw data != null && "recommend_failed".equals(response.message())
-                ? AiErrors.fromMessage(data.error())
+        throw "recommend_failed".equals(response.message())
+                ? AiErrors.fromMessage(response.error())
                 : new ServiceUnavailableException();
     }
 
