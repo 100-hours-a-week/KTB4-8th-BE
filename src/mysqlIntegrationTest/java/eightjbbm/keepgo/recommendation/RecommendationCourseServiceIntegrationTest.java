@@ -9,7 +9,7 @@ import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.service.RecommendationCourseService;
 import eightjbbm.keepgo.recommendation.service.RecommendationResultMapper;
-import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponse;
 import eightjbbm.keepgo.util.Coordinate;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -95,11 +95,11 @@ class RecommendationCourseServiceIntegrationTest {
                         120,
                         Set.of("place"),
                         null);
-        var data = new RecommendCoursesResponseV2.SuccessData(
+        var data = new RecommendCoursesResponse.SuccessData(
                 null,
-                List.of(new RecommendCoursesResponseV2.Course(
+                List.of(new RecommendCoursesResponse.Course(
                         "북촌 코스",
-                        List.of(new RecommendCoursesResponseV2.Place(
+                        List.of(new RecommendCoursesResponse.Place(
                                 String.valueOf(guide.getId()), "북촌한옥마을", 7, null, 30, "한옥 골목")),
                         60,
                         90)));

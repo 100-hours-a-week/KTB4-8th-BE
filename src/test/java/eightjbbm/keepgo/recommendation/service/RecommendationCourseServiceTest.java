@@ -15,7 +15,7 @@ import eightjbbm.keepgo.recommendation.outingcriteria.OutingCriteria;
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
-import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponse;
 import eightjbbm.keepgo.util.exception.ServiceUnavailableException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -81,7 +81,7 @@ class RecommendationCourseServiceTest {
         var second = guide(2L);
         when(guideRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(first, second));
         when(courseRepository.save(any(OutingCourse.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        var data = new RecommendCoursesResponseV2.SuccessData(
+        var data = new RecommendCoursesResponse.SuccessData(
                 null, List.of(course(places("1"), 30, 74), course(places("2"), 30, null)));
 
         var courses = service.saveCourses(criteria(), data);
@@ -108,22 +108,22 @@ class RecommendationCourseServiceTest {
         return OutingCriteria.emptyOutingCriteriaWithMemberId(1L);
     }
 
-    private RecommendCoursesResponseV2.SuccessData data(RecommendCoursesResponseV2.Course course) {
-        return new RecommendCoursesResponseV2.SuccessData(null, List.of(course));
+    private RecommendCoursesResponse.SuccessData data(RecommendCoursesResponse.Course course) {
+        return new RecommendCoursesResponse.SuccessData(null, List.of(course));
     }
 
-    private RecommendCoursesResponseV2.Course course(List<RecommendCoursesResponseV2.Place> places, int minutes) {
+    private RecommendCoursesResponse.Course course(List<RecommendCoursesResponse.Place> places, int minutes) {
         return course(places, minutes, 85);
     }
 
-    private RecommendCoursesResponseV2.Course course(
-            List<RecommendCoursesResponseV2.Place> places, int minutes, Integer matchScore) {
-        return new RecommendCoursesResponseV2.Course("코스", places, minutes, matchScore);
+    private RecommendCoursesResponse.Course course(
+            List<RecommendCoursesResponse.Place> places, int minutes, Integer matchScore) {
+        return new RecommendCoursesResponse.Course("코스", places, minutes, matchScore);
     }
 
-    private List<RecommendCoursesResponseV2.Place> places(String... placeIds) {
+    private List<RecommendCoursesResponse.Place> places(String... placeIds) {
         return Arrays.stream(placeIds)
-                .map(placeId -> new RecommendCoursesResponseV2.Place(placeId, "장소 " + placeId, 10, null, 30, null))
+                .map(placeId -> new RecommendCoursesResponse.Place(placeId, "장소 " + placeId, 10, null, 30, null))
                 .toList();
     }
 }

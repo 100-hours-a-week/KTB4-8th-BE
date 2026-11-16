@@ -591,20 +591,20 @@ origin : dict
 | 이벤트 | 본문 | BE 처리 |
 | --- | --- | --- |
 | `status` | `{"stage": String}` | `stage`를 값 그대로 FE에 전달한다. 알 수 없는 값도 막지 않는다. |
-| `done` | `{"message", "data": {"error", "courses"}}` | `message`로 결과를 판정한다. 코스는 여기서 한 번에 받는다. |
+| `done` | `{"message", "error", "courses"}` | `message`로 결과를 판정한다. 코스는 여기서 한 번에 받는다. |
 | `error` | `{"message": String}` | `llm_timeout`·`llm_rate_limited`·`llm_invalid_response`는 502(`AI_LLM_*`), 그 밖은 503으로 변환한다. |
 
 `done.message` 판정:
 
 | message | 결과 |
 | --- | --- |
-| `recommend_success`, `recommend_not_found` | 성공. `data.error`가 null이고 `data.courses`가 있어야 한다. |
+| `recommend_success`, `recommend_not_found` | 성공. `error`가 null이고 `courses`가 있어야 한다. |
 | `recommend_cancel_accepted` | 중단(`stopped`). |
-| `recommend_failed` | 실패. `data.error`가 `llm_*`이면 502, 아니면 503. |
-| 그 밖의 값, `data` 누락 | 실패(503). |
+| `recommend_failed` | 실패. `error`가 `llm_*`이면 502, 아니면 503. |
+| 그 밖의 값, 필수 `courses` 누락 또는 null | 실패(503). |
 
 - HTTP 200만으로 성공으로 보지 않는다.
-- `match_score`는 `data.courses[]` 각 코스에서 읽는다. 없으면 기본값 85를 쓴다. v2 탭의 `data.match_score`(전체 값)는 읽지 않는다.
+- `match_score`는 `courses[]` 각 코스에서 읽는다. 없으면 기본값 85를 쓴다. v2 탭의 `data.match_score`(전체 값)는 읽지 않는다.
 - 요청 `candidates[].place_id`는 정수다. 응답 `places[].place_id`는 정수 또는 숫자 문자열을 받아 정수로 해석한다.
 - `done`·`error` 없이 연결이 끊기면 실패로 처리하고 회원이 다시 요청할 수 있다.
 - 취소 시 BE가 AI 연결을 직접 닫는다. 아래 `/v1/recommend-courses/{request_id}/cancel`은 BE에서 호출하지 않는다(#370).
