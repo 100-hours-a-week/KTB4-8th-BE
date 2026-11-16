@@ -1,10 +1,13 @@
 spring:
   flyway:
-    enabled: false
+    enabled: true
     baseline-on-migrate: false
+    baseline-version: 10
     clean-disabled: true
+    validate-on-migrate: true
   sql:
     init:
+      mode: never
       schema-locations:
         - classpath:org/springframework/security/oauth2/client/oauth2-client-schema.sql
   application:
@@ -17,11 +20,13 @@ spring:
       port: ${REDIS_PORT:6379}
       timeout: 2s
   datasource:
-    url: jdbc:${DB_VENDOR:mysql}://${DB_HOST:172.25.96.1}:${DB_PORT:3306}/${DB_NAME:keepgo}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}
+    url: jdbc:${DB_VENDOR:mysql}://${DB_HOST:172.25.96.1}:${DB_PORT:3306}/${DB_NAME:keepgo}?serverTimezone=${DB_TIMEZONE:Asia/Seoul}&characterEncoding=UTF-8&connectionCollation=utf8mb4_0900_bin
     username: ${DB_USERNAME:keepgo}
     password: ${DB_PASSWORD:0000}
     driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
   jpa:
+    hibernate:
+      ddl-auto: validate
     open-in-view: false
     database-platform: org.hibernate.dialect.${DB_DIALECT:MySQL}Dialect
   security:
@@ -123,3 +128,12 @@ management:
 logging:
   level:
     root: ${LOGGING_LEVEL:INFO}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local | test
+  flyway:
+    enabled: false
+    baseline-on-migrate: false

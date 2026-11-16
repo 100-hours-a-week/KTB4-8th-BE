@@ -316,8 +316,8 @@ class MySqlMigrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("migration 프로필에서만 Flyway가 실행된다")
-    void onlyExplicitMigrationProfileAppliesMigrations() throws Exception {
+    @DisplayName("기본 실행은 Flyway와 검증을 활성화하고 명시적 비활성 설정은 DB를 변경하지 않는다")
+    void defaultEnablesMigrationsUnlessExplicitlyDisabled() throws Exception {
         var runner = new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
                 .withConfiguration(
@@ -328,7 +328,7 @@ class MySqlMigrationIntegrationTest {
                         "spring.datasource.username=" + username,
                         "spring.datasource.password=" + password);
 
-        runner.run(context -> {
+        runner.withPropertyValues("spring.flyway.enabled=false").run(context -> {
             assertThat(context.getStartupFailure()).isNull();
             assertThat(context.containsBean("flyway")).isFalse();
         });
@@ -342,13 +342,16 @@ class MySqlMigrationIntegrationTest {
             assertThat(result.getInt(1)).isEqualTo(0);
         }
 
-        runner.withPropertyValues("spring.profiles.active=migration").run(context -> {
+        runner.run(context -> {
             assertThat(context.getStartupFailure()).isNull();
             var migration = context.getBean(Flyway.class);
             assertThat(migration.info().current()).isNotNull();
             assertThat(migration.info().pending().length).isEqualTo(0);
             assertThat(migration.getConfiguration().isBaselineOnMigrate()).isFalse();
             assertThat(migration.getConfiguration().isCleanDisabled()).isTrue();
+            assertThat(migration.getConfiguration().isValidateOnMigrate()).isTrue();
+            assertThat(context.getEnvironment().getProperty("spring.sql.init.mode"))
+                    .isEqualTo("never");
             assertThat(context.getBean(MySqlMigrationPreflight.class)).isNotNull();
             assertThat(context.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"))
                     .isEqualTo("validate");
