@@ -115,10 +115,10 @@ public final class YoutubeStub implements YoutubeVideoProvider {
         }
     }
 
-    /// 필터를 통과하는 1분짜리 공개 업로드 영상을 만든다.
+    /// 필터를 통과하는 1분짜리 공개 처리 완료 영상을 만든다.
     public static Video video(String id) {
         VideoStatus status = new VideoStatus();
-        status.setUploadStatus("uploaded");
+        status.setUploadStatus("processed");
         status.setPrivacyStatus("public");
 
         VideoContentDetails contentDetails = new VideoContentDetails();

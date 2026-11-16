@@ -93,6 +93,130 @@ class YoutubeSyncIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("processed 영상 한 개를 동기화 대상으로 처리한다")
+    void processesOneProcessedVideo() throws Exception {
+        Video processed = video("processed-one");
+        processed.getStatus().setUploadStatus("processed");
+        YOUTUBE.addPage(List.of(processed));
+        Member member = newMember();
+
+        List<SseEvent> events = runToSuccess(token(member));
+        JsonNode success = data(events.getLast());
+        assertThat(success.get("video_fetched_count").asInt()).isEqualTo(1);
+        assertThat(success.get("video_target_count").asInt()).isEqualTo(1);
+        assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(1);
+        assertThat(success.get("video_failed_count").asInt()).isZero();
+        assertThat(wishlistCount(member)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("processed 영상 13개의 조회와 처리 수를 집계한다")
+    void processesThirteenProcessedVideos() throws Exception {
+        YOUTUBE.addPage(videos(ids(0, 13)));
+        Member member = newMember();
+        JsonNode success = data(runToSuccess(token(member)).getLast());
+        assertThat(success.get("video_fetched_count").asInt()).isEqualTo(13);
+        assertThat(success.get("video_target_count").asInt()).isEqualTo(13);
+        assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(13);
+        assertThat(success.get("video_failed_count").asInt()).isZero();
+        assertThat(wishlistCount(member)).isEqualTo(13);
+    }
+
+    @Test
+    @DisplayName("상태와 공개 여부 및 길이 조건을 지키고 중복 영상을 한 번만 처리한다")
+    void filtersAndDeduplicatesVideos() throws Exception {
+        Video uploaded = video("uploaded");
+        uploaded.getStatus().setUploadStatus("uploaded");
+        Video boundary = video("boundary");
+        boundary.getContentDetails().setDuration("PT3M");
+        List<Video> input = new ArrayList<>(List.of(uploaded, boundary, video("boundary")));
+        for (String status : List.of("failed", "rejected", "deleted", "unknown")) {
+            Video rejected = video(status);
+            rejected.getStatus().setUploadStatus(status);
+            input.add(rejected);
+        }
+        Video missingUploadStatus = video("missing-upload-status");
+        missingUploadStatus.getStatus().setUploadStatus(null);
+        input.add(missingUploadStatus);
+        for (String privacy : List.of("private", "unlisted")) {
+            Video rejected = video(privacy);
+            rejected.getStatus().setPrivacyStatus(privacy);
+            input.add(rejected);
+        }
+        Video longVideo = video("long");
+        longVideo.getContentDetails().setDuration("PT3M1S");
+        input.add(longVideo);
+        Video missingStatus = video("missing-status");
+        missingStatus.setStatus(null);
+        input.add(missingStatus);
+        Video missingDetails = video("missing-details");
+        missingDetails.setContentDetails(null);
+        input.add(missingDetails);
+        Video missingDuration = video("missing-duration");
+        missingDuration.getContentDetails().setDuration(null);
+        input.add(missingDuration);
+        YOUTUBE.addPage(input);
+        Member member = newMember();
+        JsonNode success = data(runToSuccess(token(member)).getLast());
+        assertThat(success.get("video_fetched_count").asInt()).isEqualTo(input.size());
+        assertThat(success.get("video_target_count").asInt()).isEqualTo(2);
+        assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(2);
+        assertThat(success.get("video_failed_count").asInt()).isZero();
+        assertThat(wishlistCount(member)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("대상이 없는 조회는 0개로 정상 완료된다")
+    void completesWithNoTargets() throws Exception {
+        YOUTUBE.addPage(List.of(privateVideo("private-only")));
+        Member member = newMember();
+        JsonNode success = data(runToSuccess(token(member)).getLast());
+        assertThat(success.get("video_fetched_count").asInt()).isEqualTo(1);
+        assertThat(success.get("video_target_count").asInt()).isZero();
+        assertThat(success.get("video_analyzed_count").asInt()).isZero();
+        assertThat(success.get("video_failed_count").asInt()).isZero();
+        assertThat(wishlistCount(member)).isZero();
+    }
+
+    @Test
+    @DisplayName("processed 영상의 공유 결과를 재사용하고 신규 영상만 분석한다")
+    void reusesProcessedResultsAndAnalyzesOnlyNewVideo() throws Exception {
+        AI_STUB.failAnalysisForVideo("not-found", 200, """
+                {"message":"analyze_success","data":{"results":[
+                  {"video_url":"https://youtube.com/shorts/not-found","status":"not_found","error":null}
+                ]}}
+                """);
+        YOUTUBE.addPage(videos("reused"));
+        runToSuccess(token(newMember()));
+        YOUTUBE.reset();
+        YOUTUBE.addPage(videos("not-found"));
+        runToSuccess(token(newMember()));
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT status FROM video_analysis WHERE video_id IN (?, ?) ORDER BY video_id",
+                        String.class,
+                        "not-found",
+                        "reused"))
+                .containsExactly("NOT_FOUND", "SUCCESS");
+        int previousRequests = AI_STUB.analysisRequestCount();
+        int previousBodies = AI_STUB.analysisRequestBodies().size();
+
+        YOUTUBE.reset();
+        YOUTUBE.addPage(videos("reused", "not-found", "new-video"));
+        Member second = newMember();
+        JsonNode success = data(runToSuccess(token(second)).getLast());
+        assertThat(success.get("video_fetched_count").asInt()).isEqualTo(3);
+        assertThat(success.get("video_target_count").asInt()).isEqualTo(3);
+        assertThat(success.get("video_analyzed_count").asInt()).isEqualTo(3);
+        assertThat(AI_STUB.analysisRequestCount()).isEqualTo(previousRequests + 1);
+        assertThat(AI_STUB.analysisRequestBodies()
+                        .subList(previousBodies, previousBodies + 1)
+                        .getFirst())
+                .contains("new-video")
+                .doesNotContain("reused", "not-found");
+        assertThat(wishlistCount(second)).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("YouTube 조회가 끝나기 전에 accepted를 받고 progress를 거쳐 success를 받는다")
     void streamsAcceptedProgressAndSuccess() throws Exception {
         YOUTUBE.addPage(videos("video-a", "video-b")).addPage(videos("video-c"));
