@@ -22,7 +22,7 @@ import eightjbbm.keepgo.recommendation.repository.CaffeineRecommendationJobStore
 import eightjbbm.keepgo.recommendation.repository.OutingCourseRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingGuideRepository;
 import eightjbbm.keepgo.recommendation.repository.OutingStopRepository;
-import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponseV2;
+import eightjbbm.keepgo.recommendation.service.dto.RecommendCoursesResponse;
 import eightjbbm.keepgo.util.Coordinate;
 import eightjbbm.keepgo.util.client.ai.gateway.AiCallProperties;
 import eightjbbm.keepgo.util.client.ai.sse.AiSseClient;
@@ -185,10 +185,12 @@ class RecommendationServiceV2Test {
         assertThat(response.getContentAsString()).contains("{\"stage\":\"retrieving\"}");
         assertThat(requestPath.get()).isEqualTo("/v3/recommend-course/stream");
         assertThat(requestBody.get()).contains("\"place_id\":1,");
-        var data = ArgumentCaptor.forClass(RecommendCoursesResponseV2.SuccessData.class);
+        var data = ArgumentCaptor.forClass(RecommendCoursesResponse.SuccessData.class);
         verify(courseService).saveCourses(any(), data.capture());
+        assertThat(data.getValue().error()).isNull();
         assertThat(data.getValue().courses().getFirst().matchScore()).isEqualTo(74);
-        var place = data.getValue().courses().getFirst().places().getFirst();
+        RecommendCoursesResponse.Place place =
+                data.getValue().courses().getFirst().places().getFirst();
         assertThat(place.placeId()).isEqualTo("1");
         assertThat(place.placeName()).isEqualTo("A");
         assertThat(place.travelMinutes()).isZero();
@@ -238,7 +240,7 @@ class RecommendationServiceV2Test {
         };
         assertThat(names(events(post("/api/v3/member/recommendation"), "recommendation.stopped")))
                 .endsWith("outing-course-recommendation.stopped");
-        var saved = ArgumentCaptor.forClass(RecommendCoursesResponseV2.SuccessData.class);
+        var saved = ArgumentCaptor.forClass(RecommendCoursesResponse.SuccessData.class);
         verify(courseService).saveCourses(any(), saved.capture());
         assertThat(saved.getValue().courses()).isEmpty();
         verify(criteriaRepository).deleteById(1L);
@@ -277,7 +279,8 @@ class RecommendationServiceV2Test {
                 stream(exchange);
                 write(exchange, "event: done\ndata: " + body + "\n\n");
             };
-            var response = events(post("/api/v3/member/recommendation"), "recommendation.service-unavailable");
+            MockHttpServletResponse response =
+                    events(post("/api/v3/member/recommendation"), "recommendation.service-unavailable");
             assertThat(names(response)).doesNotContain("outing-course-recommendation.success");
         }
         verify(courseService, never()).saveCourses(any(), any());
