@@ -7,11 +7,11 @@ import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.callback.Callback;
 import org.flywaydb.core.api.callback.Context;
 import org.flywaydb.core.api.callback.Event;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("migration")
+@ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class MySqlMigrationPreflight implements Callback {
     private static final Pattern VERSION = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+).*");
 

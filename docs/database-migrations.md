@@ -2,13 +2,13 @@
 
 #223의 범위는 검증 기반이다. 운영 DB 접속·정정·baseline·migration은 이 작업에서 수행하지 않는다. Guide 중복 정리와 이름·주소의 전역 NOT NULL/유일성 적용은 개발 DB에서 V8로 수행하고, 운영 적용은 #309에서 한다.
 
-## 기본 실행과 opt-in 프로필
+## 기본 실행과 검증 프로필
 
-기본 Flyway는 꺼져 있다. 새 baseline을 추가했다는 이유만으로 기존 애플리케이션이 DB를 변경하지 않게 한다. `baseline-on-migrate: false`, `clean-disabled: true`를 사용한다. 기존 local/test 프로필의 Hibernate 생성 동작은 유지하며 이 프로필을 운영 DB에 사용하지 않는다.
+기본 실행은 Flyway migrate 후 Hibernate validate를 수행하고 Spring SQL 초기화는 실행하지 않는다. baseline-version은 10이지만 자동 baseline은 하지 않으므로, 기존 운영 DB는 V10까지의 정정과 명시적 baseline 10 기록을 완료한 뒤 이 버전을 배포한다. `baseline-on-migrate: false`, `clean-disabled: true`를 사용한다. 기존 local/test 프로필의 Hibernate 생성 동작은 유지하며 이 프로필을 운영 DB에 사용하지 않는다.
 
-`migration` 프로필은 Flyway를 켜고 Hibernate를 `validate`, Spring SQL 초기화를 `never`로 설정한다. 명시적인 `DB_HOST`, `DB_NAME`을 요구하며 연결은 utf8mb4/utf8mb4_0900_bin을 사용한다. local/test 프로필과 조합하지 않는다. 환경 변수 등 상위 우선순위 설정으로 `ddl-auto`나 Flyway 안전 설정을 덮어쓰지 않았는지 배포 설정도 확인한다.
+`migration` 프로필은 기본 실행과 동일한 Flyway·Hibernate 검증 설정을 제공한다. 명시적인 `DB_HOST`, `DB_NAME`을 요구하며 연결은 utf8mb4/utf8mb4_0900_bin을 사용한다. local/test 프로필과 조합하지 않는다. 환경 변수 등 상위 우선순위 설정으로 `ddl-auto`나 Flyway 안전 설정을 덮어쓰지 않았는지 배포 설정도 확인한다.
 
-이 프로필의 MySqlMigrationPreflight는 baseline/migrate 전에 다음을 검사한다.
+Flyway 활성화 시 MySqlMigrationPreflight는 baseline/migrate 전에 다음을 검사한다.
 
 - MySQL 8.0.17 이상이며 MariaDB가 아니다.
 - client/connection이 utf8mb4다. results는 utf8mb4 또는 서버 측 변환을 하지 않는 NULL이다.
@@ -52,7 +52,7 @@ CI와 동일하게 `MYSQL_TEST_SERVER_URL` 환경 변수를 사용해도 된다.
 1. 빈 DB를 Flyway로 만들고 모든 현재 엔티티를 Hibernate `validate`로 확인한다. Hibernate로 테스트 스키마를 생성하지 않는다. 한국어·보조 평면 문자 왕복도 확인한다.
 2. Flyway 이력이 없는 기존 스키마 fixture와 알려진 행·매핑·삭제 이력·시퀀스 값에 대해 자동 migrate가 거부되는 것을 확인한다. 명시적 baseline 뒤 테스트 전용 V2가 nullable 컬럼을 추가하며 기존 데이터를 보존하는지 확인한다.
 3. latin1 연결은 migration 전에 거부되는지 확인한다.
-4. 실제 Spring Boot 설정으로 기본 실행은 DB를 변경하지 않고 migration 프로필에서만 Flyway가 실행되며 안전 설정과 validate가 적용되는지 확인한다.
+4. 실제 Spring Boot 설정으로 기본 실행에서 Flyway와 안전 설정 및 validate가 적용되고, 명시적 비활성 설정에서는 DB가 변경되지 않는지 확인한다.
 
 테스트 V2와 legacy 데이터는 mysqlIntegrationTest 리소스에만 있다. 애플리케이션 배포물에 포함되지 않는다. fixture의 스키마는 고정된 V1 snapshot을 SQL로 직접 로드해 Flyway history가 없는 상태를 재현한다. 이것이 실제 운영 스키마와 일치한다는 뜻은 아니다.
 
@@ -84,6 +84,19 @@ GitHub의 브랜치 보호/ruleset에서도 `MySQL migrations`를 필수 검사�
 - `type`이 소문자 `event`·`place`가 아닌 행이 있으면 collation 변경 뒤 CHECK가 가드 이후에 실패할 수 있다. 사전 보고서의 마지막 조회가 비어 있어야 한다.
 
 ## 기존 DB의 스키마 비교와 baseline 절차
+
+### V10까지 수동 적용한 운영 DB의 전환
+
+이 절차는 V1~V10의 변경을 이미 수동 반영한 DB에만 사용한다. #395의 `V10__oauth_authorization_request.sql`이 포함된 배포 커밋을 기준으로 비교한다. V8 등 미적용 변경이 남아 있으면 baseline 10을 기록하지 않는다.
+
+1. 쓰기를 중단하고 백업을 확보한다. `video_analysis.status`를 포함한 실제 DDL과 데이터, 시퀀스 할당 상태를 보관한다. enum의 목표 값은 `FAILED`, `IN_PROGRESS`, `NOT_FOUND`, `SUCCESS`이며 기존 NULL 허용 여부와 기본값은 확인 후 보존한다.
+2. enum과 V9를 정정하고 V8의 데이터·참조·벡터 정합성을 확인한다. 별도 빈 DB에 같은 배포 커밋의 V1~V10을 적용한 결과와 운영 DB의 컬럼·생성 컬럼·인덱스·FK·collation을 비교한다. V10의 OAuth 테이블도 확인한다. Hibernate validate만으로 비교를 대신하지 않는다.
+3. 이 버전의 애플리케이션을 기동하지 않은 채, 동일한 Flyway 버전과 전용 계정으로 명시적 baseline을 실행한다. CLI 예시는 `flyway -baselineVersion=10 baseline`이다. 연결 정보는 별도 보안 설정으로 공급한다. history가 실제로 비어 있는지 확인하며, 빈 테이블이라는 이유만으로 삭제할 필요는 없다. 실패하면 원인을 확인하고 임의 삭제·repair로 우회하지 않는다.
+4. `flyway_schema_history`에 `type='BASELINE'`, `version='10'`, `success=1`인 행이 기록됐는지 확인한다. `baselineVersion` 설정만 바꾸는 것은 baseline 실행이 아니다. `baseline-on-migrate`는 false로 유지한다.
+5. 기본 실행에서 Flyway 활성화, SQL 초기화 비활성화, `ddl-auto: validate`가 함께 적용된다. `migration` 프로필 추가는 필수가 아니다. local/test 프로필과 조합하지 않고, 인프라의 상위 우선순위 설정이 이를 덮어쓰지 않는지 확인한다. `BASELINE_VERSION` 같은 사용자 정의 env는 실제 설정 연결을 확인하며 이것만으로 baseline이 생성된다고 가정하지 않는다.
+6. 기동 시 V1~V10이 다시 실행되지 않고 V11 이후의 미적용 migration만 실행되는지 확인한다. 분석 요청의 저장·완료와 OAuth 로그인을 검증한 뒤 쓰기를 재개한다. 후속 migration은 복제 DB에서 먼저 검증한다.
+
+이 전환은 운영 스키마를 자동 정정하거나 자동 baseline하지 않는다. 아래 version 1 절차는 실제 DB가 V1 상태일 때 사용하는 별도 경로다.
 
 다음은 #234·#237에서 검증할 운영 절차이며 자동 실행 스크립트가 아니다.
 
